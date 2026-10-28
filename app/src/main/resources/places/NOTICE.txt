@@ -1,0 +1,33 @@
+Place names and boundaries bundled with Butterfly Atlas (places-2026-10-16.json and .bin)
+
+Built by the developer tool place-importer from these sources:
+
+1. geoBoundaries gbOpen, India ADM2 (districts), release of 2023-12-12
+   https://github.com/wmgeolab/geoBoundaries/raw/9469f09592ced973a3448cf66b6100b741b64c0d/releaseData/gbOpen/IND/ADM2/geoBoundaries-IND-ADM2.geojson
+   Runfola, D. et al. (2020) geoBoundaries: A global database of political administrative
+   boundaries. PLoS ONE 15(4): e0231866. https://www.geoboundaries.org
+   Upstream: Pathways Data Pvt. Ltd. (geonode.pathwaysdata.com), lgdirectory.gov.in.
+   Licence: Open Data Commons Open Database License (ODbL) 1.0,
+   https://opendatacommons.org/licenses/odbl/1-0/
+   The boundaries and the place list in these files are a Derived Database of it and are made
+   available under the ODbL 1.0.
+
+2. geoBoundaries gbOpen, India ADM1 (states and union territories), release of 2023-12-12
+   https://github.com/wmgeolab/geoBoundaries/raw/9469f09592ced973a3448cf66b6100b741b64c0d/releaseData/gbOpen/IND/ADM1/geoBoundaries-IND-ADM1.geojson
+   Upstream: DataMeet India community (https://github.com/datameet/maps), Election
+   Commission of India. Licence: Creative Commons Attribution 2.5 India (CC BY 2.5 IN),
+   https://creativecommons.org/licenses/by/2.5/in/
+
+3. Natural Earth v5.1.2, 1:10m Admin 0 countries (India's point of view) and Admin 1 states and
+   provinces. Made with Natural Earth. Free vector and raster map data @ naturalearthdata.com.
+   Public domain. https://www.naturalearthdata.com
+
+4. Local Government Directory (LGD), Ministry of Panchayati Raj, Government of India
+   (https://lgdirectory.gov.in): district names and LGD codes, from the list districts.12Oct2026.csv
+   (SHA-256 ff37eb5ac4fdfad369ef792b13410fff635294f50104b1061fc94b5800be4b2b). Indian district names follow the LGD spelling where a
+   boundary matches an LGD district; the boundary's own spelling is kept as an alias.
+
+Changes: borders noded into one coverage on a 1e-5 degree grid and simplified (about 100 m in
+India, about 1 km elsewhere); disputed areas follow India's official view (Natural Earth's
+India point of view); Indian states and districts clipped to India's outline; areas of India
+that geoBoundaries gives no district are areas of their state.

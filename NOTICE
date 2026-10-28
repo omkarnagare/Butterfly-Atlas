@@ -1,0 +1,8 @@
+Butterfly Atlas
+Copyright 2026 We are Naturalists
+
+Butterfly Atlas is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The bundled taxonomy data (iNaturalist) and place data (geoBoundaries, Natural Earth, Local Government Directory)
+are NOT covered by the Apache License: they stay under the terms and licences of their sources. The third-party
+libraries and fonts keep their own licences. All of them are listed, with their licences, in THIRD_PARTY_NOTICES.txt.

@@ -1,0 +1,10 @@
+* text=auto
+mvnw text eol=lf
+*.sh text eol=lf
+*.cmd text eol=crlf
+# Taxonomy bundles are checked against bundles.sha256: keep their exact bytes on every OS.
+app/src/main/resources/taxonomy/** -text
+# Place data is checked against places.sha256 the same way.
+app/src/main/resources/places/** -text
+# Migrations keep LF on every OS: the SQL text SQLite stores for each table and index is then the same everywhere.
+app/src/main/resources/db/migration/*.sql text eol=lf

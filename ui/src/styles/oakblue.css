@@ -1,0 +1,28 @@
+/* OAKBLUE-RIG-CSS-START */
+.oak{display:inline-block;position:relative;aspect-ratio:200/160;perspective:700px;vertical-align:middle}
+.oak svg{position:absolute;inset:0;width:100%;height:100%;display:block;overflow:visible}
+.oak .scene{position:absolute;inset:0;transform-style:preserve-3d;transform:rotateX(-24deg) rotateY(-14deg)}
+.oak .wg{position:absolute;inset:0;transform-style:preserve-3d;transform-origin:50% 68.75%;transform:translateZ(var(--z))}
+.oak .near.f{--z:3px}.oak .near.h{--z:2px}.oak .far.f{--z:-2px}.oak .far.h{--z:-3px}
+.oak .face{backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.oak .face.back{transform:rotateY(180deg)}
+.oak .sheen{opacity:.35}
+.oak.rest .scene{transform:none}
+.oak.perch .near{animation:oakPN 6.5s ease-in-out infinite}
+.oak.perch .far{animation:oakPF 6.5s ease-in-out infinite}
+.oak.perch .h{animation-delay:.08s}
+.oak.perch .sheen{animation:oakPS 6.5s ease-in-out infinite}
+@keyframes oakPN{0%,22%{transform:translateZ(var(--z)) rotateX(0)}38%,62%{transform:translateZ(var(--z)) rotateX(-80deg)}78%{transform:translateZ(var(--z)) rotateX(0)}84%{transform:translateZ(var(--z)) rotateX(-16deg)}89%,100%{transform:translateZ(var(--z)) rotateX(0)}}
+@keyframes oakPF{0%,22%{transform:translateZ(var(--z)) rotateX(0)}38%,62%{transform:translateZ(var(--z)) rotateX(80deg)}78%{transform:translateZ(var(--z)) rotateX(0)}84%{transform:translateZ(var(--z)) rotateX(16deg)}89%,100%{transform:translateZ(var(--z)) rotateX(0)}}
+@keyframes oakPS{0%,26%{opacity:.2}44%{opacity:.95}53%{opacity:.45}62%{opacity:.85}78%,100%{opacity:.2}}
+.oak.fly .near{animation:oakFN .36s ease-in-out infinite}
+.oak.fly .far{animation:oakFF .36s ease-in-out infinite}
+.oak.fly .h{animation-delay:.035s}
+.oak.fly .sheen{animation:oakFS .36s ease-in-out infinite}
+.oak.fly .scene{animation:oakFB .36s ease-in-out infinite}
+@keyframes oakFN{0%,100%{transform:translateZ(var(--z)) rotateX(-4deg)}50%{transform:translateZ(var(--z)) rotateX(-96deg)}}
+@keyframes oakFF{0%,100%{transform:translateZ(var(--z)) rotateX(4deg)}50%{transform:translateZ(var(--z)) rotateX(96deg)}}
+@keyframes oakFS{0%,100%{opacity:.2}50%{opacity:.9}}
+@keyframes oakFB{0%,100%{transform:rotateX(-24deg) rotateY(-14deg) translateY(0)}50%{transform:rotateX(-24deg) rotateY(-14deg) translateY(-6%)}}
+@media (prefers-reduced-motion: reduce){.oak *{animation:none!important}}
+/* OAKBLUE-RIG-CSS-END */

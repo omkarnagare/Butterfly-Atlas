@@ -1,0 +1,27 @@
+{
+  "format": 1,
+  "version": "2026-01-01",
+  "basedOn": null,
+  "generatedAt": "2026-01-01T00:00:00Z",
+  "ranks": ["family", "subfamily", "tribe", "genus", "species"],
+  "region": {"name": "India", "inatPlaceId": 6681},
+  "group": {"key": "butterflies", "name": "Butterflies", "inatTaxonId": 47224},
+  "source": {"name": "iNaturalist", "url": "https://www.inaturalist.org", "quality": "verifiable", "note": "Test fixture."},
+  "taxa": [
+    {"id": "A1", "parent": null, "rank": "family", "name": "Nymphalidae", "common": "Brush-footed Butterflies", "inatId": 1001, "synonyms": []},
+    {"id": "A9", "parent": null, "rank": "family", "name": "Papilionidae", "common": "Swallowtails", "inatId": 1009, "synonyms": []},
+    {"id": "A2", "parent": "A1", "rank": "subfamily", "name": "Danainae", "common": "Milkweed Butterflies", "inatId": 1002, "synonyms": []},
+    {"id": "A10", "parent": "A9", "rank": "subfamily", "name": "Papilioninae", "inatId": 1010, "synonyms": []},
+    {"id": "A3", "parent": "A2", "rank": "tribe", "name": "Danaini", "inatId": 1003, "synonyms": []},
+    {"id": "A4", "parent": "A3", "rank": "genus", "name": "Danaus", "common": "Tigers", "inatId": 1004, "synonyms": []},
+    {"id": "A7", "parent": "A3", "rank": "genus", "name": "Tirumala", "inatId": 1007, "synonyms": []},
+    {"id": "A11", "parent": "A10", "rank": "genus", "name": "Papilio", "common": "Swallowtails", "inatId": 1011, "synonyms": []},
+    {"id": "A5", "parent": "A4", "rank": "species", "name": "Danaus chrysippus", "common": "Plain Tiger", "inatId": 1005, "synonyms": ["Limnas klugii"]},
+    {"id": "A6", "parent": "A4", "rank": "species", "name": "Danaus genutia", "common": "Striped Tiger", "inatId": 1006, "synonyms": ["Salatura genutia"]},
+    {"id": "A8", "parent": "A7", "rank": "species", "name": "Tirumala limniace", "common": "Blue Tiger", "inatId": 1008, "synonyms": ["Danaus limniace"]},
+    {"id": "A12", "parent": "A11", "rank": "species", "name": "Papilio polytes", "common": "Common Mormon", "inatId": 1012, "synonyms": []},
+    {"id": "A13", "parent": "A11", "rank": "species", "name": "Papilio demoleus", "inatId": 1013, "synonyms": ["Princeps demoleus"]},
+    {"id": "A14", "parent": "A11", "rank": "species", "name": "Papilio clytia", "common": "Common Mime", "inatId": 1014, "synonyms": []}
+  ],
+  "changes": []
+}

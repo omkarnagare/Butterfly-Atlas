@@ -1,0 +1,128 @@
+# Every route Butterfly Atlas registers (AtlasServer.routes()), one per line: METHOD /path | group.
+# packaging/smoke/SmokeTest.java calls each of them against the built app and fails if one was never called;
+# SmokeRoutesTest (plain verify) fails when this list and the server's routes differ, so a new route cannot be forgotten.
+# The paths are as registered ({id} is a path parameter); the smoke test supplies real ids.
+
+GET /api/health | health
+
+GET /api/session | session
+GET /api/session/stream | session
+GET /launch | session
+POST /launch/new | session
+POST /api/window | session
+
+GET /api/setup | setup
+POST /api/setup | setup
+GET /api/setup/inspect | setup
+POST /api/setup/retry | setup
+
+GET /api/appearance | appearance
+PUT /api/appearance | appearance
+
+GET /api/search | taxonomy
+GET /api/summary | taxonomy
+GET /api/taxa/{id} | taxonomy
+GET /api/taxa/{id}/children | taxonomy
+PUT /api/taxa/{id}/cover | taxonomy
+GET /api/taxa/{id}/photos | taxonomy
+POST /api/taxa/{id}/photos | taxonomy
+DELETE /api/taxa/{id}/search-words | taxonomy
+POST /api/taxa/{id}/search-words | taxonomy
+GET /api/tree | taxonomy
+
+POST /api/custom-species | custom species
+GET /api/custom-species/check | custom species
+DELETE /api/custom-species/{id} | custom species
+PATCH /api/custom-species/{id} | custom species
+
+GET /api/custom-matches | taxonomy updates
+POST /api/custom-matches/{customId}/decline | taxonomy updates
+POST /api/custom-matches/{customId}/merge | taxonomy updates
+GET /api/splits | taxonomy updates
+GET /api/splits/{id} | taxonomy updates
+POST /api/splits/{id}/sort | taxonomy updates
+GET /api/update | taxonomy updates
+POST /api/update/apply | taxonomy updates
+POST /api/update/dismiss | taxonomy updates
+POST /api/update/later | taxonomy updates
+POST /api/update/retry | taxonomy updates
+
+GET /api/place-update | place updates
+POST /api/place-update/dismiss | place updates
+
+GET /api/deleted | photos
+POST /api/deleted/empty | photos
+POST /api/deleted/restore | photos
+POST /api/photos/delete | photos
+POST /api/photos/move | photos
+POST /api/photos/place | photos
+POST /api/photos/tags | photos
+PATCH /api/photos/{id} | photos
+GET /api/photos/{id}/display | photos
+GET /api/photos/{id}/original | photos
+GET /api/photos/{id}/thumb | photos
+
+GET /api/tags | tags
+POST /api/tags | tags
+DELETE /api/tags/{id} | tags
+PATCH /api/tags/{id} | tags
+
+POST /api/places | places
+GET /api/places/mine | places
+GET /api/places/recent | places
+GET /api/places/search | places
+DELETE /api/places/{id} | places
+PATCH /api/places/{id} | places
+
+GET /api/filter/count | filter
+GET /api/filter/photos | filter
+GET /api/filter/places | filter
+GET /api/filter/species | filter
+
+GET /api/fs/list | folders
+GET /api/fs/roots | folders
+
+GET /api/imports | imports
+POST /api/imports | imports
+DELETE /api/imports/{id} | imports
+GET /api/imports/{id} | imports
+POST /api/imports/{id}/accept-suggestions | imports
+POST /api/imports/{id}/assign | imports
+POST /api/imports/{id}/file | imports
+POST /api/imports/{id}/finish | imports
+GET /api/imports/{id}/items | imports
+GET /api/imports/{id}/items/{itemId}/display | imports
+GET /api/imports/{id}/items/{itemId}/preview | imports
+POST /api/imports/{id}/pause | imports
+POST /api/imports/{id}/place | imports
+PUT /api/imports/{id}/pairs | imports
+POST /api/imports/{id}/relocate | imports
+GET /api/imports/{id}/result | imports
+POST /api/imports/{id}/skip | imports
+POST /api/imports/{id}/tags | imports
+
+DELETE /api/exports | exports
+GET /api/exports | exports
+POST /api/exports | exports
+GET /api/exports/check | exports
+DELETE /api/exports/{id} | exports
+GET /api/exports/{id} | exports
+POST /api/exports/{id}/cancel | exports
+POST /api/exports/{id}/pause | exports
+POST /api/exports/{id}/resume | exports
+
+DELETE /api/backup | backup
+GET /api/backup | backup
+POST /api/backup | backup
+GET /api/backup/check | backup
+PUT /api/backup/preference | backup
+DELETE /api/backup/{id} | backup
+GET /api/backup/{id} | backup
+POST /api/backup/{id}/cancel | backup
+POST /api/backup/{id}/pause | backup
+POST /api/backup/{id}/resume | backup
+
+GET /api/status | status
+POST /api/rescan-left/dismiss | status
+
+POST /api/heic/check | heic

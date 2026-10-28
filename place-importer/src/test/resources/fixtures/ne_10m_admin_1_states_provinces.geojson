@@ -1,0 +1,8 @@
+{ "type": "FeatureCollection", "features": [
+  {"type": "Feature", "properties": {"adm1_code": "NPL-1", "adm0_a3": "NPL", "name": "Gandaki", "name_en": "Gandaki", "name_alt": "Gandaki Pradesh", "iso_3166_2": "NP-GA"}, "geometry": {"type": "Polygon", "coordinates": [[[80, 26.5], [84, 26.5], [84, 30.5], [80, 30.5], [80, 26.5]]]}},
+  {"type": "Feature", "properties": {"adm1_code": "NPL-2", "adm0_a3": "NPL", "name": "Bagmati", "name_en": "Bagmati", "name_alt": null, "iso_3166_2": "NP-BA"}, "geometry": {"type": "Polygon", "coordinates": [[[84, 26.5], [88, 26.5], [88, 30.5], [84, 30.5], [84, 26.5]]]}},
+  {"type": "Feature", "properties": {"adm1_code": "PAK-1113", "adm0_a3": "PAK", "name": "Punjab", "name_en": "Punjab", "name_alt": "Panjab|Penjab", "iso_3166_2": "PK-PB"}, "geometry": {"type": "Polygon", "coordinates": [[[60, 23], [68, 23], [68, 30], [60, 30], [60, 23]]]}},
+  {"type": "Feature", "properties": {"adm1_code": "PAK-1109", "adm0_a3": "PAK", "name": "Azad Kashmir", "name_en": "Azad Kashmir", "name_alt": null, "iso_3166_2": "PK-JK"}, "geometry": {"type": "Polygon", "coordinates": [[[60, 30], [75, 30], [75, 37], [60, 37], [60, 30]]]}},
+  {"type": "Feature", "properties": {"adm1_code": "NPL+99?", "adm0_a3": "NPL", "name": null, "name_en": null, "name_alt": null, "iso_3166_2": "-99"}, "geometry": {"type": "Polygon", "coordinates": [[[87.5, 30], [88, 30], [88, 30.5], [87.5, 30.5], [87.5, 30]]]}},
+  {"type": "Feature", "properties": {"adm1_code": "KAS-1", "adm0_a3": "KAS", "name": "Siachen Glacier", "name_en": "Siachen Glacier", "name_alt": null, "iso_3166_2": "-99"}, "geometry": {"type": "Polygon", "coordinates": [[[76, 35], [77, 35], [77, 36], [76, 36], [76, 35]]]}}
+] }

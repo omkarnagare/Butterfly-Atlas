@@ -1,0 +1,7 @@
+{ "type": "FeatureCollection", "features": [
+  {"type": "Feature", "properties": {"shapeName": "Ladākh", "shapeISO": "IN-LA", "shapeID": "ADM1-LA", "shapeGroup": "IND", "shapeType": "ADM1"}, "geometry": {"type": "Polygon", "coordinates": [[[75, 32], [80, 32], [80, 37], [75, 37], [75, 32]]]}},
+  {"type": "Feature", "properties": {"shapeName": "Jammu and Kashmīr", "shapeISO": "IN-JK", "shapeID": "ADM1-JK", "shapeGroup": "IND", "shapeType": "ADM1"}, "geometry": {"type": "Polygon", "coordinates": [[[72, 32], [75, 32], [75, 37], [72, 37], [72, 32]]]}},
+  {"type": "Feature", "properties": {"shapeName": "Arunāchal Pradesh", "shapeISO": "IN-AR", "shapeID": "ADM1-AR", "shapeGroup": "IND", "shapeType": "ADM1"}, "geometry": {"type": "Polygon", "coordinates": [[[91, 26], [98, 26], [98, 30], [91, 30], [91, 26]]]}},
+  {"type": "Feature", "properties": {"shapeName": "Mahārāshtra", "shapeISO": "IN-MH", "shapeID": "ADM1-MH", "shapeGroup": "IND", "shapeType": "ADM1"}, "geometry": {"type": "Polygon", "coordinates": [[[72, 16], [80, 16], [80, 22], [72, 22], [72, 16]]]}},
+  {"type": "Feature", "properties": {"shapeName": "Goa", "shapeISO": "IN-GA", "shapeID": "ADM1-GA", "shapeGroup": "IND", "shapeType": "ADM1"}, "geometry": {"type": "Polygon", "coordinates": [[[73.9046, 14.8], [75, 14.8], [75, 15.8], [73.9046, 15.8], [73.9046, 14.8]]]}}
+] }

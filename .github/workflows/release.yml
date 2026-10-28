@@ -1,0 +1,135 @@
+name: Release
+
+# Runs only when started by hand (Actions tab -> Release -> Run workflow, or
+# `gh workflow run release.yml --ref <branch-or-tag> -f version=1.0.0`). It builds the installers on Windows, Linux and
+# macOS and ends with a DRAFT GitHub Release holding the installers. You publish the draft by hand. Nothing here runs on
+# push or pull request: a release is always the owner's decision.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, digits only (must equal the version in the root pom.xml), e.g. 1.0.0'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Package (${{ matrix.label }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: windows
+          # the oldest Ubuntu LTS runner GitHub still offers (glibc 2.35): the .deb and .rpm then run on Ubuntu 22.04+, Debian 12+,
+          # Fedora 36+ and anything newer, and refuse to install on older systems (the README says so)
+          - os: ubuntu-22.04
+            label: linux
+          # Apple Silicon only: macos-latest is arm64, so the runtime and launcher in the .dmg are arm64 and it does not run on an
+          # Intel Mac (those users build from source, see the README)
+          - os: macos-latest
+            label: macos
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the version
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          # the digits-and-dots check comes first: the value is only ever used as a quoted shell variable, never pasted into the script
+          case "$VERSION" in
+            *[!0-9.]*|"") echo "::error::The version must be digits and dots only."; exit 1;;
+          esac
+          pom_version=$(sed -n 's:.*<version>\(.*\)</version>.*:\1:p' pom.xml | head -1)
+          echo "pom.xml says $pom_version; asked for $VERSION"
+          if [ "$pom_version" != "$VERSION" ]; then
+            echo "::error::The version asked for ($VERSION) is not the one in pom.xml ($pom_version). Change pom.xml first."
+            exit 1
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Cache downloaded Node
+        uses: actions/cache@v4
+        with:
+          path: ui/target/node
+          key: node-${{ runner.os }}-${{ hashFiles('pom.xml') }}
+
+      - name: Cache npm packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('ui/package-lock.json') }}
+
+      # Windows: the .exe is made by Inno Setup 6.7 or later, which GitHub's Windows images already have (6.7.1); the package
+      # step finds it by itself (PATH, then the Inno Setup 6/7 folders) and stops with a plain message if it is gone.
+
+      # jpackage needs fakeroot and dpkg-dev for the .deb and rpm-build for the .rpm
+      - name: Install fakeroot, dpkg-dev and rpm (Linux)
+        if: matrix.label == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fakeroot dpkg-dev rpm
+
+      # macOS: the Xcode command line tools (hdiutil, codesign, sips) are on the runner already
+
+      # Builds the app, the trimmed runtime and the application image, runs the smoke test
+      # on that image (it fails the build and names the step), and only then builds the installers.
+      - name: Package and smoke-test
+        shell: bash
+        run: ./mvnw -B -ntp -Ppackage -pl packaging -am verify
+
+      - name: Upload the installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.label }}
+          path: packaging/target/dist/*
+          if-no-files-found: error
+          retention-days: 30
+
+  draft-release:
+    name: Draft GitHub Release
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download the installers
+        uses: actions/download-artifact@v4
+        with:
+          pattern: installers-*
+          path: dist
+          merge-multiple: true
+
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          ls -l dist
+          args=()
+          for file in dist/*; do
+            case "$file" in
+              *.dmg) label="macOS, Apple Silicon only (unsigned, expect a Gatekeeper warning)";;
+              *.exe) label="Windows (unsigned, expect a SmartScreen warning)";;
+              *.deb) label="Linux .deb (Debian, Ubuntu)";;
+              *.rpm) label="Linux .rpm (Fedora, openSUSE)";;
+              *) label="$(basename "$file")";;
+            esac
+            args+=("$file#$label")
+          done
+          gh release create "v$VERSION" "${args[@]}" \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --draft \
+            --title "Butterfly Atlas $VERSION" \
+            --notes "Butterfly Atlas $VERSION. Installers are not signed: Windows shows a SmartScreen warning, macOS a Gatekeeper warning. The macOS installer is for Apple Silicon Macs only; on an Intel Mac, build from source (see the README). See the README, Installing, for the steps. Quit the app before installing a newer version."

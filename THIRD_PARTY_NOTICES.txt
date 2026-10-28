@@ -1,0 +1,589 @@
+Butterfly Atlas: third-party notices
+====================================
+
+Butterfly Atlas itself is Copyright 2026 We are Naturalists and licensed under the Apache License 2.0 (see LICENSE and
+NOTICE). This file lists the data and software it includes that belong to others, with their licences. They keep their
+own licences; nothing in LICENSE limits what those licences give you. Butterfly Atlas never goes online: none of this is
+fetched at run time.
+
+1. DATA
+-------
+
+1.1 Taxonomy (the butterfly list of India)
+    Names, common names, ranks and the family tree come from iNaturalist (https://www.inaturalist.org): the species list
+    is built from verifiable iNaturalist observations in India and its taxon data, by the developer's taxonomy-importer
+    tool, and shipped as the plain, checksum-verified file taxonomy/taxonomy-india-YYYY-MM-DD.json inside the app. The
+    data is not obfuscated, encrypted or hidden. No iNaturalist photographs are included.
+
+    What the file holds: scientific names, common names, ranks, iNaturalist taxon numbers and synonyms, and the fact
+    that a species has verifiable observations in India (the data was retrieved on 2026-10-08). It holds no photographs,
+    no observation records, no observer names and no coordinates.
+
+    iNaturalist's Terms of Use (https://www.inaturalist.org/pages/terms) say that content its users contribute is, unless
+    the contributor chooses otherwise, licensed under Creative Commons Attribution-NonCommercial (CC BY-NC); each
+    observation, photograph and sound carries its own licence. None of that content is included here. iNaturalist's
+    published terms do not state a separate licence for taxon names or taxonomy data, and common names were contributed by
+    its users. The data was retrieved through iNaturalist's public API under its Terms of Service and is credited here.
+    Butterfly Atlas is not endorsed by iNaturalist. This data is not covered by Butterfly Atlas's Apache License.
+
+1.2 Place names and boundaries
+    Place names and boundaries bundled with Butterfly Atlas (places-2026-10-16.json and .bin)
+    
+    Built by the developer tool place-importer from these sources:
+    
+    1. geoBoundaries gbOpen, India ADM2 (districts), release of 2023-12-12
+       https://github.com/wmgeolab/geoBoundaries/raw/9469f09592ced973a3448cf66b6100b741b64c0d/releaseData/gbOpen/IND/ADM2/geoBoundaries-IND-ADM2.geojson
+       Runfola, D. et al. (2020) geoBoundaries: A global database of political administrative
+       boundaries. PLoS ONE 15(4): e0231866. https://www.geoboundaries.org
+       Upstream: Pathways Data Pvt. Ltd. (geonode.pathwaysdata.com), lgdirectory.gov.in.
+       Licence: Open Data Commons Open Database License (ODbL) 1.0,
+       https://opendatacommons.org/licenses/odbl/1-0/
+       The boundaries and the place list in these files are a Derived Database of it and are made
+       available under the ODbL 1.0.
+    
+    2. geoBoundaries gbOpen, India ADM1 (states and union territories), release of 2023-12-12
+       https://github.com/wmgeolab/geoBoundaries/raw/9469f09592ced973a3448cf66b6100b741b64c0d/releaseData/gbOpen/IND/ADM1/geoBoundaries-IND-ADM1.geojson
+       Upstream: DataMeet India community (https://github.com/datameet/maps), Election
+       Commission of India. Licence: Creative Commons Attribution 2.5 India (CC BY 2.5 IN),
+       https://creativecommons.org/licenses/by/2.5/in/
+    
+    3. Natural Earth v5.1.2, 1:10m Admin 0 countries (India's point of view) and Admin 1 states and
+       provinces. Made with Natural Earth. Free vector and raster map data @ naturalearthdata.com.
+       Public domain. https://www.naturalearthdata.com
+    
+    4. Local Government Directory (LGD), Ministry of Panchayati Raj, Government of India
+       (https://lgdirectory.gov.in): district names and LGD codes, from the list districts.12Oct2026.csv
+       (SHA-256 ff37eb5ac4fdfad369ef792b13410fff635294f50104b1061fc94b5800be4b2b). Indian district names follow the LGD spelling where a
+       boundary matches an LGD district; the boundary's own spelling is kept as an alias.
+    
+    Changes: borders noded into one coverage on a 1e-5 degree grid and simplified (about 100 m in
+    India, about 1 km elsewhere); disputed areas follow India's official view (Natural Earth's
+    India point of view); Indian states and districts clipped to India's outline; areas of India
+    that geoBoundaries gives no district are areas of their state.
+
+2. SOFTWARE BUNDLED IN THE APP
+------------------------------
+
+Licences are as published by each project for the version shipped; "Apache-2.0" is the Apache License, Version 2.0
+(https://www.apache.org/licenses/LICENSE-2.0), "BSD-3-Clause" https://opensource.org/license/bsd-3-clause, "MIT"
+https://opensource.org/license/mit, "ISC" https://opensource.org/license/isc-license-txt, "OFL-1.1" the SIL Open Font
+License 1.1 (https://openfontlicense.org), "EPL-2.0" the Eclipse Public License 2.0 (https://www.eclipse.org/legal/epl-2.0/).
+
+Java runtime
+  OpenJDK (the trimmed runtime inside the app)  GPL-2.0 with the Classpath Exception  https://openjdk.org/legal/gplv2+ce.html
+
+Windows installer
+  Inno Setup 6.7 or later (the Windows installer, and its uninstaller unins000.exe in the app folder)
+                                                  Inno Setup License   https://jrsoftware.org/files/is/license.txt
+
+Web server and HTTP
+  Javalin 6.6.0                                  Apache-2.0   https://javalin.io
+  Eclipse Jetty 11.0.25 (server, http, io, util, security, servlet, webapp, xml, websocket-*)
+                                                  Apache-2.0 or EPL-2.0   https://jetty.org
+  Jetty's Jakarta Servlet API 5.0.2              EPL-2.0 (with GPL-2.0 Classpath Exception)  https://jakarta.ee
+  Kotlin standard library 1.9.25 (stdlib, jdk7, jdk8)   Apache-2.0   https://kotlinlang.org
+  JetBrains annotations 13.0                     Apache-2.0   https://github.com/JetBrains/java-annotations
+
+JSON and logging
+  Jackson 2.19.0 (core, annotations, databind)   Apache-2.0   https://github.com/FasterXML/jackson
+  FastDoubleParser (inside jackson-core)         MIT          https://github.com/wrandelshofer/FastDoubleParser
+  SLF4J 2.0.17 (api, simple)                     MIT          https://www.slf4j.org
+
+Database
+  SQLite JDBC 3.50.3.0 (Xerial)                  Apache-2.0   https://github.com/xerial/sqlite-jdbc
+  SQLite (inside the JDBC driver)                Public domain  https://www.sqlite.org/copyright.html
+  Zentus SQLite JDBC code (inside the driver)    BSD-2-Clause (text in section 6)
+  Flyway Community 11.13.2                       Apache-2.0   https://flywaydb.org
+
+Photos and metadata
+  TwelveMonkeys ImageIO 3.15.2 (core, metadata, jpeg, tiff, webp, common-lang, common-io, common-image)
+                                                  BSD-3-Clause   https://github.com/haraldk/TwelveMonkeys
+  metadata-extractor 2.21.0 (Drew Noakes)        Apache-2.0   https://github.com/drewnoakes/metadata-extractor
+  Adobe XMP Core 6.1.11                          BSD-3-Clause   https://github.com/drewnoakes/xmp-java
+  Apache Commons Imaging 1.0.0-alpha6            Apache-2.0   https://commons.apache.org/proper/commons-imaging/
+  Apache Commons IO 2.19.0                       Apache-2.0   https://commons.apache.org/proper/commons-io/
+  Apache Commons Lang 3.17.0                     Apache-2.0   https://commons.apache.org/proper/commons-lang/
+
+3. SOFTWARE AND FONTS IN THE USER INTERFACE
+-------------------------------------------
+
+  Svelte 5 (compiled into the interface)         MIT          https://svelte.dev
+  d3-hierarchy 3, d3-interpolate 3, d3-color 3   ISC          https://d3js.org
+  Bricolage Grotesque, Figtree, Newsreader, IBM Plex Mono (fonts, through Fontsource)
+                                                  OFL-1.1      https://fontsource.org
+
+4. BUILD TOOLS (not part of what is installed)
+----------------------------------------------
+
+  jlink and jpackage from the JDK, Inno Setup's compiler (Windows), Maven, Node.js. They are used to build the
+  installers; none of their code is in the app apart from what the tools generate.
+
+5. HEIC PHOTOS: THE COMPUTER'S OWN DECODER (not included)
+---------------------------------------------------------
+
+  Butterfly Atlas includes no HEIC, HEIF or HEVC picture decoder. To show a HEIC photo it starts, as a separate
+  program, a decoder that the computer's vendor or the user provides: sips on macOS, Windows' own HEIF and HEVC
+  decoders on Windows (through Windows PowerShell), and heif-convert on Linux. Using that decoder is covered by the
+  licence of whoever provides it (the computer's vendor, or the user who installed it), not by Butterfly Atlas, which
+  grants no rights in it. Where a decoder is restricted by patents in a country, obtaining and using it lawfully is a
+  matter for the user and the decoder's supplier. Without a decoder, HEIC photos are still kept exactly as they are.
+
+  The app carries two tiny HEIC test pictures (about 800 bytes each, simple shapes drawn by Butterfly Atlas's own
+  code) that it asks the decoder to show, only to check that the decoder works and whether it turns pictures itself.
+  Photo details such as the date and GPS position are read from HEIC files by Butterfly Atlas's own code and
+  metadata-extractor (listed above); no picture is decoded for that.
+
+6. LICENCE TEXTS
+----------------
+
+The licences below ask that their text and copyright lines travel with the program; here they are, taken from the
+components themselves. The Apache License 2.0 is in LICENSE; the NOTICE texts of the Apache-licensed libraries that
+have one follow it. The Java runtime's own licences are in the runtime's legal folder inside the app.
+
+6.1 MIT License
+
+  SLF4J 2.0.17: Copyright (c) 2004-2022 QOS.ch Sarl (Switzerland). All rights reserved.
+  Svelte 5: Copyright (c) 2016-2025 Svelte Contributors (https://github.com/sveltejs/svelte/graphs/contributors)
+  FastDoubleParser (inside jackson-core): Copyright (c) 2023 Werner Randelshofer, Switzerland
+
+    Permission is hereby granted, free  of charge, to any person obtaining
+    a  copy  of this  software  and  associated  documentation files  (the
+    "Software"), to  deal in  the Software without  restriction, including
+    without limitation  the rights to  use, copy, modify,  merge, publish,
+    distribute,  sublicense, and/or sell  copies of  the Software,  and to
+    permit persons to whom the Software  is furnished to do so, subject to
+    the following conditions:
+
+    The  above  copyright  notice  and  this permission  notice  shall  be
+    included in all copies or substantial portions of the Software.
+
+    THE  SOFTWARE IS  PROVIDED  "AS  IS", WITHOUT  WARRANTY  OF ANY  KIND,
+    EXPRESS OR  IMPLIED, INCLUDING  BUT NOT LIMITED  TO THE  WARRANTIES OF
+    MERCHANTABILITY,    FITNESS    FOR    A   PARTICULAR    PURPOSE    AND
+    NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+    LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+    OF CONTRACT, TORT OR OTHERWISE,  ARISING FROM, OUT OF OR IN CONNECTION
+    WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+6.2 ISC License
+
+  d3-hierarchy 3.1.2 and d3-interpolate 3.0.1: Copyright 2010-2021 Mike Bostock
+  d3-color 3.1.0: Copyright 2010-2022 Mike Bostock
+
+    Permission to use, copy, modify, and/or distribute this software for any purpose
+    with or without fee is hereby granted, provided that the above copyright notice
+    and this permission notice appear in all copies.
+
+    THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+    REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+    FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+    INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
+    OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+    TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
+    THIS SOFTWARE.
+
+6.3 BSD-3-Clause: TwelveMonkeys ImageIO 3.15.2
+
+    BSD 3-Clause License
+
+    Copyright (c) 2008-2020, Harald Kuhr
+    All rights reserved.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice, this
+      list of conditions and the following disclaimer.
+
+    * Redistributions in binary form must reproduce the above copyright notice,
+      this list of conditions and the following disclaimer in the documentation
+      and/or other materials provided with the distribution.
+
+    * Neither the name of the copyright holder nor the names of its
+      contributors may be used to endorse or promote products derived from
+      this software without specific prior written permission.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+    AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+    IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+    DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+    FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+    DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+    SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+    CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+    OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+6.4 BSD-3-Clause: Adobe XMP Core 6.1.11 (the text Adobe publishes for its XMP Toolkit)
+
+    BSD 3-Clause License
+
+    Copyright (c) 2020, Adobe
+    All rights reserved.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are met:
+
+    1. Redistributions of source code must retain the above copyright notice, this
+       list of conditions and the following disclaimer.
+
+    2. Redistributions in binary form must reproduce the above copyright notice,
+       this list of conditions and the following disclaimer in the documentation
+       and/or other materials provided with the distribution.
+
+    3. Neither the name of the copyright holder nor the names of its
+       contributors may be used to endorse or promote products derived from
+       this software without specific prior written permission.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+    AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+    IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+    DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+    FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+    DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+    SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+    CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+    OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+6.5 Zentus SQLite JDBC code, inside SQLite JDBC 3.50.3.0
+
+    Copyright (c) 2006, David Crawshaw.  All rights reserved.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions
+    are met:
+
+    1. Redistributions of source code must retain the above copyright
+       notice, this list of conditions and the following disclaimer.
+    2. Redistributions in binary form must reproduce the above copyright
+       notice, this list of conditions and the following disclaimer in the
+       documentation and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+    ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+    IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+    ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+    FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+    DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+    OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+    HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+    LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+    OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+    SUCH DAMAGE.
+
+6.6 SIL Open Font License 1.1: the fonts
+
+  bricolage-grotesque: Copyright 2022 The Bricolage Grotesque Project Authors (https://github.com/ateliertriay/bricolage)
+  figtree: Copyright 2022 The Figtree Project Authors (https://github.com/erikdkennedy/figtree)
+  newsreader: Copyright 2020 The Newsreader Project Authors (http://github.com/productiontype/Newsreader)
+  ibm-plex-mono: Copyright 2017 IBM Corp. All rights reserved.
+
+    This Font Software is licensed under the SIL Open Font License, Version 1.1.
+    This license is copied below, and is also available with a FAQ at:
+    http://scripts.sil.org/OFL
+
+
+    -----------------------------------------------------------
+    SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+    -----------------------------------------------------------
+
+    PREAMBLE
+    The goals of the Open Font License (OFL) are to stimulate worldwide
+    development of collaborative font projects, to support the font creation
+    efforts of academic and linguistic communities, and to provide a free and
+    open framework in which fonts may be shared and improved in partnership
+    with others.
+
+    The OFL allows the licensed fonts to be used, studied, modified and
+    redistributed freely as long as they are not sold by themselves. The
+    fonts, including any derivative works, can be bundled, embedded,
+    redistributed and/or sold with any software provided that any reserved
+    names are not used by derivative works. The fonts and derivatives,
+    however, cannot be released under any other type of license. The
+    requirement for fonts to remain under this license does not apply
+    to any document created using the fonts or their derivatives.
+
+    DEFINITIONS
+    "Font Software" refers to the set of files released by the Copyright
+    Holder(s) under this license and clearly marked as such. This may
+    include source files, build scripts and documentation.
+
+    "Reserved Font Name" refers to any names specified as such after the
+    copyright statement(s).
+
+    "Original Version" refers to the collection of Font Software components as
+    distributed by the Copyright Holder(s).
+
+    "Modified Version" refers to any derivative made by adding to, deleting,
+    or substituting -- in part or in whole -- any of the components of the
+    Original Version, by changing formats or by porting the Font Software to a
+    new environment.
+
+    "Author" refers to any designer, engineer, programmer, technical
+    writer or other person who contributed to the Font Software.
+
+    PERMISSION & CONDITIONS
+    Permission is hereby granted, free of charge, to any person obtaining
+    a copy of the Font Software, to use, study, copy, merge, embed, modify,
+    redistribute, and sell modified and unmodified copies of the Font
+    Software, subject to the following conditions:
+
+    1) Neither the Font Software nor any of its individual components,
+    in Original or Modified Versions, may be sold by itself.
+
+    2) Original or Modified Versions of the Font Software may be bundled,
+    redistributed and/or sold with any software, provided that each copy
+    contains the above copyright notice and this license. These can be
+    included either as stand-alone text files, human-readable headers or
+    in the appropriate machine-readable metadata fields within text or
+    binary files as long as those fields can be easily viewed by the user.
+
+    3) No Modified Version of the Font Software may use the Reserved Font
+    Name(s) unless explicit written permission is granted by the corresponding
+    Copyright Holder. This restriction only applies to the primary font name as
+    presented to the users.
+
+    4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
+    Software shall not be used to promote, endorse or advertise any
+    Modified Version, except to acknowledge the contribution(s) of the
+    Copyright Holder(s) and the Author(s) or with their explicit written
+    permission.
+
+    5) The Font Software, modified or unmodified, in part or in whole,
+    must be distributed entirely under this license, and must not be
+    distributed under any other license. The requirement for fonts to
+    remain under this license does not apply to any document created
+    using the Font Software.
+
+    TERMINATION
+    This license becomes null and void if any of the above conditions are
+    not met.
+
+    DISCLAIMER
+    THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
+    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+    OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
+    COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+    INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
+    DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
+    OTHER DEALINGS IN THE FONT SOFTWARE.
+
+6.7 NOTICE texts of Apache-2.0 and EPL-2.0 libraries
+
+  -- Apache Commons Imaging
+
+    Apache Commons Imaging
+    Copyright 2007-2025 The Apache Software Foundation
+
+    This product includes software developed at
+    The Apache Software Foundation (https://www.apache.org/).
+
+  -- Apache Commons IO
+
+    Apache Commons IO
+    Copyright 2002-2025 The Apache Software Foundation
+
+    This product includes software developed at
+    The Apache Software Foundation (https://www.apache.org/).
+
+  -- Apache Commons Lang
+
+    Apache Commons Lang
+    Copyright 2001-2024 The Apache Software Foundation
+
+    This product includes software developed at
+    The Apache Software Foundation (https://www.apache.org/).
+
+  -- Jackson (core; annotations and databind are the same less the last part)
+
+    # Jackson JSON processor
+
+    Jackson is a high-performance, Free/Open Source JSON processing library.
+    It was originally written by Tatu Saloranta (tatu.saloranta@iki.fi), and has
+    been in development since 2007.
+    It is currently developed by a community of developers.
+
+    ## Copyright
+
+    Copyright 2007-, Tatu Saloranta (tatu.saloranta@iki.fi)
+
+    ## Licensing
+
+    Jackson 2.x core and extension components are licensed under Apache License 2.0
+    To find the details that apply to this artifact see the accompanying LICENSE file.
+
+    ## Credits
+
+    A list of contributors may be found from CREDITS(-2.x) file, which is included
+    in some artifacts (usually source distributions); but is always available
+    from the source code management (SCM) system project uses.
+
+    ## FastDoubleParser
+
+    jackson-core bundles a shaded copy of FastDoubleParser <https://github.com/wrandelshofer/FastDoubleParser>.
+    That code is available under an MIT license <https://github.com/wrandelshofer/FastDoubleParser/blob/main/LICENSE>
+    under the following copyright.
+
+    Copyright © 2023 Werner Randelshofer, Switzerland. MIT License.
+
+    See FastDoubleParser-NOTICE for details of other source code included in FastDoubleParser
+    and the licenses and copyrights that apply to that code.
+
+  -- Eclipse Jetty 11.0.25 (the same NOTICE in every Jetty jar)
+
+    Notices for Eclipse Jetty
+    =========================
+    This content is produced and maintained by the Eclipse Jetty project.
+
+    Project home: https://jetty.org/
+
+    Trademarks
+    ----------
+    Eclipse Jetty, and Jetty are trademarks of the Eclipse Foundation.
+
+    Copyright
+    ---------
+    All contributions are the property of the respective authors or of
+    entities to which copyright has been assigned by the authors (eg. employer).
+
+    Declared Project Licenses
+    -------------------------
+    This artifacts of this project are made available under the terms of:
+
+      * the Eclipse Public License v2.0
+        https://www.eclipse.org/legal/epl-2.0
+        SPDX-License-Identifier: EPL-2.0
+
+      or
+
+      * the Apache License, Version 2.0
+        https://www.apache.org/licenses/LICENSE-2.0
+        SPDX-License-Identifier: Apache-2.0
+
+    The following dependencies are EPL.
+     * org.eclipse.jetty.orbit:org.eclipse.jdt.core
+
+    The following dependencies are EPL and ASL2.
+     * org.eclipse.jetty.orbit:javax.security.auth.message
+
+    The following dependencies are EPL and CDDL 1.0.
+     * org.eclipse.jetty.orbit:javax.mail.glassfish
+
+    The following dependencies are CDDL + GPLv2 with classpath exception.
+    https://glassfish.dev.java.net/nonav/public/CDDL+GPL.html
+
+     * jakarta.servlet:jakarta.servlet-api
+     * javax.annotation:javax.annotation-api
+     * javax.transaction:javax.transaction-api
+     * javax.websocket:javax.websocket-api
+
+    The following dependencies are licensed by the OW2 Foundation according to the
+    terms of http://asm.ow2.org/license.html
+
+     * org.ow2.asm:asm-commons
+     * org.ow2.asm:asm
+
+    The following dependencies are ASL2 licensed.
+
+     * org.apache.taglibs:taglibs-standard-spec
+     * org.apache.taglibs:taglibs-standard-impl
+
+    The following dependencies are ASL2 licensed.  Based on selected classes from
+    following Apache Tomcat jars, all ASL2 licensed.
+
+     * org.mortbay.jasper:apache-jsp
+     * org.apache.tomcat:tomcat-jasper
+     * org.apache.tomcat:tomcat-juli
+     * org.apache.tomcat:tomcat-jsp-api
+     * org.apache.tomcat:tomcat-el-api
+     * org.apache.tomcat:tomcat-jasper-el
+     * org.apache.tomcat:tomcat-api
+     * org.apache.tomcat:tomcat-util-scan
+     * org.apache.tomcat:tomcat-util
+     * org.mortbay.jasper:apache-el
+     * org.apache.tomcat:tomcat-jasper-el
+     * org.apache.tomcat:tomcat-el-api
+
+    The following artifacts are CDDL + GPLv2 with classpath exception.
+    https://glassfish.dev.java.net/nonav/public/CDDL+GPL.html
+
+     * org.eclipse.jetty.toolchain:jetty-schemas
+
+    Cryptography
+    ------------
+    Content may contain encryption software. The country in which you are currently
+    may have restrictions on the import, possession, and use, and/or re-export to
+    another country, of encryption software. BEFORE using any encryption software,
+    please check the country's laws, regulations and policies concerning the import,
+    possession, or use, and re-export of encryption software, to see if this is
+    permitted.
+
+    The UnixCrypt.java code implements the one way cryptography used by
+    Unix systems for simple password protection.  Copyright 1996 Aki Yoshida,
+    modified April 2001  by Iris Van den Broeke, Daniel Deville.
+    Permission to use, copy, modify and distribute UnixCrypt
+    for non-commercial or commercial purposes and without fee is
+    granted provided that the copyright notice appears in all copies.
+
+  -- Jetty's Jakarta Servlet API 5.0.2 (EPL-2.0: its source code is at the repositories it names)
+
+    # Notices for Eclipse Project for Servlet
+
+    This content is produced and maintained by the Eclipse Project for Servlet
+    project.
+
+    * Project home: https://projects.eclipse.org/projects/ee4j.servlet
+
+
+    ## Trademarks
+
+    Eclipse Project for Servlet is a trademark of the Eclipse Foundation.
+
+
+    ## Copyright
+
+    All content is the property of the respective authors or their employers. For
+    more information regarding authorship of content, please consult the listed
+    source code repository logs.
+
+
+    ## Declared Project Licenses
+
+    This program and the accompanying materials are made available under the terms
+    of the Eclipse Public License v. 2.0 which is available at
+    http://www.eclipse.org/legal/epl-2.0. This Source Code may also be made
+    available under the following Secondary Licenses when the conditions for such
+    availability set forth in the Eclipse Public License v. 2.0 are satisfied: GNU
+    General Public License, version 2 with the GNU Classpath Exception which is
+    available at https://www.gnu.org/software/classpath/license.html.
+
+    SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
+
+
+    ## Source Code
+
+    The project maintains the following source code repositories:
+
+     * https://github.com/eclipse-ee4j/servlet-api
+     * https://github.com/eclipse/jetty.toolchain
+
+
+    ## Third-party Content
+
+    ## Jakarta
+
+    The following artifacts are EPL 2.0 + GPLv2 with classpath exception.
+    https://projects.eclipse.org/projects/ee4j.servlet
+
+     * jakarta.servlet:jakarta.servlet-api
+
+
+    ## GlassFish
+
+    The following artifacts are CDDL + GPLv2 with classpath exception.
+    https://glassfish.dev.java.net/nonav/public/CDDL+GPL.html
+
+     * org.eclipse.jetty.toolchain:jetty-schemas

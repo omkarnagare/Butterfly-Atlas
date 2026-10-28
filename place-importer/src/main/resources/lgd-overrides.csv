@@ -1,0 +1,113 @@
+state_iso,geoboundaries_name,lgd_code,note
+IN-AN,South Andaman,602,LGD: South Andamans
+IN-AP,Anantapur,502,renamed Ananthapuramu
+IN-AP,Kadapa(YSR),504,LGD: Y.S.R. Kadapa
+IN-AS,Kamrup Metropolitan,618,LGD: Kamrup Metro
+IN-AS,Karbi Anglong East,292,LGD: Karbi Anglong
+IN-AS,Karbi Anglong West,710,LGD: West Karbi Anglong
+IN-AS,Karimganj,293,renamed Sribhumi in 2024
+IN-AS,Morigaon,296,LGD: Marigaon
+IN-AS,South Salmara-Mankachar,707,LGD: South Salmara Mancachar
+IN-BR,Purba Champaran,213,LGD: Purbi Champaran
+IN-CT,Balrampur,649,LGD: Balrampur-Ramanujganj
+IN-CT,Baloda Bazar,644,LGD: Balodabazar-Bhatapara
+IN-CT,Bemetra,650,LGD: Bemetara
+IN-CT,Gariaband,645,LGD: Gariyaband
+IN-CT,Gaurella Pendra Marwahi,734,LGD: Gaurela-Pendra-Marwahi
+IN-CT,Koriya,384,LGD: Korea
+IN-GJ,Ahmadabad,438,LGD: Ahmedabad
+IN-GJ,Aravali,672,LGD: Arvalli
+IN-GJ,Batod,676,LGD: Botad
+IN-GJ,Chhota Udaipur,668,LGD: Chhotaudepur
+IN-GJ,Dohad,445,LGD: Dahod
+IN-HP,Lahul & Spiti,21,LGD: Lahaul And Spiti
+IN-HR,Gurgaon,62,renamed Gurugram in 2016
+IN-HR,Mewat,604,renamed Nuh in 2016
+IN-JH,Kodarma,334,LGD: Koderma
+IN-JH,Pashchimi Singhbhum,343,LGD: West Singhbhum
+IN-JH,Purbi Singhbhum,327,LGD: East Singhbum
+IN-JH,Sahibganj,340,LGD: Sahebganj
+IN-JK,Badgam,2,LGD: Budgam
+IN-JK,Bandipore,623,LGD: Bandipora
+IN-JK,Baramula,3,LGD: Baramulla
+IN-JK,Punch,10,LGD: Poonch
+IN-JK,Shupiyan,625,LGD: Shopian
+IN-KA,Bagalkot,524,LGD: Bagalkote
+IN-KA,Bangalore,525,LGD: Bengaluru Urban
+IN-KA,Bangalore Rural,526,LGD: Bengaluru Rural
+IN-KA,Belgaum,527,renamed Belagavi
+IN-KA,Bellary,528,renamed Ballari
+IN-KA,Bijapur,530,renamed Vijayapura
+IN-KA,Chikmagalur,532,renamed Chikkamagaluru
+IN-KA,Gulbarga,538,renamed Kalaburagi
+IN-KA,Mysore,545,renamed Mysuru
+IN-KA,Ramanagara,631,renamed Bengaluru South in 2025
+IN-KA,Shimoga,547,renamed Shivamogga
+IN-KA,Tumkur,548,renamed Tumakuru
+IN-LD,Lakshadweep,553,LGD: Lakshadweep District
+IN-MH,Ahmadnagar,466,renamed Ahilyanagar in 2024
+IN-MH,Aurangabad,469,renamed Chhatrapati Sambhajinagar in 2023
+IN-MH,Bid,470,LGD: Beed
+IN-MH,Buldana,472,LGD: Buldhana
+IN-MH,Gondiya,476,LGD: Gondia
+IN-MH,Osmanabad,488,renamed Dharashiv in 2023
+IN-MH,Raigarh,491,LGD: Raigad
+IN-MP,Agar,667,LGD: Agar-Malwa
+IN-MP,Hoshangabad,409,renamed Narmadapuram in 2022
+IN-MZ,Saiha,267,LGD: Siaha
+IN-OR,Anugul,344,LGD: Anugola
+IN-OR,Bargarh,347,LGD: Baragada
+IN-OR,Baudh,349,LGD: Boudh
+IN-OR,Cuttack,350,LGD: Kataka
+IN-OR,Debagarh,351,LGD: Debagada
+IN-OR,Jajapur,356,LGD: Jajpur
+IN-OR,Kandhamal,359,LGD: Kandhamala
+IN-OR,Kendrapara,360,LGD: Kendrapada
+IN-OR,Nabarangapur,366,LGD: Nabarangpur
+IN-OR,Nayagarh,367,LGD: Nayagada
+IN-OR,Sundargarh,373,LGD: Sundaragada
+IN-PB,Firozpur,31,LGD: Ferozepur
+IN-PB,Muktsar,39,LGD: Sri Muktsar Sahib
+IN-PB,Sahibzada Ajit Singh Nagar,608,LGD: S.A.S Nagar
+IN-PY,Mahe,600,LGD lists Mahe as a sub-district of Puducherry district
+IN-PY,Yanam,600,LGD lists Yanam as a sub-district of Puducherry district
+IN-RJ,Chittaurgarh,95,LGD: Chittorgarh
+IN-RJ,Dhaulpur,98,LGD: Dholpur
+IN-RJ,Jalor,104,LGD: Jalore
+IN-RJ,Jhunjhunun,106,LGD: Jhunjhunu
+IN-SK,East District,225,renamed Gangtok in 2021
+IN-SK,North District,226,renamed Mangan in 2021
+IN-SK,South District,227,renamed Namchi in 2021
+IN-SK,West District,228,renamed Gyalshing in 2021
+IN-TG,Bhadradri,690,LGD: Bhadradri Kothagudem
+IN-TG,Hydrabad,507,LGD: Hyderabad
+IN-TG,Jagtial,681,LGD: Jagitial
+IN-TG,Jangaon,689,LGD: Jangoan
+IN-TG,Jayashankar,687,LGD: Jayashankar Bhupalapally
+IN-TG,Jogulamba,695,LGD: Jogulamba Gadwal
+IN-TG,Komaram Bheem,699,LGD: Kumuram Bheem Asifabad
+IN-TG,Medchal,700,LGD: Medchal Malkajgiri
+IN-TG,Warangal (R),522,Warangal Rural became Warangal in 2021
+IN-TG,Warangal (U),686,Warangal Urban became Hanumakonda in 2021
+IN-TG,Yadadri Bhongiri,697,LGD: Yadadri Bhuvanagiri
+IN-TN,Chengalputtu,730,LGD: Chengalpattu
+IN-TR,Sipahijula,653,LGD: Sepahijala
+IN-TR,Unokoti,655,LGD: Unakoti
+IN-UP,Allahabad,120,renamed Prayagraj in 2018
+IN-UP,Faizabad,140,renamed Ayodhya in 2018
+IN-UP,Jyotiba Phule Nagar,154,LGD: Amroha
+IN-UP,Kanshiram Nagar,633,LGD: Kasganj
+IN-UP,Mahamaya Nagar,163,LGD: Hathras
+IN-UP,Samli,660,LGD: Shamli
+IN-UT,Garhwal,52,LGD: Pauri Garhwal
+IN-UT,Hardwar,50,LGD: Haridwar
+IN-WB,Barddhaman,306,LGD: Purba Bardhaman
+IN-WB,Darjiling,309,LGD: Darjeeling
+IN-WB,Haora,313,LGD: Howrah
+IN-WB,Hugli,312,LGD: Hooghly
+IN-WB,Koch Bihar,308,LGD: Cooch Behar
+IN-WB,Maldah,316,LGD: Malda
+IN-WB,North Twenty Four Parganas,303,LGD: North 24 Parganas
+IN-WB,Paschim Barddhaman,704,LGD: Paschim Bardhaman
+IN-WB,Puruliya,321,LGD: Purulia
+IN-WB,South Twenty Four Parganas,304,LGD: South 24 Parganas

@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.butterflyatlas</groupId>
+        <artifactId>butterfly-atlas-parent</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>butterfly-atlas-packaging</artifactId>
+    <packaging>pom</packaging>
+    <name>Butterfly Atlas — Packaging</name>
+    <description>Installers for the OS this runs on (profile "package"); nothing here runs in a plain verify</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.butterflyatlas</groupId>
+            <artifactId>butterfly-atlas-app</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
+
+    <properties>
+        <!-- Linux only: which installers to build (-Dpackaging.linuxTypes=rpm on a machine without dpkg). -->
+        <packaging.linuxTypes>deb,rpm</packaging.linuxTypes>
+    </properties>
+
+    <profiles>
+        <profile>
+            <id>package</id>
+            <build>
+                <plugins>
+                    <!-- The app module's own jar, copied where jdeps, jlink and jpackage read it. -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <version>3.8.1</version>
+                        <executions>
+                            <execution>
+                                <id>app-jar-in</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>copy-dependencies</goal>
+                                </goals>
+                                <configuration>
+                                    <includeArtifactIds>butterfly-atlas-app</includeArtifactIds>
+                                    <stripVersion>true</stripVersion>
+                                    <outputDirectory>${project.build.directory}/work/in</outputDirectory>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>runtime-libs</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>copy-dependencies</goal>
+                                </goals>
+                                <configuration>
+                                    <excludeArtifactIds>butterfly-atlas-app</excludeArtifactIds>
+                                    <includeScope>runtime</includeScope>
+                                    <outputDirectory>${project.build.directory}/work/libs</outputDirectory>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <!-- jdeps + jlink, then the application image, then (after the smoke test) the installers: one program,
+                         PackageApp.java, runs the JDK's own tools (and Inno Setup on Windows); any failing step ends the
+                         build and names itself. -->
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <configuration>
+                            <executable>${java.home}${file.separator}bin${file.separator}java</executable>
+                        </configuration>
+                        <executions>
+                            <!-- On every OS, first: the Windows installer script keeps its fixed settings and the Inno Setup
+                                 lookup its order (Inno Setup itself runs only on Windows). -->
+                            <execution>
+                                <id>check-windows</id>
+                                <phase>validate</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <arguments>
+                                        <argument>${project.basedir}/scripts/PackageApp.java</argument>
+                                        <argument>check-windows</argument>
+                                        <argument>--root</argument>
+                                        <argument>${project.basedir}/..</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>runtime</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <arguments>
+                                        <argument>${project.basedir}/scripts/PackageApp.java</argument>
+                                        <argument>runtime</argument>
+                                        <argument>--work</argument>
+                                        <argument>${project.build.directory}/work</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>image</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <arguments>
+                                        <argument>${project.basedir}/scripts/PackageApp.java</argument>
+                                        <argument>image</argument>
+                                        <argument>--work</argument>
+                                        <argument>${project.build.directory}/work</argument>
+                                        <argument>--root</argument>
+                                        <argument>${project.basedir}/..</argument>
+                                        <argument>--version</argument>
+                                        <argument>${project.version}</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>smoke</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <arguments>
+                                        <argument>${project.basedir}/scripts/PackageApp.java</argument>
+                                        <argument>smoke</argument>
+                                        <argument>--work</argument>
+                                        <argument>${project.build.directory}/work</argument>
+                                        <argument>--root</argument>
+                                        <argument>${project.basedir}/..</argument>
+                                        <argument>--version</argument>
+                                        <argument>${project.version}</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>installers</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <arguments>
+                                        <argument>${project.basedir}/scripts/PackageApp.java</argument>
+                                        <argument>installers</argument>
+                                        <argument>--work</argument>
+                                        <argument>${project.build.directory}/work</argument>
+                                        <argument>--root</argument>
+                                        <argument>${project.basedir}/..</argument>
+                                        <argument>--version</argument>
+                                        <argument>${project.version}</argument>
+                                        <argument>--dist</argument>
+                                        <argument>${project.build.directory}/dist</argument>
+                                        <argument>--linux-types</argument>
+                                        <argument>${packaging.linuxTypes}</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>

@@ -1,0 +1,137 @@
+{
+  "about": "Phase 4a contract §1: query strings the server (filters/Filter.java, FilterTest) and the UI (ui/src/lib/filter.js, filter.test.js) must read alike and print alike. Each case: the query as it comes, the filter both read from it, and the query both print for that filter. Cases where the two sides differ on purpose (a value outside its list or more than 200 ids: the server refuses, the UI falls back) are not here; each side tests those itself. Rules: lists are split on commas before decoding; '+' is a literal plus, never a space; a stray '%' is kept as it is; ids are trimmed of whitespace as JavaScript's String.prototype.trim does (incl. no-break spaces), then empty ones dropped and repeats dropped in order; of a repeated key the first counts; an empty value is the default; unknown keys are ignored.",
+  "cases": [
+    {
+      "name": "no query is every default",
+      "query": "",
+      "filter": { "taxa": [], "tags": [], "tagMode": "any", "places": [], "status": "all", "source": "all", "stages": null },
+      "printed": ""
+    },
+    {
+      "name": "unknown keys are ignored",
+      "query": "view=photos&after=x&limit=3&zoom",
+      "filter": { "taxa": [], "tags": [], "tagMode": "any", "places": [], "status": "all", "source": "all", "stages": null },
+      "printed": ""
+    },
+    {
+      "name": "every key, in any order, prints in the contract order",
+      "query": "stages=missing&source=manual&status=not&places=P20,unknown&tagMode=all&tags=egg,larva&taxa=A12,A230",
+      "filter": { "taxa": ["A12", "A230"], "tags": ["egg", "larva"], "tagMode": "all", "places": ["P20", "unknown"], "status": "not", "source": "manual", "stages": "missing" },
+      "printed": "taxa=A12,A230&tags=egg,larva&tagMode=all&places=P20,unknown&status=not&source=manual&stages=missing"
+    },
+    {
+      "name": "defaults given are left out when printed",
+      "query": "tagMode=any&status=all&source=all&taxa=A1",
+      "filter": { "taxa": ["A1"], "tags": [], "tagMode": "any", "places": [], "status": "all", "source": "all", "stages": null },
+      "printed": "taxa=A1"
+    },
+    {
+      "name": "an empty value is the default",
+      "query": "taxa=&tags=&tagMode=&places=&status=&source=&stages=",
+      "filter": { "taxa": [], "tags": [], "tagMode": "any", "places": [], "status": "all", "source": "all", "stages": null },
+      "printed": ""
+    },
+    {
+      "name": "a key with no '=' is an empty value",
+      "query": "taxa&status=not",
+      "filter": { "taxa": [], "tags": [], "tagMode": "any", "places": [], "status": "not", "source": "all", "stages": null },
+      "printed": "status=not"
+    },
+    {
+      "name": "of a repeated key the first counts",
+      "query": "status=not&taxa=A5&status=photographed&taxa=A6&status=bogus",
+      "filter": { "taxa": ["A5"], "tags": [], "tagMode": "any", "places": [], "status": "not", "source": "all", "stages": null },
+      "printed": "taxa=A5&status=not"
+    },
+    {
+      "name": "ids are de-duplicated in order and empty ones dropped",
+      "query": "taxa=A5,,A1,A5,A1&tags=larva,egg,larva&places=unknown,P4,unknown,",
+      "filter": { "taxa": ["A5", "A1"], "tags": ["larva", "egg"], "tagMode": "any", "places": ["unknown", "P4"], "status": "all", "source": "all", "stages": null },
+      "printed": "taxa=A5,A1&tags=larva,egg&places=unknown,P4"
+    },
+    {
+      "name": "an encoded comma stays inside its id",
+      "query": "tags=a%2Cb,c&taxa=A1%2C%20A2&places=P4%2C,unknown",
+      "filter": { "taxa": ["A1, A2"], "tags": ["a,b", "c"], "tagMode": "any", "places": ["P4,", "unknown"], "status": "all", "source": "all", "stages": null },
+      "printed": "taxa=A1%2C%20A2&tags=a%2Cb,c&places=P4%2C,unknown"
+    },
+    {
+      "name": "the group id reads encoded or not and prints its colon as it is",
+      "query": "taxa=G%3Abutterflies,G:butterflies,U7",
+      "filter": { "taxa": ["G:butterflies", "U7"], "tags": [], "tagMode": "any", "places": [], "status": "all", "source": "all", "stages": null },
+      "printed": "taxa=G:butterflies,U7"
+    },
+    {
+      "name": "ids print all but letters, digits and - . _ ~ : encoded",
+      "query": "tags=mud%2Dpuddling,a%26b,it's(1)!*",
+      "filter": { "taxa": [], "tags": ["mud-puddling", "a&b", "it's(1)!*"], "tagMode": "any", "places": [], "status": "all", "source": "all", "stages": null },
+      "printed": "tags=mud-puddling,a%26b,it%27s%281%29%21%2A"
+    },
+    {
+      "name": "a non-ASCII tag key round-trips",
+      "query": "tags=%C3%A9clos%C3%A9,café",
+      "filter": { "taxa": [], "tags": ["éclosé", "café"], "tagMode": "any", "places": [], "status": "all", "source": "all", "stages": null },
+      "printed": "tags=%C3%A9clos%C3%A9,caf%C3%A9"
+    },
+    {
+      "name": "a stray '%' is kept as it is",
+      "query": "tags=100%,a%zz,b%2,%",
+      "filter": { "taxa": [], "tags": ["100%", "a%zz", "b%2", "%"], "tagMode": "any", "places": [], "status": "all", "source": "all", "stages": null },
+      "printed": "tags=100%25,a%25zz,b%252,%25"
+    },
+    {
+      "name": "'+' is a literal plus, never a space",
+      "query": "tags=a+b,c%2Bd,+,a%20b",
+      "filter": { "taxa": [], "tags": ["a+b", "c+d", "+", "a b"], "tagMode": "any", "places": [], "status": "all", "source": "all", "stages": null },
+      "printed": "tags=a%2Bb,c%2Bd,%2B,a%20b"
+    },
+    {
+      "name": "'+' next to a stray '%' is still kept as it is",
+      "query": "tags=a%+b",
+      "filter": { "taxa": [], "tags": ["a%+b"], "tagMode": "any", "places": [], "status": "all", "source": "all", "stages": null },
+      "printed": "tags=a%25%2Bb"
+    },
+    {
+      "name": "ids are trimmed of spaces, tabs, line breaks and no-break spaces; inner ones stay",
+      "query": "tags=%20larva%20,%09egg%0A,%C2%A0pupa%C2%A0,%E2%80%87male%E2%80%AF,%E3%80%80female,%EF%BB%BFdsf,%C2%A0,%20%0D%0A,a%C2%A0b",
+      "filter": { "taxa": [], "tags": ["larva", "egg", "pupa", "male", "female", "dsf", "a b"], "tagMode": "any", "places": [], "status": "all", "source": "all", "stages": null },
+      "printed": "tags=larva,egg,pupa,male,female,dsf,a%C2%A0b"
+    },
+    {
+      "name": "trimming can make two ids one",
+      "query": "taxa=A1,%C2%A0A1,A1%20&places=%20P4,P4",
+      "filter": { "taxa": ["A1"], "tags": [], "tagMode": "any", "places": ["P4"], "status": "all", "source": "all", "stages": null },
+      "printed": "taxa=A1&places=P4"
+    },
+    {
+      "name": "choices are decoded",
+      "query": "status=%6Eot&tagMode=%61ll&tags=egg",
+      "filter": { "taxa": [], "tags": ["egg"], "tagMode": "all", "places": [], "status": "not", "source": "all", "stages": null },
+      "printed": "tags=egg&tagMode=all&status=not"
+    },
+    {
+      "name": "keys are decoded",
+      "query": "ta%78a=A1&%73tatus=photographed",
+      "filter": { "taxa": ["A1"], "tags": [], "tagMode": "any", "places": [], "status": "photographed", "source": "all", "stages": null },
+      "printed": "taxa=A1&status=photographed"
+    },
+    {
+      "name": "file types keep the order given, once each, printed after stages (7a contract §4; a missing types is [])",
+      "query": "types=raw,jpeg,raw,%20png&stages=missing&taxa=A1",
+      "filter": { "taxa": ["A1"], "tags": [], "tagMode": "any", "places": [], "status": "all", "source": "all", "stages": "missing", "types": ["raw", "jpeg", "png"] },
+      "printed": "taxa=A1&stages=missing&types=raw,jpeg,png"
+    },
+    {
+      "name": "an empty types is every file type",
+      "query": "types=&tags=egg",
+      "filter": { "taxa": [], "tags": ["egg"], "tagMode": "any", "places": [], "status": "all", "source": "all", "stages": null, "types": [] },
+      "printed": "tags=egg"
+    },
+    {
+      "name": "file types alone",
+      "query": "types=tiff,webp",
+      "filter": { "taxa": [], "tags": [], "tagMode": "any", "places": [], "status": "all", "source": "all", "stages": null, "types": ["tiff", "webp"] },
+      "printed": "types=tiff,webp"
+    }
+  ]
+}

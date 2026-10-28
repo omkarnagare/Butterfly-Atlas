@@ -1,0 +1,65 @@
+/* Butterfly Atlas theme — see docs/PLAN.md §8a and the Meadow design (warm paper; dusk garden). Dusk is keyed on
+   data-theme, which lib/theme.svelte.js sets: the saved Light or Dark, else the OS setting. */
+:root {
+  --bg: #f6f4ea; --surface: #fffdf6; --surface-2: #eef0e1; --ink: #1c2a20; --muted: #556453; --line: #e0e1cf;
+  --accent: #2c7a47; --accent-ink: #ffffff; --glow: #e9a012;
+  --f-pap: #3767cf; --f-pie: #d6a40a; --f-nym: #e0662a; --f-lyc: #7d57cf; --f-hes: #9a7444; --f-rio: #c4437a;
+  /* bars and counts in a family's colour: the bright yellow and orange are too pale against the track (design §2) */
+  --f-pap-deep: #3767cf; --f-pie-deep: #9a7300; --f-nym-deep: #c9561c; --f-lyc-deep: #7d57cf; --f-hes-deep: #9a7444; --f-rio-deep: #c4437a;
+  /* a bar's empty part; a family band is its colour at --band-tint over the surface (the species header's at
+     --head-tint); the family ring's unfilled tint */
+  --track: #e7e9d8; --band-tint: 13%; --head-tint: 13%; --ring-tint: .22;
+  /* the meadow drawings (lib/meadow.js): grass, stems and leaves, daisies, lantana and ixora */
+  --grass: #5f9a3c; --grass-2: #4d8a33; --grass-back: #a9c98a; --stem: #4d7f31; --leaf: #5e9a3e; --leaf-2: #77ad52; --leaf-vein: #ffffff40;
+  --petal: #ffffff; --heart: #f0b429; --lan-1: #fbe26a; --lan-2: #f7a23a; --lan-3: #ec5f8c; --ix-1: #ff9a7a; --ix-2: #e2483d;
+  --display: 'Bricolage Grotesque Variable', 'Avenir Next', system-ui, sans-serif;
+  --body: 'Figtree Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --latin: 'Newsreader Variable', Georgia, 'Times New Roman', serif;
+  --mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  --shadow: 0 22px 44px -30px rgba(40, 52, 30, .55);
+  color-scheme: light;
+}
+:root[data-theme=dark] {
+  --bg: #0f1b16; --surface: #15241d; --surface-2: #1b2d25; --ink: #e9efe4; --muted: #a3b4a6; --line: #26392f;
+  --accent: #7dd49a; --accent-ink: #0b2415; --glow: #ffbe3d;
+  --f-pap: #7ea2ff; --f-pie: #f0cf4a; --f-nym: #ff9358; --f-lyc: #b196ff; --f-hes: #d2a571; --f-rio: #f27aa8;
+  --f-pap-deep: #7ea2ff; --f-pie-deep: #f0cf4a; --f-nym-deep: #ff9358; --f-lyc-deep: #b196ff; --f-hes-deep: #d2a571; --f-rio-deep: #f27aa8;
+  /* at dusk the species header is only a hint of its family colour: 13% of the bright orange reads as a brown panel */
+  --track: #22352b; --head-tint: 7%; --ring-tint: .3;
+  --grass: #2f5a2a; --grass-2: #274c23; --grass-back: #1d3a24; --stem: #2c4f27; --leaf: #335f2c; --leaf-2: #3d6c33; --leaf-vein: #ffffff1a;
+  --petal: #cfd6c8; --heart: #b98a2a; --lan-1: #b9a64a; --lan-2: #b8773a; --lan-3: #a9507a; --ix-1: #b06a58; --ix-2: #9c3c36;
+  --shadow: 0 22px 44px -26px rgba(0, 0, 0, .8);
+  color-scheme: dark;
+}
+/* Before the theme store has run (no data-theme yet), a dark computer gets the dusk page, so nothing flashes white. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) { --bg: #0f1b16; --ink: #e9efe4; color-scheme: dark; }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.55 var(--body);
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -.01em; }
+.wrap { max-width: 1180px; margin-inline: auto; padding-inline: 20px; }
+.mono { font-family: var(--mono); }
+.bn { font-family: var(--latin); font-style: italic; font-weight: 500; }
+.muted { color: var(--muted); }
+.eyebrow { font: 500 11px/1 var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    animation-delay: 0s !important;
+    transition-delay: 0s !important;
+  }
+}
