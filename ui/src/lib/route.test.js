@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import {
-  GROUP_ID, exportHref, exportPhotoHref, hrefFor, importHref, importPhotoHref, parseRoute, photoHref, splitHref, splitPhotoHref, UPDATE_HREF,
+  ADDITIONS_ID, GROUP_ID, exploreHref, explorePhotoHref, exportHref, exportPhotoHref, hrefFor, importHref, importPhotoHref, parseRoute, photoHref, splitHref, splitPhotoHref, UPDATE_HREF,
 } from './route.js';
 
 test('empty and unknown hashes go home', () => {
@@ -138,4 +138,28 @@ test('a species address carries one file type, as it carries a tag and a place (
   expect(parseRoute('#/species/A5?type=heic')).toEqual({ screen: 'species', id: 'A5', type: 'heic' });
   expect(photoHref('A5', 12, 'larva', null, 'raw')).toBe('#/species/A5/photo/12?tag=larva&type=raw');
   expect(photoHref('A5', 12, 'all', null, null)).toBe('#/species/A5/photo/12');
+});
+
+test('a filtered Explore page keeps its filter (printed) and view; Species is the default view', () => {
+  expect(parseRoute('#/explore?tags=female')).toEqual({ screen: 'explore', id: GROUP_ID, query: 'tags=female', view: 'species' });
+  expect(parseRoute('#/explore/A1?tagMode=any&tags=female&view=photos'))
+    .toEqual({ screen: 'explore', id: 'A1', query: 'tags=female', view: 'photos' });
+  expect(parseRoute('#/explore/A1?view=places')).toEqual({ screen: 'explore', id: 'A1', query: '', view: 'places' });
+  expect(parseRoute('#/explore/A1?view=nonsense&tags=male')).toEqual({ screen: 'explore', id: 'A1', query: 'tags=male', view: 'species' });
+});
+
+test('a photo of a filtered Explore page opens the viewer over its Photos view', () => {
+  expect(parseRoute('#/explore/A1/photo/12?tags=female')).toEqual({ screen: 'explore', id: 'A1', query: 'tags=female', view: 'photos', photoId: 12 });
+  expect(parseRoute('#/explore/photo/12?tags=female')).toEqual({ screen: 'explore', id: GROUP_ID, query: 'tags=female', view: 'photos', photoId: 12 });
+  expect(parseRoute('#/explore/A1/photo/0?tags=female')).toEqual({ screen: 'explore', id: 'A1', query: 'tags=female', view: 'species' });
+});
+
+test('Explore addresses: the top page has no id, Species is left out, the photo address has no view', () => {
+  expect(exploreHref(GROUP_ID, '')).toBe('#/explore');
+  expect(exploreHref('A1', '')).toBe('#/explore/A1');
+  expect(exploreHref('A1', '', 'photos')).toBe('#/explore/A1?view=photos');
+  expect(exploreHref(GROUP_ID, 'tags=female', 'places')).toBe('#/explore?tags=female&view=places');
+  expect(exploreHref(ADDITIONS_ID, 'tags=female')).toBe('#/explore/U%3Abutterflies?tags=female');
+  expect(explorePhotoHref('A1', 12, 'tags=female')).toBe('#/explore/A1/photo/12?tags=female');
+  expect(explorePhotoHref(GROUP_ID, 12, '')).toBe('#/explore/photo/12');
 });
