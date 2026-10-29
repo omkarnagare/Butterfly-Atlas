@@ -190,12 +190,13 @@ kbd { font: 500 11px/1 var(--mono); border: 1px solid var(--line); border-bottom
 .map text { font: 600 13px var(--body); fill: var(--ink); paint-order: stroke; stroke: var(--surface); stroke-width: 3px;
   stroke-linejoin: round; pointer-events: none; text-anchor: middle; dominant-baseline: middle; }
 
-/* search words */
-.words { display: grid; gap: 10px; justify-items: start; }
-.words-panel { display: grid; gap: 10px; width: min(420px, 100%); padding: 14px; border-radius: 16px; background: var(--surface);
-  border: 1px solid var(--line); animation: pop .22s cubic-bezier(.2,.8,.2,1.2) both; }
-.words-panel p { margin: 0; font-size: 13px; }
-.words-panel form { display: flex; gap: 8px; }
+/* a species' other names */
+.other-names { display: grid; gap: 8px; justify-items: start; }
+.other-names .on-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 14px; }
+.other-names .on-row .btn { padding: 5px 12px; font-size: 13px; }
+.other-names form { display: flex; gap: 8px; width: min(460px, 100%); }
+.other-names form .field { flex: 1; min-width: 0; }
+.other-names p { margin: 0; font-size: 13px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .chip { border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; background: var(--surface); font-size: 13px; font-weight: 600;
   display: inline-flex; gap: 6px; align-items: center; transition: border-color .2s; }

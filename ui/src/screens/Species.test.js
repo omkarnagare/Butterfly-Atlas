@@ -59,7 +59,7 @@ test('shows the scientific name, common name, Atlas id, other names and folder',
   expect(screen.getByText('Limnas klugii')).toBeTruthy();
   expect(container.textContent).toContain('Folder created with the first photo: images/Nymphalidae/Danainae/Danaini/Danaus/Danaus_chrysippus_[A5]/');
   expect(screen.getByRole('heading', { name: 'Not photographed yet' })).toBeTruthy();
-  expect(screen.getByRole('button', { name: /Search words/ })).toBeTruthy();
+  expect(screen.getByRole('button', { name: '+ Add a name' })).toBeTruthy();
 });
 
 test('marks a species that is no longer on the India list', async () => {

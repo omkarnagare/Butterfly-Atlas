@@ -81,6 +81,17 @@ class SearchServiceTest {
     }
 
     @Test
+    void aWordSavedOnAGenusIsStillFound() {
+        new SearchWordService(() -> db, TestBundles.CLOCK).add("A4", "Tiger kin");
+
+        SearchService.Hit hit = search.search("tiger kin", 20).getFirst();
+
+        assertThat(hit.id()).isEqualTo("A4");
+        assertThat(hit.matchKind()).isEqualTo("word");
+        assertThat(hit.matched()).isEqualTo("Tiger kin");
+    }
+
+    @Test
     void ignoresAccentsAndCase() {
         assertThat(ids("PLÁIN tiger")).first().isEqualTo("A5");
     }

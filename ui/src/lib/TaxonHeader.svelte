@@ -1,6 +1,5 @@
 <script>
   import Meter from './Meter.svelte';
-  import SearchWords from './SearchWords.svelte';
   import { names, RANK_LABELS } from './names.js';
   import { famStyle } from './families.js';
   import { countUp } from './countUp.js';
@@ -8,7 +7,7 @@
 
   /**
    * Explore page header: rank, title, progress; `extra` renders under the progress (view switch). Custom additions has
-   * its group's name as eyebrow (its rank label is its own name) and no search words; a progress line shows only while
+   * its group's name as eyebrow (its rank label is its own name); a progress line shows only while
    * there are species to count.
    */
   let { taxon, extra } = $props();
@@ -29,7 +28,6 @@
       <span class="ct"><b use:countUp={taxon.species.got}>{taxon.species.got}</b> of {taxon.species.total} species photographed</span>
       <Meter got={taxon.species.got} total={taxon.species.total} />
     {/if}
-    {#if !additions}<SearchWords taxonId={taxon.id} words={taxon.searchWords} />{/if}
     {@render extra?.()}
   </div>
 </div>
