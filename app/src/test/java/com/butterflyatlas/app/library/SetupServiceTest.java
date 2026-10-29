@@ -187,7 +187,7 @@ class SetupServiceTest {
         Path file = Files.writeString(home.resolve("notes.txt"), "x");
         SetupService setup = service(holder);
 
-        assertThat(setup.inspect(folder.toString())).isEqualTo(check(folder, folder, SetupService.EXISTING));
+        assertThat(setup.inspect(folder.toString())).isEqualTo(existing(folder, folder));
         assertThat(setup.inspect(home.resolve("New").toString(), true))
                 .isEqualTo(check(home.resolve("New"), home.resolve("New"), SetupService.CREATE));
         assertThat(setup.inspect(file.toString(), true)).isEqualTo(check(file, null, SetupService.NOT_A_FOLDER));
@@ -228,9 +228,9 @@ class SetupServiceTest {
         SetupService setup = service(holder);
 
         assertThat(setup.inspect(home.resolve("Old").toString(), false))
-                .isEqualTo(check(home.resolve("Old"), library, SetupService.EXISTING));
+                .isEqualTo(existing(home.resolve("Old"), library));
         assertThat(setup.inspect(library.toString(), false)).as("the library folder itself")
-                .isEqualTo(check(library, library, SetupService.EXISTING));
+                .isEqualTo(existing(library, library));
     }
 
     @Test
@@ -282,6 +282,79 @@ class SetupServiceTest {
                         e -> assertThat(e.getMessage()).isEqualTo("That folder can't be found. Choose another folder."));
         assertThat(home.resolve("Missing")).doesNotExist();
         assertThat(holder.current()).isEmpty();
+    }
+
+    /** A library with unfinished work (UnfinishedWorkTest), as copied from another computer: nothing remembers it here. */
+    private Path copiedWithUnfinishedWork() {
+        Path folder = home.resolve("Copied").resolve("Butterfly_Atlas");
+        UnfinishedWorkTest.leaveUnfinished(
+                Library.open(folder, TestBundles.fixture(), TestPlaces.bundles(), TestBundles.CLOCK).database());
+        return folder;
+    }
+
+    @Test
+    void inspectCountsTheUnfinishedWorkOfAnExistingLibrary() {
+        Path folder = copiedWithUnfinishedWork();
+        SetupService setup = service(holder);
+
+        assertThat(setup.inspect(folder.getParent().toString(), false).unfinished())
+                .isEqualTo(new UnfinishedWork.Counts(1, 1, 1));
+        assertThat(setup.inspect(folder.toString()).unfinished()).isEqualTo(new UnfinishedWork.Counts(1, 1, 1));
+        assertThat(setup.inspect(home.resolve("New").toString()).unfinished()).as("only for an existing library").isNull();
+        assertThat(count(folder, "SELECT COUNT(*) FROM import_run WHERE state = 'open'")).as("nothing changed").isEqualTo(1);
+    }
+
+    @Test
+    void openingAnExistingLibraryAtSetupClearsItsUnfinishedWork() {
+        Path folder = copiedWithUnfinishedWork();
+
+        service(holder).setup(folder.getParent().toString(), false);
+
+        assertThat(count(holder, "SELECT COUNT(*) FROM import_run WHERE state = 'open'")).isZero();
+        assertThat(count(holder, "SELECT COUNT(*) FROM export_run WHERE state IN ('running', 'paused')")).isZero();
+        assertThat(count(holder, "SELECT COUNT(*) FROM backup_run WHERE state IN ('running', 'paused')")).isZero();
+        assertThat(count(holder, "SELECT COUNT(*) FROM image")).isEqualTo(1);
+    }
+
+    @Test
+    void theRememberedLibraryAtStartKeepsItsUnfinishedWork() {
+        Path folder = copiedWithUnfinishedWork();
+        config().save(new AppConfig(folder.toString()));
+
+        service(holder).startup(Optional.empty());
+
+        assertThat(holder.library().folder()).isEqualTo(folder);
+        assertThat(count(holder, "SELECT COUNT(*) FROM import_run WHERE state = 'open'")).isEqualTo(1);
+        assertThat(count(holder, "SELECT COUNT(*) FROM export_run WHERE state = 'paused'")).isEqualTo(1);
+    }
+
+    @Test
+    void aClearThatFailsOpensNothingAndChangesNothing() {
+        Path folder = copiedWithUnfinishedWork();
+        exec(folder, "CREATE TRIGGER refuse BEFORE UPDATE ON export_run BEGIN SELECT RAISE(ABORT, 'refused'); END");
+
+        assertThatThrownBy(() -> service(holder).setup(folder.toString()))
+                .isInstanceOfSatisfying(AtlasException.class, e -> assertThat(e.getMessage()).startsWith(
+                        "Butterfly Atlas couldn't clear the work left unfinished in that library, so it didn't open it."));
+
+        assertThat(holder.current()).isEmpty();
+        assertThat(config().load()).isEmpty();
+        assertThat(count(folder, "SELECT COUNT(*) FROM import_run WHERE state = 'open'")).as("rolled back").isEqualTo(1);
+    }
+
+    private static int count(Path folder, String sql) {
+        return com.butterflyatlas.app.db.Database.open(folder.resolve("atlas.db")).read(c -> {
+            try (PreparedStatement ps = c.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                return rs.getInt(1);
+            }
+        });
+    }
+
+    /** An existing library with nothing unfinished. */
+    private static SetupService.FolderCheck existing(Path picked, Path library) {
+        return new SetupService.FolderCheck(picked.toString(), true, library.toString(), SetupService.EXISTING,
+                new UnfinishedWork.Counts(0, 0, 0));
     }
 
     private static SetupService.FolderCheck check(Path picked, Path library, String kind) {

@@ -343,8 +343,10 @@ public final class SetupService {
             return new FolderCheck(rawPath, false, null, RELATIVE, null);
         }
         Place place = place(picked, exact);
+        UnfinishedWork.Counts unfinished = EXISTING.equals(place.kind())
+                ? UnfinishedWork.count(place.folder().resolve(Database.FILE_NAME)) : null;
         return new FolderCheck(picked.toString(), true, place.folder() == null ? null : place.folder().toString(),
-                place.kind(), null);
+                place.kind(), unfinished);
     }
 
     /** Where the library of a chosen folder is (see {@link #inspect(String, boolean)}), and what happens there. */
@@ -408,6 +410,7 @@ public final class SetupService {
             }
         }
         Path folder = place.folder();
+        boolean existing = EXISTING.equals(place.kind());
         try {
             Files.createDirectories(folder);
         } catch (IOException e) {
@@ -437,6 +440,9 @@ public final class SetupService {
             throw AtlasException.invalid("Butterfly Atlas cannot open the library in that folder. "
                     + "If it holds a file called atlas.db from somewhere else, choose another folder.");
         }
+        if (existing) {
+            clearUnfinished(library, folder);
+        }
         try {
             config.save(new AppConfig(folder.toString(), theme));
         } catch (UncheckedIOException e) {
@@ -446,6 +452,22 @@ public final class SetupService {
         problem = null;
         failed = null;
         return status();
+    }
+
+    /**
+     * Clears the work an existing library was left with where it was used before (setup design §3); when that fails
+     * nothing of it changed, the library is not opened (its lock is given back) and the setup screen says why.
+     */
+    private void clearUnfinished(Library library, Path folder) {
+        try {
+            UnfinishedWork.clear(library, clock);
+        } catch (RuntimeException e) {
+            release(held);
+            held = null;
+            LOG.warn("Could not clear the unfinished work of the library in {}", folder, e);
+            throw AtlasException.invalid("Butterfly Atlas couldn't clear the work left unfinished in that library, so it"
+                    + " didn't open it. " + plain(folder, e, LibraryDrive::usableSpace));
+        }
     }
 
     /**
