@@ -119,7 +119,7 @@ export const UNNAMED = '…';
 
 export const placeName = (names, placeId) => (placeId === 'unknown' ? UNKNOWN_PLACE : names?.places.get(placeId) ?? UNNAMED);
 export const taxonName = (names, taxonId) => names?.taxa.get(taxonId) ?? UNNAMED;
-const tagName = (names, key) => names?.tags.get(key) ?? key.replace(/_/g, ' ');
+const tagName = (names, key) => names?.tags.get(key) ?? key;
 
 const STATUS = { photographed: PHOTOGRAPHED, not: NOT_PHOTOGRAPHED };
 /** The Source choices: custom species are `manual` to the API and "Custom" to the user (Phase 5 design D3). */
