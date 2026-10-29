@@ -134,3 +134,26 @@ test('New window that could not open says the server\'s words in a toast, long e
   expect(toast.ms).toBe(LINK_MS);
   expect(screen.getByRole('button', { name: 'New window' }).textContent).toBe('New window');
 });
+
+test('New window passes on where this window is, so the new one opens there; it says so when the browser won\'t let it', async () => {
+  window.location.hash = '#/explore/A1?tags=female';
+  openWindow.mockResolvedValue(null);
+  render(TopBar);
+  await fireEvent.click(screen.getByRole('button', { name: 'New window' }));
+  await vi.waitFor(() => expect(toast.message).toBe('A new window is opening.'));
+  expect(JSON.parse(localStorage.getItem('atlas.newWindowAt')).hash).toBe('#/explore/A1?tags=female');
+  localStorage.clear();
+
+  const blocked = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked'); });
+  await fireEvent.click(screen.getByRole('button', { name: 'New window' }));
+  await vi.waitFor(() => expect(toast.message).toBe("A new window is opening on Home: this browser didn't let Butterfly Atlas pass on where you were."));
+  blocked.mockRestore();
+});
+
+test('New window that could not open takes back the address it passed on', async () => {
+  openWindow.mockRejectedValue(Object.assign(new Error('No window.'), { code: 'window_failed' }));
+  render(TopBar);
+  await fireEvent.click(screen.getByRole('button', { name: 'New window' }));
+  await vi.waitFor(() => expect(toast.message).toBe('No window.'));
+  expect(localStorage.getItem('atlas.newWindowAt')).toBeNull();
+});

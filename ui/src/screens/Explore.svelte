@@ -8,14 +8,39 @@
   import MapView from '../lib/MapView.svelte';
   import AdditionsCard from '../lib/AdditionsCard.svelte';
   import AddSpeciesDialog from '../lib/AddSpeciesDialog.svelte';
-  import { hrefFor } from '../lib/route.js';
+  import FilterResults from '../lib/FilterResults.svelte';
+  import { parseFilter, printFilter } from '../lib/filter.js';
+  import { exploreAddress, pageFilter, startsFiltered } from '../lib/exploreFilter.js';
+  import { exploreHref, explorePhotoHref, exportHref, hrefFor } from '../lib/route.js';
   import { loadViewMode, saveViewMode } from '../lib/viewMode.js';
   import { LIBRARY_CHANGED } from '../lib/status.svelte.js';
   import LoadError from '../lib/LoadError.svelte';
   import { loadProblem } from '../lib/problems.js';
 
-  /** @type {{ id: string }} */
-  let { id } = $props();
+  /**
+   * An Explore page (#/explore[/<id>]): the group's header and its child cards or the map, under the filter row
+   * (filters-in-Explore design). The page's own part of the filter (the group as a Taxa chip; Custom additions as
+   * Source: Custom; nothing on the top page) is in its path; `query` is the rest, `view` and `photoId` as on Export.
+   * With no filter of its own the page is as it was, with the filter row and presets above the cards; with one, the
+   * cards and the Cards/Map switch give way to the filter's Species · Photos · Places views (lib/FilterResults), where
+   * photos can be edited, and Export these… opens Export with the same filter and view.
+   * @type {{ id: string, query?: string | null, view?: string, photoId?: number | null, delay?: number }}
+   */
+  let { id, query = null, view = 'species', photoId = null, delay = 200 } = $props();
+
+  let filtered = $derived(startsFiltered({ query, view, photoId }));
+  // The full filter, printed: the page's part and the rest from the address.
+  let full = $derived(printFilter(pageFilter(id, query ?? '')));
+  let printed = $state('');
+  // A filter's address: on this page while it still has the page's part, else on the top page.
+  function resultsHref(text, which) {
+    const at = exploreAddress(id, parseFilter(text));
+    return exploreHref(at.id, at.query, which);
+  }
+  function photoHref(photo, text) {
+    const at = exploreAddress(id, parseFilter(text));
+    return explorePhotoHref(at.id, photo, at.query);
+  }
 
   let taxon = $state(null);
   let children = $state([]);
@@ -97,14 +122,26 @@
         {#if taxon.rank === 'additions'}
           <button class="btn" type="button" onclick={(e) => openAdd(e.currentTarget)}>Add a species</button>
         {/if}
-        <div class="seg" role="group" aria-label="View">
-          <button type="button" class:on={mode === 'cards'} aria-pressed={mode === 'cards'} onclick={() => show('cards')}>Cards</button>
-          <button type="button" class:on={mode === 'map'} aria-pressed={mode === 'map'} onclick={() => show('map')}>Map</button>
-        </div>
+        {#if !filtered}
+          <div class="seg" role="group" aria-label="View">
+            <button type="button" class:on={mode === 'cards'} aria-pressed={mode === 'cards'} onclick={() => show('cards')}>Cards</button>
+            <button type="button" class:on={mode === 'map'} aria-pressed={mode === 'map'} onclick={() => show('map')}>Map</button>
+          </div>
+        {/if}
       {/snippet}
     </TaxonHeader>
   {/key}
-  {#if mode === 'map'}
+  <div class="xf">
+    <FilterResults query={full} view={filtered ? view : 'species'} photoId={filtered ? photoId : null} {delay} results={filtered} editable
+                   seed={taxon.rank === 'group' || taxon.rank === 'additions' ? null : { taxa: [taxon] }} {resultsHref} {photoHref} bind:printed>
+      {#snippet actions()}
+        <a class="btn ghost" href={exportHref(printed, view)}>Export these…</a>
+      {/snippet}
+    </FilterResults>
+  </div>
+  {#if filtered}
+    <!-- the filter's views are above -->
+  {:else if mode === 'map'}
     <MapView focusId={taxon.id} onFocus={(t) => { window.location.hash = hrefFor(t); }} />
     <p class="hint">Click a circle to zoom in, the background to zoom out. Filled circles are species you have photographed; click one to open it.</p>
   {:else}
@@ -127,3 +164,7 @@
 {:else}
   <p class="muted loading" role="status">Opening…</p>
 {/if}
+
+<style>
+  .xf { margin: 18px 0 22px; }
+</style>

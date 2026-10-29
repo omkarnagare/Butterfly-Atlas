@@ -11,14 +11,18 @@
   import { labeller } from './tags.js';
   import { forgetViewerOpen } from './viewer.js';
   import ViewerTitle from './ViewerTitle.svelte';
+  import PhotoEdits from './PhotoEdits.svelte';
   import { STEP } from './zoom.js';
   import { ABOUT_THIS_PHOTO, CLOSE, NEXT_PHOTO, PREVIOUS_PHOTO, UNKNOWN_PLACE, viewerLabel } from './messages.js';
 
   /**
    * The photo viewer over the Export screen's Photos view (#/export/photo/<id>?<filter>, contract §4): dark, growing out
    * of the clicked tile, ← → and swipes through the photos loaded so far (the address is replaced, so Back closes it),
-   * + − 0 zoom, Escape closes. It only shows: the species (with a link to its page), the tags, the place and the file;
-   * changes are made on the species page. Near the end of what is loaded it asks for the next page (`onMore`), once for
+   * + − 0 zoom, Escape closes. On Export it only shows: the species (with a link to its page), the tags, the place and
+   * the file; changes are made on the species page. `editable` (Explore's filtered photos, filters-in-Explore design §6)
+   * gives it the edit panel (lib/PhotoEdits) for the photo's own species: after an edit `onEdited()` reads the results
+   * again, and after a move or a delete `onEdited({ left: true })`, the screen moving on to another photo.
+   * `photoHref(id, query)` writes a photo's address (by default Export's). Near the end of what is loaded it asks for the next page (`onMore`), once for
    * what is loaded and never while one is `loading` or has failed; a step past the last loaded photo waits for the page
    * and moves on when it comes, and with no more pages it goes round. A failed page (`error`) shows in the viewer with
    * Try again (`onRetry`, the same page again); before the first photo it goes round only when every page is loaded.
@@ -26,6 +30,7 @@
    */
   let {
     photos, photoId, query, total = 0, tags = [], hasMore = false, loading = false, error = '', onMore = () => {}, onRetry = () => {}, returnFocus = () => null, onClose,
+    editable = false, onEdited = async () => {}, photoHref = exportPhotoHref,
   } = $props();
 
   let root = $state(null);
@@ -90,7 +95,7 @@
     if (to < 0 && hasMore) return; // the last photo is not loaded yet
     if (photos.length < 2) return;
     const next = photos[(to + photos.length) % photos.length];
-    window.location.replace(exportPhotoHref(next.id, query));
+    window.location.replace(photoHref(next.id, query));
   }
 
   // The pressed Try again leaves the viewer: focus goes to Close, never to the page.
@@ -142,17 +147,23 @@
     <aside class="lb-side" aria-label={ABOUT_THIS_PHOTO}>
       <h3>Species</h3>
       <p><a class="lb-link" href="#/species/{encodeURIComponent(photo.species.id)}">Open the species page</a></p>
-      <h3>Tags</h3>
-      {#if photo.tags.length}
-        <div class="chips">{#each photo.tags as key (key)}<span class="chip">{label(key)}</span>{/each}</div>
+      {#if editable}
+        <!-- the pressed Move… or Delete leaves the panel: keep keyboard focus inside the viewer -->
+        <PhotoEdits {photo} species={photo.species} {tags} onChanged={() => onEdited()}
+                    onLeft={() => { closeButton?.focus(); return onEdited({ left: true }); }} />
       {:else}
-        <p class="muted">Untagged</p>
+        <h3>Tags</h3>
+        {#if photo.tags.length}
+          <div class="chips">{#each photo.tags as key (key)}<span class="chip">{label(key)}</span>{/each}</div>
+        {:else}
+          <p class="muted">Untagged</p>
+        {/if}
+        <h3>Place</h3>
+        {#if photo.place}<p class="place">{photo.place.path.join(', ')}</p>{:else}<p class="muted">{UNKNOWN_PLACE}</p>{/if}
+        <h3>File</h3>
+        <p class="fp">{photo.relPath}</p>
+        {#each fileLines(photo) as line (line)}<p class="muted">{line}</p>{/each}
       {/if}
-      <h3>Place</h3>
-      {#if photo.place}<p class="place">{photo.place.path.join(', ')}</p>{:else}<p class="muted">{UNKNOWN_PLACE}</p>{/if}
-      <h3>File</h3>
-      <p class="fp">{photo.relPath}</p>
-      {#each fileLines(photo) as line (line)}<p class="muted">{line}</p>{/each}
       <p class="muted keys">← → photos · + − zoom · 0 fit · Esc close</p>
     </aside>
   {/if}

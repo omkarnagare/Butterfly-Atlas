@@ -1,7 +1,8 @@
 import { FILE_TYPES, decode, parseFilter, printFilter } from './filter.js';
 
 /**
- * Hash routes: #/ home, #/setup, #/explore[/<id>], #/species/<id>[/photo/<photoId>][?tag=<key>][&place=<id|unknown>][&type=<file type>], #/deleted,
+ * Hash routes: #/ home, #/setup, #/explore[/<id>][?<filter>][&view=photos|places] and #/explore[/<id>]/photo/<photoId>[?<filter>]
+ * (an Explore page, filtered, and a photo of its results; the filter leaves out the page's own part), #/species/<id>[/photo/<photoId>][?tag=<key>][&place=<id|unknown>][&type=<file type>], #/deleted,
  * #/import (the imports), #/import/<id>[/photo/<itemId>] (one import's grid and its large view),
  * #/export[?<filter>][&view=photos|places] (the Export screen) and #/export/photo/<id>[?<filter>] (a photo of its results),
  * #/settings (Settings: backup and About, Phase 6), #/update (the taxonomy update) and #/split/<id>[/photo/<photoId>] (sorting a split species' photos, and one of them large).
@@ -9,6 +10,8 @@ import { FILE_TYPES, decode, parseFilter, printFilter } from './filter.js';
  * gallery filters it pages through, and on a species page's own address (from the Export results) the chips it opens with.
  */
 export const GROUP_ID = 'G:butterflies';
+/** The group's Custom additions (the server's U:<group>). */
+export const ADDITIONS_ID = 'U:butterflies';
 const POSITIVE = /^[1-9]\d*$/;
 const VIEWS = ['species', 'photos', 'places'];
 
@@ -18,7 +21,18 @@ export function parseRoute(hash) {
   const screen = parts[0];
   const id = parts[1] ? decode(parts[1]) : null;
   if (screen === 'setup') return { screen: 'setup' };
-  if (screen === 'explore') return { screen: 'explore', id: id ?? GROUP_ID };
+  if (screen === 'explore') {
+    // #/explore/photo/<n> is the top page's photo; taxon ids never read "photo".
+    const top = parts[1] === 'photo';
+    const page = top ? GROUP_ID : id ?? GROUP_ID;
+    const at = top ? 2 : 3;
+    const photoId = parts[at - 1] === 'photo' && POSITIVE.test(parts[at] ?? '') ? Number(parts[at]) : null;
+    if (!query && photoId === null) return { screen: 'explore', id: page };
+    const filter = printFilter(parseFilter(query));
+    if (photoId) return { screen: 'explore', id: page, query: filter, view: 'photos', photoId };
+    const view = /(?:^|&)view=(\w+)/.exec(query)?.[1];
+    return { screen: 'explore', id: page, query: filter, view: VIEWS.includes(view) ? view : 'species' };
+  }
   if (screen === 'species' && id) {
     const photoId = parts[2] === 'photo' && POSITIVE.test(parts[3] ?? '') ? Number(parts[3]) : null;
     const params = new URLSearchParams(query);
@@ -71,6 +85,17 @@ export function photoHref(taxonId, photoId, tag = null, place = null, type = nul
 }
 
 export const importHref = (importId) => `#/import/${importId}`;
+
+const explorePath = (id) => `#/explore${id === GROUP_ID ? '' : `/${encodeURIComponent(id)}`}`;
+
+/** An Explore page's address for a printed filter without the page's own part (lib/exploreFilter.js) and a view. */
+export function exploreHref(id, query, view = 'species') {
+  const params = [query, view !== 'species' ? `view=${view}` : ''].filter(Boolean);
+  return `${explorePath(id)}${params.length ? `?${params.join('&')}` : ''}`;
+}
+
+/** A photo of a filtered Explore page's results (the viewer over its Photos view). */
+export const explorePhotoHref = (id, photoId, query) => `${explorePath(id)}/photo/${photoId}${query ? `?${query}` : ''}`;
 
 /** The Export screen's address for a printed filter (lib/filter.js) and a view ('species' is left out). */
 export function exportHref(query, view = 'species') {

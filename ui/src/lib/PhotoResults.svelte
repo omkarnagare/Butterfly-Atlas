@@ -15,7 +15,7 @@
   /**
    * The Export screen's Photos view (contract §4): the matching photos loaded so far as a virtualised grid of square
    * thumbnails, with the species name on hover and focus; a tile opens the viewer over the results
-   * (#/export/photo/<id>?<filter>). When the end of what is loaded comes near and there are more pages (`hasMore`),
+   * (`photoHref`, by default #/export/photo/<id>?<filter>). When the end of what is loaded comes near and there are more pages (`hasMore`),
    * `onMore()` asks for the next one (never while one is `loading`; a failed page shows `error` and Try again, which
    * calls `onRetry`, by default `onMore`). One
    * tile is in the tab order; arrow keys move by tile and by row, Home and End to the ends. `focusId` (the photo open
@@ -26,7 +26,7 @@
    * (`unreadable`) says "Can't show this photo" (Phase 7a). With HEIC photos loaded while the computer has no HEIC
    * decoder, a bar says so above the grid, with How and Check again (Phase 7b audit D1).
    */
-  let { photos, query, hasMore = false, loading = false, error = '', focusId = null, onMore, onRetry = onMore } = $props();
+  let { photos, query, photoHref = exportPhotoHref, hasMore = false, loading = false, error = '', focusId = null, onMore, onRetry = onMore } = $props();
 
   const GAP = 10;
   const MIN_TILE = 150;
@@ -129,7 +129,7 @@
       {#each photos.slice(r * cols, r * cols + cols) as photo, c (photo.id)}
         {@const i = r * cols + c}
         <div role="listitem" aria-setsize={hasMore ? -1 : photos.length} aria-posinset={i + 1} style="width: {tile}px">
-          <a class="ftile" class:waiting={!ready.has(photo.id) && !photo.unreadable} href={exportPhotoHref(photo.id, query)} data-photo-id={photo.id} data-index={i} tabindex={i === focusAt ? 0 : -1}
+          <a class="ftile" class:waiting={!ready.has(photo.id) && !photo.unreadable} href={photoHref(photo.id, query)} data-photo-id={photo.id} data-index={i} tabindex={i === focusAt ? 0 : -1}
              aria-label="Open {title(photo)}, {photo.fileName}{photo.unreadable ? `, ${CANT_SHOW.toLowerCase()}` : ''}" onclick={open} onkeydown={(e) => onKey(e, i)} onfocus={() => (focusAt = i)}>
             {#if photo.unreadable}
               <span class="cant" aria-hidden="true">{CANT_SHOW}</span>

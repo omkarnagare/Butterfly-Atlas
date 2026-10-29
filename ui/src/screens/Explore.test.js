@@ -1,14 +1,31 @@
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { beforeEach, expect, test, vi } from 'vitest';
 import Explore from './Explore.svelte';
-import { addCustomSpecies, checkCustomName, getChildren, getTaxon, getTree } from '../lib/api.js';
+import { addCustomSpecies, checkCustomName, filterCount, filterPhotos, filterPlaces, filterSpecies, getChildren, getTags, getTaxon, getTree } from '../lib/api.js';
+import { EMPTY } from '../lib/filter.js';
 
 vi.mock('../lib/api.js', () => ({
   getTaxon: vi.fn(), getChildren: vi.fn(), getTree: vi.fn(), addSearchWord: vi.fn(), removeSearchWord: vi.fn(), getStatus: vi.fn(),
   addCustomSpecies: vi.fn(), checkCustomName: vi.fn(), renameCustomSpecies: vi.fn(),
+  filterCount: vi.fn(), filterSpecies: vi.fn(), filterPhotos: vi.fn(), filterPlaces: vi.fn(), getTags: vi.fn(), search: vi.fn(), searchPlaces: vi.fn(),
+  photoThumb: (photo) => `./api/photos/${photo.id}/thumb?v=1`,
+  displayUrl: (id) => `./api/photos/${id}/display`,
 }));
 
-beforeEach(() => vi.resetAllMocks());
+const answer = (query) => ({
+  photos: 12, species: 3, photographedSpecies: 2, bytes: 1000, manualSpecies: true,
+  filter: { ...EMPTY, query, taxa: [{ id: 'A1', name: 'Nymphalidae' }] },
+});
+
+beforeEach(() => {
+  vi.resetAllMocks();
+  getTags.mockResolvedValue([{ id: 7, key: 'female', label: 'female', source: 'builtin', photoCount: 3 }]);
+  filterCount.mockImplementation(async (query) => answer(query));
+  filterSpecies.mockResolvedValue([]);
+  filterPlaces.mockResolvedValue([]);
+  filterPhotos.mockResolvedValue({ photos: [], next: null });
+  window.location.hash = '#/explore';
+});
 
 const path = [
   { id: 'G:butterflies', rank: 'group', name: 'Butterflies', common: null },
@@ -41,12 +58,12 @@ test('shows species as species cards', async () => {
     card({ id: 'A5', rank: 'species', name: 'Danaus chrysippus', common: 'Plain Tiger' }),
     card({ id: 'A6', rank: 'species', name: 'Danaus genutia' }),
   ]);
-  render(Explore, { id: 'A4' });
+  const { container } = render(Explore, { id: 'A4' });
 
   expect(await screen.findByText('Plain Tiger')).toBeTruthy();
   expect(screen.getByText('Danaus chrysippus')).toBeTruthy();
   expect(screen.getByText('Danaus genutia')).toBeTruthy();
-  expect(screen.getAllByText('Not yet photographed')).toHaveLength(2);
+  expect(within(container.querySelector('.grid')).getAllByText('Not yet photographed')).toHaveLength(2);
 });
 
 test('loads the new taxon when the id changes', async () => {
@@ -193,7 +210,8 @@ test('with species the card opens the Custom additions page, whose header offers
   expect(screen.queryByRole('button', { name: /Search words/ })).toBeNull();
   expect(container.querySelector('.xh .ct').textContent).toBe('1 of 2 species photographed');
   expect(screen.getByText('Neptis sankara')).toBeTruthy();
-  expect(screen.getAllByText('Custom')).toHaveLength(2);
+  // the filter row's Source: Custom chip aside
+  expect(screen.getAllByText('Custom').filter((each) => !each.closest('.ex-filter'))).toHaveLength(2);
   expect(container.querySelectorAll('.grid .spc')).toHaveLength(2);
   await fireEvent.click(screen.getByRole('button', { name: 'Add a species' }));
   expect(await screen.findByRole('dialog', { name: 'Add a species' })).toBeTruthy();
@@ -207,4 +225,111 @@ test('an empty Custom additions page says so and still offers Add a species', as
   expect(container.querySelector('.xh .ct')).toBeNull();
   expect(container.querySelector('.xh .meter, .xh [role="img"]')).toBeNull();
   expect(screen.getByRole('button', { name: 'Add a species' })).toBeTruthy();
+});
+
+const family = () => detail({ id: 'A1', rank: 'family', name: 'Nymphalidae', common: 'Brush-footed Butterflies', path: path.slice(0, 1) });
+const top = () => detail({ id: 'G:butterflies', rank: 'group', name: 'Butterflies', family: null, path: [] });
+const chipNames = (container) => [...container.querySelectorAll('.ex-filter .fchip, .ex-filter [data-chip]')].map((c) => c.textContent);
+
+test('no filter: the page as today, with the filter row and presets and nothing counted', async () => {
+  getTaxon.mockResolvedValue(family());
+  getChildren.mockResolvedValue([card({ id: 'A2', rank: 'subfamily', name: 'Danainae' })]);
+  const { container } = render(Explore, { id: 'A1', delay: 0 });
+
+  expect(await screen.findByRole('heading', { level: 1, name: 'Nymphalidae' })).toBeTruthy();
+  expect(container.querySelectorAll('.grid .tc, .grid a')).not.toHaveLength(0);
+  expect(screen.getByRole('group', { name: 'View' }).textContent).toContain('Cards');
+  expect(screen.getByRole('button', { name: /Add filter/ })).toBeTruthy();
+  expect(screen.getByRole('group', { name: 'Presets' })).toBeTruthy();
+  expect(container.querySelector('.ex-filter').textContent).toContain('Nymphalidae');
+  expect(filterCount).not.toHaveBeenCalled();
+  expect(screen.queryByRole('link', { name: 'Export these…' })).toBeNull();
+});
+
+test('filtered at the top: the count and the Species view replace the cards, and Cards/Map hides', async () => {
+  getTaxon.mockResolvedValue(top());
+  getChildren.mockResolvedValue([card({ id: 'A1', rank: 'family', name: 'Nymphalidae' })]);
+  const { container } = render(Explore, { id: 'G:butterflies', query: 'tags=female', view: 'species', delay: 0 });
+
+  await vi.waitFor(() => expect(filterCount).toHaveBeenCalledWith('tags=female', expect.anything()));
+  await vi.waitFor(() => expect(filterSpecies).toHaveBeenCalledWith('tags=female', expect.anything()));
+  expect(container.querySelector('.grid')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Cards' })).toBeNull();
+  expect(screen.getByRole('button', { name: 'Photos' })).toBeTruthy();
+  expect(screen.getByRole('link', { name: 'Export these…' }).getAttribute('href')).toBe('#/export?tags=female');
+});
+
+test('filtered inside a group: the views ask for the full filter, and Export these… carries it and the view', async () => {
+  getTaxon.mockResolvedValue(family());
+  getChildren.mockResolvedValue([]);
+  render(Explore, { id: 'A1', query: 'tags=female', view: 'photos', delay: 0 });
+
+  await vi.waitFor(() => expect(filterPhotos).toHaveBeenCalledWith('taxa=A1&tags=female', expect.anything()));
+  expect(filterCount).toHaveBeenCalledWith('taxa=A1&tags=female', expect.anything());
+  expect(screen.getByRole('link', { name: 'Export these…' }).getAttribute('href')).toBe('#/export?taxa=A1&tags=female&view=photos');
+});
+
+test('adding a filter on a group page stays on it; removing the group\'s chip widens to the top page; Clear goes to the plain top page', async () => {
+  getTaxon.mockResolvedValue(family());
+  getChildren.mockResolvedValue([]);
+  window.location.hash = '#/explore/A1';
+  const { rerender } = render(Explore, { id: 'A1', delay: 0 });
+  await screen.findByRole('heading', { level: 1, name: 'Nymphalidae' });
+
+  await fireEvent.click(screen.getByRole('button', { name: 'Not yet photographed' }));
+  expect(window.location.hash).toBe('#/explore/A1?status=not');
+
+  await rerender({ id: 'A1', query: 'status=not', view: 'species', delay: 0 });
+  await fireEvent.click(screen.getByRole('button', { name: /Remove.*Taxa|Remove Nymphalidae/ }));
+  expect(window.location.hash).toBe('#/explore?status=not');
+
+  await rerender({ id: 'G:butterflies', query: 'status=not', view: 'species', delay: 0 });
+  await fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+  expect(window.location.hash).toBe('#/explore');
+});
+
+test('the filter and view live in the address: another address (Back, Forward) shows its filter', async () => {
+  getTaxon.mockResolvedValue(family());
+  getChildren.mockResolvedValue([]);
+  const { rerender } = render(Explore, { id: 'A1', query: 'tags=female', view: 'species', delay: 0 });
+  await vi.waitFor(() => expect(filterSpecies).toHaveBeenCalledWith('taxa=A1&tags=female', expect.anything()));
+
+  await rerender({ id: 'A1', query: 'status=not', view: 'places', delay: 0 });
+  await vi.waitFor(() => expect(filterPlaces).toHaveBeenCalledWith('taxa=A1&status=not', expect.anything()));
+
+  await rerender({ id: 'A1', query: null, view: 'species', delay: 0 });
+  expect(await screen.findByRole('group', { name: 'View' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Cards' })).toBeTruthy();
+});
+
+test('Custom additions starts with Source: Custom and keeps Add a species; its address leaves the source out', async () => {
+  getTaxon.mockResolvedValue(detail({ id: 'U:butterflies', rank: 'additions', name: 'Custom additions', family: null, species: { got: 0, total: 0 } }));
+  getChildren.mockResolvedValue([]);
+  window.location.hash = '#/explore/U%3Abutterflies';
+  const { container, rerender } = render(Explore, { id: 'U:butterflies', delay: 0 });
+  await screen.findByRole('heading', { level: 1, name: 'Custom additions' });
+
+  expect(container.querySelector('.ex-filter').textContent).toContain('Custom');
+  expect(screen.getByRole('button', { name: 'Add a species' })).toBeTruthy();
+  await fireEvent.click(screen.getByRole('button', { name: 'Not yet photographed' }));
+  expect(window.location.hash).toBe('#/explore/U%3Abutterflies?status=not');
+
+  await rerender({ id: 'U:butterflies', query: 'status=not', view: 'species', delay: 0 });
+  await vi.waitFor(() => expect(filterCount).toHaveBeenCalledWith('status=not&source=manual', expect.anything()));
+});
+
+test('a filtered group page\'s photos open in its own viewer address, which can edit them', async () => {
+  getTaxon.mockResolvedValue(family());
+  getChildren.mockResolvedValue([]);
+  const photo = {
+    id: 5, taxonId: 'A9', fileName: 'x.jpg', relPath: 'images/x.jpg', tags: ['female'], width: 4, height: 3, isCover: false, place: null,
+    species: { id: 'A9', name: 'Danaus genutia', common: 'Striped Tiger' },
+  };
+  filterPhotos.mockResolvedValue({ photos: [photo], next: null });
+  const { container, rerender } = render(Explore, { id: 'A1', query: 'tags=female', view: 'photos', delay: 0 });
+
+  await vi.waitFor(() => expect(container.querySelector('.fgrid a')?.getAttribute('href')).toBe('#/explore/A1/photo/5?tags=female'));
+  await rerender({ id: 'A1', query: 'tags=female', view: 'photos', photoId: 5, delay: 0 });
+  expect(await screen.findByRole('button', { name: 'Delete' })).toBeTruthy();
+  expect(within(screen.getByRole('dialog')).getByRole('link', { name: /Striped Tiger/ }).getAttribute('href')).toBe('#/species/A9');
 });
