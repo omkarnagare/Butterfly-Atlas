@@ -10,6 +10,7 @@
   import { exportPhotoHref } from './route.js';
   import { labeller } from './tags.js';
   import { forgetViewerOpen } from './viewer.js';
+  import ViewerTitle from './ViewerTitle.svelte';
   import { STEP } from './zoom.js';
   import { ABOUT_THIS_PHOTO, CLOSE, NEXT_PHOTO, PREVIOUS_PHOTO, UNKNOWN_PLACE, viewerLabel } from './messages.js';
 
@@ -122,7 +123,7 @@
 <div class="ov lb" bind:this={root} role="dialog" aria-modal="true" aria-label={viewerLabel(title)}
      use:modal={{ returnFocus: () => returnFocus(shownId) }}>
   <div class="lb-top">
-    <div class="lb-name"><span>{title}</span>{#if photo?.species.common}<i class="bn">{photo.species.name}</i>{/if}</div>
+    {#if photo}<ViewerTitle taxonId={photo.species.id} name={photo.species.name} common={photo.species.common} linked />{/if}
     <span class="c" aria-live="polite">{(index + 1).toLocaleString()} / {Math.max(total, photos.length).toLocaleString()}</span>
     <button class="lb-x" type="button" bind:this={closeButton} aria-label={CLOSE} onclick={onClose}>×</button>
   </div>

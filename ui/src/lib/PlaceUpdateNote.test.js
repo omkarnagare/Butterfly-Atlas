@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import PlaceUpdateNote from './PlaceUpdateNote.svelte';
 import { dismissPlaceUpdate, getPlaceUpdate, getStatus } from './api.js';
 import { resetStatus, status } from './status.svelte.js';
+import { forgetViewerOpen, viewerOpenedFrom } from './viewer.js';
 
 vi.mock('./api.js', () => ({ getPlaceUpdate: vi.fn(), dismissPlaceUpdate: vi.fn(), getStatus: vi.fn() }));
 
@@ -785,4 +786,20 @@ test('a species line in a place that no longer exists links to the species witho
   const link = await within(card).findByRole('link', { name: /Danaus chrysippus/ });
   expect(link.getAttribute('href')).toBe('#/species/A5');
   expect(text(link)).toBe('Danaus chrysippus — 2 photos in a place that no longer exists');
+});
+
+test('a photo link opens the viewer as opened from Home, so its title leads to the species', async () => {
+  getPlaceUpdate.mockResolvedValue(placeNote());
+  status.placeUpdate = { note: true, formerPhotos: 12, notChecked: 0, pending: 0, moved: 0, rechecking: false, failed: false, lost: 0 };
+  forgetViewerOpen();
+  window.location.hash = '#/';
+  render(PlaceUpdateNote);
+  const card = await screen.findByRole('region', { name: 'Place names updated' });
+  const photoLink = await within(card).findByRole('link', { name: 'Danaus_chrysippus_041.jpg' });
+
+  photoLink.addEventListener('click', (event) => event.preventDefault());
+  await fireEvent.click(photoLink);
+
+  expect(viewerOpenedFrom()).toBe('#/');
+  forgetViewerOpen();
 });

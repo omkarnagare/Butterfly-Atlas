@@ -3,6 +3,7 @@
   import { dismissPlaceUpdate, getPlaceUpdate } from './api.js';
   import { refreshStatus, status } from './status.svelte.js';
   import { photoHref } from './route.js';
+  import { noteViewerOpen } from './viewer.js';
   import { LIBRARY_CODES } from './events.js';
   import { knownPlace } from './places.js';
   import {
@@ -296,7 +297,7 @@
 {#snippet uncheckedLinks()}
   <ul class="pu-list">
     {#each note.notChecked as photo (photo.photoId)}
-      <li><a href={photoHref(photo.taxonId, photo.photoId)}>{photo.fileName}</a> <span class="muted">· <i class="bn">{photo.name}</i></span>{#if photo.reason || photo.final !== undefined}{` — ${[photo.reason, uncheckedNext(photo)].filter(Boolean).join(' ')}`}{/if}</li>
+      <li><a href={photoHref(photo.taxonId, photo.photoId)} onclick={noteViewerOpen}>{photo.fileName}</a> <span class="muted">· <i class="bn">{photo.name}</i></span>{#if photo.reason || photo.final !== undefined}{` — ${[photo.reason, uncheckedNext(photo)].filter(Boolean).join(' ')}`}{/if}</li>
     {/each}
   </ul>
 {/snippet}
@@ -306,7 +307,7 @@
     <p><span>{lostLine(group.photos.length, group.place)}</span></p>
     <ul class="pu-list">
       {#each group.photos as photo (photo.photoId)}
-        <li><a href={photoHref(photo.taxonId, photo.photoId)}>{photo.fileName}</a> <span class="muted">· <i class="bn">{photo.name}</i></span></li>
+        <li><a href={photoHref(photo.taxonId, photo.photoId)} onclick={noteViewerOpen}>{photo.fileName}</a> <span class="muted">· <i class="bn">{photo.name}</i></span></li>
       {/each}
     </ul>
   {/each}

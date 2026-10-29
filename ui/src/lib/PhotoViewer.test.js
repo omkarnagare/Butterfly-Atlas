@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { beforeEach, expect, test, vi } from 'vitest';
 import PhotoViewer from './PhotoViewer.svelte';
 import { resetStatus, status } from './status.svelte.js';
+import { forgetViewerOpen, noteViewerOpen } from './viewer.js';
 import {
   addCustomSpecies, checkCustomName, deletePhotos, getChildren, getRecentPlaces, movePhotos, placePhotos, search, setCover, setPhotoTags, unplacePhotos,
 } from './api.js';
@@ -388,4 +389,48 @@ test('a HEIC photo the decoder could not read says the decode note at once', () 
   render(PhotoViewer, { taxon, photos: [heicPhoto({ unreadable: true })], photoId: 3, tags, onClose: vi.fn(), onChanged: vi.fn() });
   expect(screen.getByRole('status').textContent).toBe(
     "This HEIC photo can't be shown: the computer's decoder couldn't read it. The file may be damaged, or use a HEIC feature the decoder doesn't support. Save it as JPEG on the device it came from and add that.");
+});
+
+function openedFrom(address) {
+  forgetViewerOpen();
+  window.location.hash = address;
+  noteViewerOpen();
+  window.location.hash = '#/species/A5/photo/3';
+}
+
+test('opened from another page, the title links to the species page, replacing the viewer\'s address', async () => {
+  const back = vi.spyOn(window.history, 'back').mockImplementation(() => {});
+  openedFrom('#/');
+  const { onClose } = open();
+
+  const link = screen.getByRole('link', { name: /Plain Tiger/ });
+  expect(link.getAttribute('href')).toBe('#/species/A5');
+  expect(link.getAttribute('title')).toBe('Open Plain Tiger');
+  expect(link.textContent).toContain('Danaus chrysippus');
+  await fireEvent.click(link);
+
+  expect(window.location.hash).toBe('#/species/A5');
+  expect(back).not.toHaveBeenCalled();
+  expect(onClose).not.toHaveBeenCalled();
+  back.mockRestore();
+});
+
+test('opened from the species\' own page, or from its address, the title is plain text', () => {
+  openedFrom('#/species/A5?tag=male');
+  const { unmount } = open();
+  expect(screen.queryByRole('link', { name: /Plain Tiger/ })).toBeNull();
+  expect(screen.getByText('Plain Tiger')).toBeTruthy();
+  unmount();
+
+  forgetViewerOpen();
+  window.location.hash = '#/species/A5/photo/3';
+  open();
+  expect(screen.queryByRole('link', { name: /Plain Tiger/ })).toBeNull();
+});
+
+test('a species with no common name is opened by its scientific name', () => {
+  openedFrom('#/export?view=photos');
+  open(3, { taxon: { ...taxon, common: null } });
+
+  expect(screen.getByRole('link', { name: 'Danaus chrysippus' }).getAttribute('title')).toBe('Open Danaus chrysippus');
 });
