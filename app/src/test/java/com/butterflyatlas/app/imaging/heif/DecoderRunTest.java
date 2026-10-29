@@ -13,6 +13,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -288,30 +290,35 @@ class DecoderRunTest {
 
         List<PhotoProcessor.Use> order = new CopyOnWriteArrayList<>();
         List<CompletableFuture<Void>> waiters = new ArrayList<>();
-        for (PhotoProcessor.Use use : List.of(PhotoProcessor.Use.CATCH_UP, PhotoProcessor.Use.IMPORT,
-                PhotoProcessor.Use.SHOWN, PhotoProcessor.Use.VIEW)) {
-            waiters.add(CompletableFuture.runAsync(() -> {
-                try {
-                    if (slots.acquire(use, Duration.ofSeconds(10))) {
-                        order.add(use);
+        // A thread for each waiter: the shared pool has only cores − 1 threads, so on a 3- or 4-core machine (CI) a
+        // waiter would not start until another one got its slot.
+        try (ExecutorService threads = Executors.newFixedThreadPool(4)) {
+            for (PhotoProcessor.Use use : List.of(PhotoProcessor.Use.CATCH_UP, PhotoProcessor.Use.IMPORT,
+                    PhotoProcessor.Use.SHOWN, PhotoProcessor.Use.VIEW)) {
+                waiters.add(CompletableFuture.runAsync(() -> {
+                    try {
+                        if (slots.acquire(use, Duration.ofSeconds(10))) {
+                            order.add(use);
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
                     }
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
+                }, threads));
+                long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+                while (slots.waiting() < waiters.size() && System.nanoTime() < until) {
+                    Thread.onSpinWait();
                 }
-            }));
-            long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-            while (slots.waiting() < waiters.size() && System.nanoTime() < until) {
-                Thread.onSpinWait();
+                assertThat(slots.waiting()).as(use + " waiting").isEqualTo(waiters.size());
             }
-        }
-        for (int i = 0; i < 4; i++) {
-            slots.release();
-            long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-            while (order.size() < i + 1 && System.nanoTime() < until) {
-                Thread.onSpinWait();
+            for (int i = 0; i < 4; i++) {
+                slots.release();
+                long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+                while (order.size() < i + 1 && System.nanoTime() < until) {
+                    Thread.onSpinWait();
+                }
             }
+            CompletableFuture.allOf(waiters.toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS);
         }
-        CompletableFuture.allOf(waiters.toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS);
         assertThat(order).containsExactly(PhotoProcessor.Use.VIEW, PhotoProcessor.Use.SHOWN, PhotoProcessor.Use.IMPORT,
                 PhotoProcessor.Use.CATCH_UP);
     }

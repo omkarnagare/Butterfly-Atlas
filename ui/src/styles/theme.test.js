@@ -4,11 +4,13 @@ import { describe, expect, test } from 'vitest';
 /**
  * WCAG AA for the Meadow tokens (design §2), read from theme.css itself so a changed colour is checked at once: text
  * ≥ 4.5:1 on every background it sits on, family bands included; bars ≥ 3:1 against their track and the card (1.4.11).
- * (Read from disk: Vitest empties imported CSS, `?raw` included. Tests run from ui/.)
+ * (Read from disk: Vitest empties imported CSS, `?raw` included. Tests run from ui/. Windows line endings, which a
+ * Windows checkout gives, become \n so the selectors below match.)
  */
-const css = readFileSync('src/styles/theme.css', 'utf8');
+const read = (file) => readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
+const css = read('src/styles/theme.css');
 // Some pairs depend on which token a rule in atlas.css uses: the colour it names (`var(--x)`, family ones by family).
-const atlas = readFileSync('src/styles/atlas.css', 'utf8');
+const atlas = read('src/styles/atlas.css');
 function uses(selector, property) {
   const at = atlas.indexOf(`\n${selector} {`);
   if (at < 0) throw new Error(`no ${selector} rule in atlas.css`);
