@@ -185,6 +185,19 @@ public final class TestServices {
         return services;
     }
 
+    /**
+     * The library {@code home} remembers, opened as the app does at its next start (setup would clear its unfinished
+     * work: setup design §3). Its folder was set up by an earlier {@code configured(home…)}.
+     */
+    public static AtlasServices restarted(Path home) {
+        AtlasServices services = unconfigured(home, new ImageIoPhotoProcessor(), null, new LibraryHolder());
+        services.setup().startup(java.util.Optional.empty());
+        if (!services.setup().status().configured()) {
+            throw new IllegalStateException("The remembered library did not open: " + services.setup().status().problem());
+        }
+        return services;
+    }
+
     /** The fixture library open at {@code home/Atlas}. */
     public static AtlasServices configured(Path home) {
         return configured(home, new ImageIoPhotoProcessor());

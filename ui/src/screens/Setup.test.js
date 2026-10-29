@@ -1,9 +1,11 @@
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { beforeEach, expect, test, vi } from 'vitest';
 import Setup from './Setup.svelte';
-import { inspectFolder, retrySetup, setUpLibrary } from '../lib/api.js';
+import { getFsRoots, inspectFolder, listFolder, retrySetup, setUpLibrary } from '../lib/api.js';
 
-vi.mock('../lib/api.js', () => ({ inspectFolder: vi.fn(), setUpLibrary: vi.fn(), retrySetup: vi.fn() }));
+vi.mock('../lib/api.js', () => ({
+  inspectFolder: vi.fn(), setUpLibrary: vi.fn(), retrySetup: vi.fn(), getFsRoots: vi.fn(), listFolder: vi.fn(),
+}));
 
 beforeEach(() => vi.resetAllMocks());
 
@@ -18,7 +20,7 @@ test('uses the suggested folder', async () => {
   expect(screen.getByText('/Users/me/Documents/Butterfly Atlas')).toBeTruthy();
   await fireEvent.click(screen.getByRole('button', { name: 'Use this folder' }));
 
-  expect(setUpLibrary).toHaveBeenCalledWith('/Users/me/Documents/Butterfly Atlas');
+  expect(setUpLibrary).toHaveBeenCalledWith('/Users/me/Documents/Butterfly Atlas', true);
   await vi.waitFor(() => expect(onDone).toHaveBeenCalledOnce());
 });
 
@@ -31,45 +33,66 @@ test('shows why a folder cannot be used', async () => {
   expect((await screen.findByRole('alert')).textContent).toContain('cannot save files in that folder');
 });
 
-test('offers to open a library found in a typed folder', async () => {
-  inspectFolder.mockResolvedValue({ path: '/data/Atlas', absolute: true, exists: true, folder: true, hasLibrary: true, writable: true });
+// The folder browser in setup mode, at Documents, where the library would be created.
+function browserAt(check = { kind: 'create', libraryFolder: '/Users/me/Documents/Butterfly_Atlas' }) {
+  getFsRoots.mockResolvedValue([{ name: 'Documents', path: '/Users/me/Documents', kind: 'documents' }]);
+  listFolder.mockResolvedValue({
+    path: '/Users/me/Documents', name: 'Documents', parent: '/Users/me', crumbs: [{ name: 'Documents', path: '/Users/me/Documents' }],
+    folders: [], photos: 0, isLibrary: false, openImport: null,
+  });
+  inspectFolder.mockImplementation(async (path, exact) => (exact === false
+    ? { path, absolute: true, unfinished: null, ...check } : null));
+}
+
+test('"Choose a different folder" opens the folder browser; choosing there sets the library up inside that folder', async () => {
+  browserAt();
+  setUpLibrary.mockResolvedValue({ configured: true });
+  const onDone = vi.fn();
+  render(Setup, { status, onDone });
+
+  await fireEvent.click(screen.getByRole('button', { name: 'Choose a different folder' }));
+  const dialog = screen.getByRole('dialog', { name: 'Choose where to keep your library' });
+  expect(screen.queryByPlaceholderText('For example, /Volumes/Photos/Butterflies')).toBeNull();
+  await screen.findByText('Your library will be created in /Users/me/Documents/Butterfly_Atlas.');
+  await fireEvent.click(within(dialog).getByRole('button', { name: 'Use this folder' }));
+
+  expect(setUpLibrary).toHaveBeenCalledWith('/Users/me/Documents', false);
+  await vi.waitFor(() => expect(onDone).toHaveBeenCalledOnce());
+});
+
+test('Cancel in the folder browser goes back to the suggested folder', async () => {
+  browserAt();
   render(Setup, { status, onDone: vi.fn() });
 
   await fireEvent.click(screen.getByRole('button', { name: 'Choose a different folder' }));
-  await fireEvent.input(screen.getByLabelText('Folder path'), { target: { value: '/data/Atlas' } });
+  await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
-  expect(await screen.findByRole('button', { name: 'Open this existing library' }, { timeout: 2000 })).toBeTruthy();
-  expect(inspectFolder).toHaveBeenCalledWith('/data/Atlas');
-  expect(screen.getByText(/already has a Butterfly Atlas library/)).toBeTruthy();
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(screen.getByText('/Users/me/Documents/Butterfly Atlas')).toBeTruthy();
+});
+
+test('the suggested folder\'s library says what unfinished work opening it clears; a new one says nothing more', async () => {
+  inspectFolder.mockResolvedValue({
+    path: status.suggestedFolder, absolute: true, libraryFolder: status.suggestedFolder, kind: 'existing',
+    unfinished: { imports: 0, exports: 2, backups: 0 },
+  });
+  const { unmount } = render(Setup, { status, onDone: vi.fn() });
+
+  expect(await screen.findByText(/^This folder already has a Butterfly Atlas library\. It will open as it is, except for work left unfinished where it was used before: 2 paused exports\. They will be cleared/))
+    .toBeTruthy();
+  expect(inspectFolder).toHaveBeenCalledWith(status.suggestedFolder, true);
+  unmount();
+
+  inspectFolder.mockResolvedValue({ path: status.suggestedFolder, absolute: true, libraryFolder: status.suggestedFolder, kind: 'create', unfinished: null });
+  render(Setup, { status, onDone: vi.fn() });
+  await vi.waitFor(() => expect(inspectFolder).toHaveBeenCalledTimes(2));
+  expect(screen.queryByText(/unfinished|will be created/)).toBeNull();
 });
 
 test('explains a problem found at startup', () => {
   render(Setup, { status: { ...status, problem: 'Butterfly Atlas could not find your library at /Volumes/Card.' }, onDone: vi.fn() });
 
   expect(screen.getByRole('alert').textContent).toContain('/Volumes/Card');
-});
-
-test('moves focus to the folder field', async () => {
-  render(Setup, { status, onDone: vi.fn() });
-
-  await fireEvent.click(screen.getByRole('button', { name: 'Choose a different folder' }));
-
-  await vi.waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Folder path')));
-});
-
-test('submits the typed folder with Enter', async () => {
-  setUpLibrary.mockResolvedValue({ configured: true });
-  inspectFolder.mockResolvedValue(null);
-  const onDone = vi.fn();
-  render(Setup, { status, onDone });
-
-  await fireEvent.click(screen.getByRole('button', { name: 'Choose a different folder' }));
-  const field = screen.getByLabelText('Folder path');
-  await fireEvent.input(field, { target: { value: '/data/New' } });
-  await fireEvent.submit(field.closest('form'));
-
-  expect(setUpLibrary).toHaveBeenCalledWith('/data/New');
-  await vi.waitFor(() => expect(onDone).toHaveBeenCalledOnce());
 });
 
 test('continues when the library was already set up elsewhere', async () => {
@@ -218,14 +241,13 @@ test('a library another copy is using, or one made by a newer version, is refuse
   }
 });
 
-test('the same refusals are shown for a typed folder, and when Try again meets them', async () => {
+test('the same refusals are shown in the folder browser, and when Try again meets them', async () => {
+  browserAt();
   setUpLibrary.mockRejectedValue(Object.assign(new Error(IN_USE), { code: 'library_in_use', status: 409 }));
-  inspectFolder.mockResolvedValue(null);
   const { unmount } = render(Setup, { status, onDone: vi.fn() });
   await fireEvent.click(screen.getByRole('button', { name: 'Choose a different folder' }));
-  const field = screen.getByLabelText('Folder path');
-  await fireEvent.input(field, { target: { value: '/data/Busy' } });
-  await fireEvent.submit(field.closest('form'));
+  await screen.findByText('Your library will be created in /Users/me/Documents/Butterfly_Atlas.');
+  await fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Use this folder' }));
   expect((await screen.findByRole('alert')).textContent).toBe(IN_USE);
   unmount();
 

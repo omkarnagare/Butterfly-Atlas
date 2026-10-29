@@ -39,12 +39,15 @@ public final class AppDirs {
         return base.resolve("butterfly-atlas");
     }
 
+    /** The library folder's name: in Documents on first launch, and inside a folder chosen at setup. */
+    public static final String LIBRARY_NAME = "Butterfly_Atlas";
+
     /**
      * The data folder offered on first launch: a name without a space, as every name the app creates. A library set up
      * before keeps its folder (config.json names it).
      */
     public static Path defaultDataFolder(Path home) {
-        return home.resolve("Documents").resolve("Butterfly_Atlas");
+        return home.resolve("Documents").resolve(LIBRARY_NAME);
     }
 
     /**

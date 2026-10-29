@@ -181,16 +181,184 @@ class SetupServiceTest {
     }
 
     @Test
-    void inspectDescribesAFolder() {
+    void inspectAsGivenDescribesTheFolderItself() throws Exception {
         Path folder = home.resolve("Atlas");
         service(new LibraryHolder()).setup(folder.toString());
+        Path file = Files.writeString(home.resolve("notes.txt"), "x");
         SetupService setup = service(holder);
 
-        assertThat(setup.inspect(folder.toString()))
-                .isEqualTo(new SetupService.FolderCheck(folder.toString(), true, true, true, true, true));
-        assertThat(setup.inspect(home.resolve("New").toString()))
-                .isEqualTo(new SetupService.FolderCheck(home.resolve("New").toString(), true, false, false, false, true));
-        assertThat(setup.inspect("relative").absolute()).isFalse();
+        assertThat(setup.inspect(folder.toString())).isEqualTo(existing(folder, folder));
+        assertThat(setup.inspect(home.resolve("New").toString(), true))
+                .isEqualTo(check(home.resolve("New"), home.resolve("New"), SetupService.CREATE));
+        assertThat(setup.inspect(file.toString(), true)).isEqualTo(check(file, null, SetupService.NOT_A_FOLDER));
+        assertThat(setup.inspect("relative", true))
+                .isEqualTo(new SetupService.FolderCheck("relative", false, null, SetupService.RELATIVE, null));
+    }
+
+    @Test
+    void inspectInsideKeepsTheLibraryInAButterflyAtlasFolder() throws Exception {
+        SetupService setup = service(holder);
+        Path documents = Files.createDirectories(home.resolve("Documents"));
+        assertThat(setup.inspect(documents.toString(), false))
+                .isEqualTo(check(documents, documents.resolve("Butterfly_Atlas"), SetupService.CREATE));
+
+        Files.createDirectories(documents.resolve("Butterfly_Atlas"));
+        assertThat(setup.inspect(documents.toString(), false)).as("an empty Butterfly_Atlas is used")
+                .isEqualTo(check(documents, documents.resolve("Butterfly_Atlas"), SetupService.CREATE));
+
+        Files.writeString(documents.resolve("Butterfly_Atlas").resolve("other.txt"), "x");
+        assertThat(setup.inspect(documents.toString(), false))
+                .isEqualTo(check(documents, documents.resolve("Butterfly_Atlas"), SetupService.TAKEN));
+
+        Path drive = Files.createDirectories(home.resolve("Drive"));
+        Files.writeString(drive.resolve("Butterfly_Atlas"), "a file");
+        assertThat(setup.inspect(drive.toString(), false))
+                .isEqualTo(check(drive, drive.resolve("Butterfly_Atlas"), SetupService.TAKEN));
+
+        assertThat(setup.inspect(home.resolve("Missing").toString(), false))
+                .isEqualTo(check(home.resolve("Missing"), null, SetupService.NOT_FOUND));
+        Path file = Files.writeString(home.resolve("notes.txt"), "x");
+        assertThat(setup.inspect(file.toString(), false)).isEqualTo(check(file, null, SetupService.NOT_A_FOLDER));
+    }
+
+    @Test
+    void inspectInsideFindsALibraryInTheFolderOrInItsButterflyAtlasFolder() {
+        Path library = home.resolve("Old").resolve("Butterfly_Atlas");
+        service(new LibraryHolder()).setup(library.toString());
+        SetupService setup = service(holder);
+
+        assertThat(setup.inspect(home.resolve("Old").toString(), false))
+                .isEqualTo(existing(home.resolve("Old"), library));
+        assertThat(setup.inspect(library.toString(), false)).as("the library folder itself")
+                .isEqualTo(existing(library, library));
+    }
+
+    @Test
+    void inspectInsideSaysWhenTheFolderCannotBeWritten() throws Exception {
+        Path locked = Files.createDirectories(home.resolve("Locked"));
+        org.junit.jupiter.api.Assumptions.assumeTrue(locked.getFileSystem().supportedFileAttributeViews().contains("posix"));
+        Files.setPosixFilePermissions(locked, java.nio.file.attribute.PosixFilePermissions.fromString("r-xr-xr-x"));
+        try {
+            org.junit.jupiter.api.Assumptions.assumeFalse(Files.isWritable(locked), "running as a user who can write anywhere");
+            assertThat(service(holder).inspect(locked.toString(), false))
+                    .isEqualTo(check(locked, locked.resolve("Butterfly_Atlas"), SetupService.NOT_WRITABLE));
+        } finally {
+            Files.setPosixFilePermissions(locked, java.nio.file.attribute.PosixFilePermissions.fromString("rwxr-xr-x"));
+        }
+    }
+
+    @Test
+    void setupInsideCreatesTheLibraryInAButterflyAtlasFolder() throws Exception {
+        Path documents = Files.createDirectories(home.resolve("Documents"));
+
+        SetupService.Status status = service(holder).setup(documents.toString(), false);
+
+        Path library = documents.resolve("Butterfly_Atlas");
+        assertThat(status.dataFolder()).isEqualTo(library.toString());
+        assertThat(library.resolve("atlas.db")).exists();
+        assertThat(config().load()).contains(new AppConfig(library.toString()));
+    }
+
+    @Test
+    void setupInsideOpensTheLibraryThatIsThere() {
+        Path library = home.resolve("Old").resolve("Butterfly_Atlas");
+        service(new LibraryHolder()).setup(library.toString());
+
+        assertThat(service(holder).setup(home.resolve("Old").toString(), false).dataFolder()).isEqualTo(library.toString());
+        assertThat(library.resolve("Butterfly_Atlas")).doesNotExist();
+    }
+
+    @Test
+    void setupInsideRefusesATakenOrMissingFolder() throws Exception {
+        Path documents = Files.createDirectories(home.resolve("Documents"));
+        Files.writeString(Files.createDirectories(documents.resolve("Butterfly_Atlas")).resolve("other.txt"), "x");
+
+        assertThatThrownBy(() -> service(holder).setup(documents.toString(), false))
+                .isInstanceOfSatisfying(AtlasException.class, e -> assertThat(e.getMessage()).isEqualTo(
+                        documents.resolve("Butterfly_Atlas") + " already exists and isn't a Butterfly Atlas library."
+                                + " Choose another folder."));
+        assertThatThrownBy(() -> service(holder).setup(home.resolve("Missing").toString(), false))
+                .isInstanceOfSatisfying(AtlasException.class,
+                        e -> assertThat(e.getMessage()).isEqualTo("That folder can't be found. Choose another folder."));
+        assertThat(home.resolve("Missing")).doesNotExist();
+        assertThat(holder.current()).isEmpty();
+    }
+
+    /** A library with unfinished work (UnfinishedWorkTest), as copied from another computer: nothing remembers it here. */
+    private Path copiedWithUnfinishedWork() {
+        Path folder = home.resolve("Copied").resolve("Butterfly_Atlas");
+        UnfinishedWorkTest.leaveUnfinished(
+                Library.open(folder, TestBundles.fixture(), TestPlaces.bundles(), TestBundles.CLOCK).database());
+        return folder;
+    }
+
+    @Test
+    void inspectCountsTheUnfinishedWorkOfAnExistingLibrary() {
+        Path folder = copiedWithUnfinishedWork();
+        SetupService setup = service(holder);
+
+        assertThat(setup.inspect(folder.getParent().toString(), false).unfinished())
+                .isEqualTo(new UnfinishedWork.Counts(1, 1, 1));
+        assertThat(setup.inspect(folder.toString()).unfinished()).isEqualTo(new UnfinishedWork.Counts(1, 1, 1));
+        assertThat(setup.inspect(home.resolve("New").toString()).unfinished()).as("only for an existing library").isNull();
+        assertThat(count(folder, "SELECT COUNT(*) FROM import_run WHERE state = 'open'")).as("nothing changed").isEqualTo(1);
+    }
+
+    @Test
+    void openingAnExistingLibraryAtSetupClearsItsUnfinishedWork() {
+        Path folder = copiedWithUnfinishedWork();
+
+        service(holder).setup(folder.getParent().toString(), false);
+
+        assertThat(count(holder, "SELECT COUNT(*) FROM import_run WHERE state = 'open'")).isZero();
+        assertThat(count(holder, "SELECT COUNT(*) FROM export_run WHERE state IN ('running', 'paused')")).isZero();
+        assertThat(count(holder, "SELECT COUNT(*) FROM backup_run WHERE state IN ('running', 'paused')")).isZero();
+        assertThat(count(holder, "SELECT COUNT(*) FROM image")).isEqualTo(1);
+    }
+
+    @Test
+    void theRememberedLibraryAtStartKeepsItsUnfinishedWork() {
+        Path folder = copiedWithUnfinishedWork();
+        config().save(new AppConfig(folder.toString()));
+
+        service(holder).startup(Optional.empty());
+
+        assertThat(holder.library().folder()).isEqualTo(folder);
+        assertThat(count(holder, "SELECT COUNT(*) FROM import_run WHERE state = 'open'")).isEqualTo(1);
+        assertThat(count(holder, "SELECT COUNT(*) FROM export_run WHERE state = 'paused'")).isEqualTo(1);
+    }
+
+    @Test
+    void aClearThatFailsOpensNothingAndChangesNothing() {
+        Path folder = copiedWithUnfinishedWork();
+        exec(folder, "CREATE TRIGGER refuse BEFORE UPDATE ON export_run BEGIN SELECT RAISE(ABORT, 'refused'); END");
+
+        assertThatThrownBy(() -> service(holder).setup(folder.toString()))
+                .isInstanceOfSatisfying(AtlasException.class, e -> assertThat(e.getMessage()).startsWith(
+                        "Butterfly Atlas couldn't clear the work left unfinished in that library, so it didn't open it."));
+
+        assertThat(holder.current()).isEmpty();
+        assertThat(config().load()).isEmpty();
+        assertThat(count(folder, "SELECT COUNT(*) FROM import_run WHERE state = 'open'")).as("rolled back").isEqualTo(1);
+    }
+
+    private static int count(Path folder, String sql) {
+        return com.butterflyatlas.app.db.Database.open(folder.resolve("atlas.db")).read(c -> {
+            try (PreparedStatement ps = c.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                return rs.getInt(1);
+            }
+        });
+    }
+
+    /** An existing library with nothing unfinished. */
+    private static SetupService.FolderCheck existing(Path picked, Path library) {
+        return new SetupService.FolderCheck(picked.toString(), true, library.toString(), SetupService.EXISTING,
+                new UnfinishedWork.Counts(0, 0, 0));
+    }
+
+    private static SetupService.FolderCheck check(Path picked, Path library, String kind) {
+        return new SetupService.FolderCheck(picked.toString(), true, library == null ? null : library.toString(), kind, null);
     }
 
     @Test

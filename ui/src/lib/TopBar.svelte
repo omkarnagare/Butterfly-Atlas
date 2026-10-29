@@ -5,6 +5,8 @@
 
   /** @type {{ current?: 'home' | 'explore' | 'export' | 'import' | 'settings', onSearch?: () => void }} */
   let { current = 'home', onSearch = () => {} } = $props();
+  // The search shortcut as this computer writes it (App.svelte takes ⌘K or Ctrl K, and /).
+  const SEARCH_KEYS = /Mac/.test(globalThis.navigator?.userAgent ?? '') ? '⌘K' : 'Ctrl K';
 
   // New window (several-windows contract §8, A13): "Opening…" (aria-disabled) until the app answers, which can take a
   // few seconds while the browser starts; then a toast either way, a refusal in the server's words, long enough to read.
@@ -58,7 +60,8 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
         <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
       </svg>
-      <span>Search species, genera, families</span>
+      <span>Search</span>
+      <kbd>{SEARCH_KEYS}</kbd>
     </button>
   </div>
 </header>
@@ -86,14 +89,17 @@
   }
   .imp:hover { color: var(--ink); background: var(--surface-2); }
   .imp[aria-current='page'] { background: var(--surface-2); color: var(--ink); }
+  /* A short pill (icon, Search, the shortcut) the height of Import folder: it never wraps. */
   .searchbtn {
-    display: flex; align-items: center; gap: 10px; flex: 0 1 260px; min-width: 0;
+    display: flex; align-items: center; gap: 8px; flex: none; white-space: nowrap;
     border: 1px solid var(--line); background: var(--surface); border-radius: 12px;
-    padding: 8px 10px 8px 12px; color: var(--muted); transition: border-color .2s, box-shadow .2s;
+    padding: 7px 8px 7px 12px; font-weight: 600; color: var(--muted); transition: border-color .2s, box-shadow .2s;
   }
   .searchbtn:hover { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 14%, transparent); }
-  .searchbtn span { flex: 1; text-align: left; }
+  .searchbtn kbd {
+    font: 600 12px/1 var(--mono); padding: 3px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface-2);
+  }
   @media (max-width: 640px) {
-    .searchbtn span, .imp span, .logo b { display: none; }
+    .searchbtn span, .searchbtn kbd, .imp span, .logo b { display: none; }
   }
 </style>
