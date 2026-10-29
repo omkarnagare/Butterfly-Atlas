@@ -42,6 +42,21 @@ test('calls onSearch when the search button is pressed', async () => {
   expect(onSearch).toHaveBeenCalledOnce();
 });
 
+test('the search button is a short "Search" pill with the shortcut for this computer, and keeps its full name', () => {
+  const agent = vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)');
+  const { unmount } = render(TopBar);
+  const button = screen.getByRole('button', { name: 'Search species, genera, families' });
+  expect(button.textContent.replace(/\s+/g, ' ').trim()).toBe('Search ⌘K');
+  expect(button.querySelector('kbd').textContent).toBe('⌘K');
+  unmount();
+
+  agent.mockReturnValue('Mozilla/5.0 (Windows NT 10.0; Win64; x64)');
+  render(TopBar);
+  expect(screen.getByRole('button', { name: 'Search species, genera, families' }).textContent.replace(/\s+/g, ' ').trim())
+    .toBe('Search Ctrl K');
+  agent.mockRestore();
+});
+
 test('marks Home as the current page by default', () => {
   render(TopBar);
   expect(screen.getByRole('link', { name: 'Home' }).getAttribute('aria-current')).toBe('page');
