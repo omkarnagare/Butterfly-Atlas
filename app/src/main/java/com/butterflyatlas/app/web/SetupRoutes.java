@@ -8,7 +8,7 @@ import io.javalin.Javalin;
 final class SetupRoutes {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record SetupRequest(String dataFolder) {
+    record SetupRequest(String dataFolder, Boolean exact) {
     }
 
     private final SetupService setup;
@@ -19,8 +19,13 @@ final class SetupRoutes {
 
     void register(Javalin app) {
         app.get("/api/setup", ctx -> ctx.json(setup.status()));
-        app.get("/api/setup/inspect", ctx -> ctx.json(setup.inspect(ctx.queryParam("path"))));
-        app.post("/api/setup", ctx -> ctx.json(setup.setup(Json.body(ctx, SetupRequest.class).dataFolder())));
+        // exact: the folder is the library folder (the default); exact=false: the library is kept in it (setup design §3).
+        app.get("/api/setup/inspect", ctx -> ctx.json(setup.inspect(ctx.queryParam("path"),
+                !"false".equals(ctx.queryParam("exact")))));
+        app.post("/api/setup", ctx -> {
+            SetupRequest request = Json.body(ctx, SetupRequest.class);
+            ctx.json(setup.setup(request.dataFolder(), request.exact() == null || request.exact()));
+        });
         app.post("/api/setup/retry", ctx -> ctx.json(setup.retry()));
     }
 }

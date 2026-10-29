@@ -41,9 +41,28 @@ public final class SetupService {
     public record Status(boolean configured, String suggestedFolder, String dataFolder, String problem, boolean retry) {
     }
 
-    /** A live check of a typed path, before the user commits to it. */
-    public record FolderCheck(String path, boolean absolute, boolean exists, boolean folder, boolean hasLibrary,
-                              boolean writable) {
+    /**
+     * A live check of a folder, before the user commits to it: the library folder it gives ({@code libraryFolder}, null
+     * when there is none) and what happens there ({@code kind}). {@code unfinished}: what an existing library was left
+     * with where it was used before, cleared when it is opened here (null unless {@link #EXISTING}).
+     */
+    public record FolderCheck(String path, boolean absolute, String libraryFolder, String kind, UnfinishedWork.Counts unfinished) {
+    }
+
+    /** The library folder holds a library, which opens as it is. */
+    public static final String EXISTING = "existing";
+    /** The library is created in the library folder. */
+    public static final String CREATE = "create";
+    /** The folder's {@code Butterfly_Atlas} is a file, or a folder that is neither a library nor empty. */
+    public static final String TAKEN = "taken";
+    public static final String NOT_WRITABLE = "not_writable";
+    public static final String NOT_FOUND = "not_found";
+    public static final String NOT_A_FOLDER = "not_a_folder";
+    /** Not a full path (or not a path at all). */
+    public static final String RELATIVE = "relative";
+
+    /** The library folder for a chosen folder, and what happens there. */
+    record Place(Path folder, String kind) {
     }
 
     private final ConfigStore config;
@@ -306,28 +325,89 @@ public final class SetupService {
         return requested;
     }
 
+    /** {@link #inspect(String, boolean)} for the folder as given. */
     public FolderCheck inspect(String rawPath) {
-        Path path;
-        try {
-            path = resolve(rawPath);
-        } catch (AtlasException e) {
-            return new FolderCheck(rawPath, false, false, false, false, false);
-        }
-        boolean exists = Files.exists(path);
-        boolean folder = Files.isDirectory(path);
-        boolean hasLibrary = folder && Files.isRegularFile(path.resolve(Database.FILE_NAME));
-        boolean writable = folder ? Files.isWritable(path) : !exists && nearestExistingIsWritable(path);
-        return new FolderCheck(path.toString(), true, exists, folder, hasLibrary, writable);
+        return inspect(rawPath, true);
     }
 
+    /**
+     * Checks a folder for setup. {@code exact}: the folder is the library folder (the suggested folder, a typed path);
+     * otherwise it is where the library is kept (the folder browser): the folder itself when it holds a library, else its
+     * {@code Butterfly_Atlas}.
+     */
+    public FolderCheck inspect(String rawPath, boolean exact) {
+        Path picked;
+        try {
+            picked = resolve(rawPath);
+        } catch (AtlasException e) {
+            return new FolderCheck(rawPath, false, null, RELATIVE, null);
+        }
+        Place place = place(picked, exact);
+        return new FolderCheck(picked.toString(), true, place.folder() == null ? null : place.folder().toString(),
+                place.kind(), null);
+    }
+
+    /** Where the library of a chosen folder is (see {@link #inspect(String, boolean)}), and what happens there. */
+    static Place place(Path picked, boolean exact) {
+        if (Files.exists(picked) && !Files.isDirectory(picked)) {
+            return new Place(null, NOT_A_FOLDER);
+        }
+        if (hasLibrary(picked)) {
+            return new Place(picked, EXISTING);
+        }
+        if (exact) {
+            return new Place(picked, writable(picked) ? CREATE : NOT_WRITABLE);
+        }
+        if (!Files.isDirectory(picked)) {
+            return new Place(null, NOT_FOUND);
+        }
+        Path inside = picked.resolve(AppDirs.LIBRARY_NAME);
+        if (hasLibrary(inside)) {
+            return new Place(inside, EXISTING);
+        }
+        if (Files.exists(inside) && (!Files.isDirectory(inside) || !isEmpty(inside))) {
+            return new Place(inside, TAKEN);
+        }
+        return new Place(inside, writable(inside) ? CREATE : NOT_WRITABLE);
+    }
+
+    private static boolean hasLibrary(Path folder) {
+        return Files.isRegularFile(folder.resolve(Database.FILE_NAME));
+    }
+
+    private static boolean writable(Path folder) {
+        return Files.isDirectory(folder) ? Files.isWritable(folder) : nearestExistingIsWritable(folder);
+    }
+
+    /** True when the folder has nothing in it; one that can't be listed counts as not empty. */
+    private static boolean isEmpty(Path folder) {
+        try (java.util.stream.Stream<Path> entries = Files.list(folder)) {
+            return entries.findAny().isEmpty();
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    /** {@link #setup(String, boolean)} for the folder as given. */
     public synchronized Status setup(String rawPath) {
+        return setup(rawPath, true);
+    }
+
+    /** Creates or opens the library of a chosen folder ({@code exact} as in {@link #inspect(String, boolean)}). */
+    public synchronized Status setup(String rawPath, boolean exact) {
         if (holder.current().isPresent()) {
             throw new AtlasException(AtlasException.Kind.ALREADY_CONFIGURED, "Your library is already set up.");
         }
-        Path folder = resolve(rawPath);
-        if (Files.exists(folder) && !Files.isDirectory(folder)) {
-            throw AtlasException.invalid("That is a file, not a folder. Choose a folder.");
+        Place place = place(resolve(rawPath), exact);
+        switch (place.kind()) {
+            case NOT_A_FOLDER -> throw AtlasException.invalid("That is a file, not a folder. Choose a folder.");
+            case NOT_FOUND -> throw AtlasException.invalid("That folder can't be found. Choose another folder.");
+            case TAKEN -> throw AtlasException.invalid(place.folder()
+                    + " already exists and isn't a Butterfly Atlas library. Choose another folder.");
+            default -> {
+            }
         }
+        Path folder = place.folder();
         try {
             Files.createDirectories(folder);
         } catch (IOException e) {

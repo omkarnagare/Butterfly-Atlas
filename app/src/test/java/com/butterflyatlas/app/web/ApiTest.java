@@ -84,8 +84,8 @@ class ApiTest {
         assertThat(status.get("suggestedFolder").asText()).endsWith("Butterfly_Atlas");
 
         JsonNode check = get("api/setup/inspect?path=" + encode(folder.toString()));
-        assertThat(check.get("exists").asBoolean()).isFalse();
-        assertThat(check.get("writable").asBoolean()).isTrue();
+        assertThat(check.get("kind").asText()).isEqualTo("create");
+        assertThat(check.get("libraryFolder").asText()).as("as given, without exact").isEqualTo(folder.toString());
 
         HttpResponse<String> setup = send("POST", "api/setup",
                 JSON.writeValueAsString(JSON.createObjectNode().put("dataFolder", folder.toString())));
@@ -93,6 +93,22 @@ class ApiTest {
         assertThat(JSON.readTree(setup.body()).get("configured").asBoolean()).isTrue();
 
         assertThat(get("api/summary").get("families").size()).isEqualTo(2);
+    }
+
+    @Test
+    void setupInsideAChosenFolderMakesAButterflyAtlasFolder() throws Exception {
+        server = AtlasServer.start(0, TestServices.unconfigured(home));
+        Path picked = java.nio.file.Files.createDirectories(home.resolve("Pictures"));
+
+        JsonNode check = get("api/setup/inspect?exact=false&path=" + encode(picked.toString()));
+        assertThat(check.get("kind").asText()).isEqualTo("create");
+        assertThat(check.get("libraryFolder").asText()).isEqualTo(picked.resolve("Butterfly_Atlas").toString());
+
+        HttpResponse<String> setup = send("POST", "api/setup", JSON.writeValueAsString(JSON.createObjectNode()
+                .put("dataFolder", picked.toString()).put("exact", false)));
+        assertThat(setup.statusCode()).isEqualTo(200);
+        assertThat(JSON.readTree(setup.body()).get("dataFolder").asText())
+                .isEqualTo(picked.resolve("Butterfly_Atlas").toString());
     }
 
     @Test
