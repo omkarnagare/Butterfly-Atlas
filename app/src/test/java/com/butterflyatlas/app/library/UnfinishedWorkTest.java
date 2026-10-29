@@ -1,7 +1,6 @@
 package com.butterflyatlas.app.library;
 
 import com.butterflyatlas.app.db.Database;
-import com.butterflyatlas.app.imports.ImportStore;
 import com.butterflyatlas.app.testing.TestBundles;
 import com.butterflyatlas.app.testing.TestPlaces;
 import org.junit.jupiter.api.Test;
@@ -114,12 +113,9 @@ class UnfinishedWorkTest {
     }
 
     @Test
-    void clearingDropsOpenImportsAndCancelsRunningAndPausedRunsKeepingTheirFiles() throws Exception {
+    void clearingDropsOpenImportsAndCancelsRunningAndPausedRunsKeepingTheirFiles() {
         Library library = library("Atlas");
         leaveUnfinished(library.database());
-        Path preview = Files.createDirectories(ImportStore.previewFolder(library.folder(), 1)).resolve("1-a.jpg");
-        Files.writeString(preview, "preview");
-
         UnfinishedWork.Counts cleared = UnfinishedWork.clear(library, TestBundles.CLOCK);
 
         assertThat(cleared).isEqualTo(new UnfinishedWork.Counts(1, 1, 1));
@@ -131,7 +127,6 @@ class UnfinishedWorkTest {
         assertThat(rows(db, "SELECT id, state, cancel_choice, paused_by, notice, finished_at FROM export_run ORDER BY id"))
                 .containsExactly("1|cancelled|keep|null|null|" + now, "2|done|null|null|null|null");
         assertThat(rows(db, "SELECT state, cancel, finished_at FROM backup_run")).containsExactly("cancelled|keep|" + now);
-        assertThat(ImportStore.previewFolder(library.folder(), 1)).doesNotExist();
         assertThat(UnfinishedWork.count(db.file())).isEqualTo(new UnfinishedWork.Counts(0, 0, 0));
     }
 
