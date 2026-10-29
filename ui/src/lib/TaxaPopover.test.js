@@ -109,3 +109,22 @@ test('Enter right after typing more adds nothing: the results of the older words
   expect(onChange).not.toHaveBeenCalled();
   expect(screen.queryByRole('option')).toBeNull();
 });
+
+test('a result found by an older name or one of the user\'s own names says so; a name or common-name match does not', async () => {
+  const terpsicore = { ...hit('A801', 'species', 'Acraea terpsicore', 'Tawny Coster', 'Nymphalidae'), matchKind: 'synonym', matched: 'Acraea violae' };
+  const kaner = { ...tiger, matchKind: 'word', matched: 'Kaner' };
+  search.mockResolvedValue([terpsicore, kaner, danaus]);
+  render(TaxaPopover, { filter: EMPTY, names: mergeNames(undefined, {}), onChange: vi.fn(), onClose: vi.fn() });
+
+  await fireEvent.input(field(), { target: { value: 'a' } });
+  const options = await screen.findAllByRole('option');
+
+  expect(options.map((o) => o.textContent.replace(/\s+/g, ' ').trim())).toEqual([
+    'Tawny Coster Acraea terpsicore · Nymphalidae also known as Acraea violae Species',
+    'Plain Tiger Danaus chrysippus · Nymphalidae also known as Kaner Species',
+    'Danaus Tigers · Nymphalidae Genus',
+  ]);
+  expect(options[0].querySelector('.aka i').classList.contains('bn')).toBe(true);
+  expect(options[1].querySelector('.aka i').classList.contains('plain')).toBe(true);
+  expect(options[2].querySelector('.aka')).toBeNull();
+});

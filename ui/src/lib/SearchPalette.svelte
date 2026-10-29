@@ -6,6 +6,7 @@
   import { hrefFor } from './route.js';
   import { modal } from './modal.js';
   import { splitBadge } from './updates.js';
+  import { ALSO_KNOWN_AS } from './messages.js';
 
   /** ⌘K / Ctrl+K / "/" search (docs/PLAN.md §8a): results as you type, arrow keys and Enter. */
   let { onClose, returnFocus = undefined } = $props();
@@ -131,7 +132,7 @@
           <span class="tx">
             <b class:bn={n.titleLatin}>{n.title}</b>
             {#if n.sub}<span class:bn={n.subLatin} class:muted={!n.subLatin}>{n.sub}</span>{/if}
-            {#if aka(hit)}<span class="muted">also known as <i class:bn={latinAka(hit)}>{aka(hit)}</i></span>{/if}
+            {#if aka(hit)}<span class="muted">{ALSO_KNOWN_AS} <i class:bn={latinAka(hit)}>{aka(hit)}</i></span>{/if}
             {#if hit.path}<span class="muted">{hit.path}</span>{/if}
             {#if hit.source === 'manual'}<span class="badge custom">Custom</span>{/if}
             {#if hit.active === false}<span class="badge">Not in the current India list</span>{/if}

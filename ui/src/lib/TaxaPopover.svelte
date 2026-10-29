@@ -5,11 +5,12 @@
   import { MAX_IDS, taxonName, UNNAMED } from './filter.js';
   import { famStyle } from './families.js';
   import { liveCount } from './liveCount.js';
+  import { ALSO_KNOWN_AS } from './messages.js';
   import { RANK_LABELS, names as titles } from './names.js';
 
   /**
    * The Taxa popover (contract §4): a search field (150 ms after typing pauses, /api/search) whose results show their
-   * rank and family; choosing one (Enter or a click) adds it to the filter's taxa, and its name is passed on with
+   * rank and family, and the older or other name they were found by; choosing one (Enter or a click) adds it to the filter's taxa, and its name is passed on with
    * `onChange(filter, { taxa: [hit] })`. The chosen taxa are listed with remove buttons. Taxa at any rank; the whole
    * group is what no taxa means, so it is not offered.
    */
@@ -101,6 +102,9 @@
     const n = titles(hit);
     return { other: n.sub, latin: n.subLatin, family: hit.rank !== 'family' ? hit.family : null };
   }
+
+  /** The name a hit was found by when it is not its own: an older name (Latin) or one of the user's other names. */
+  const aka = (hit) => (hit.matchKind === 'synonym' || hit.matchKind === 'word' ? hit.matched : null);
 </script>
 
 <Popover title="Taxa" {anchor} {returnFocus} {onClose}>
@@ -119,6 +123,7 @@
         <span class="tx">
           <b class:bn={n.titleLatin}>{n.title}</b>
           {#if s.other || s.family}<span class="muted">{#if s.other}<i class:bn={s.latin} class:plain={!s.latin}>{s.other}</i>{/if}{#if s.family}{s.other ? ` · ${s.family}` : s.family}{/if}</span>{/if}
+          {#if aka(hit)}<span class="muted aka">{ALSO_KNOWN_AS} <i class:bn={hit.matchKind === 'synonym'} class:plain={hit.matchKind === 'word'}>{aka(hit)}</i></span>{/if}
         </span>
         <span class="rk2">{RANK_LABELS[hit.rank] ?? hit.rank}</span>
       </div>
