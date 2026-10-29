@@ -204,7 +204,7 @@
   <main class="wrap" tabindex="-1">
     {@render libraryBanner()}
     {#if route.screen === 'explore'}
-      <Explore id={route.id} />
+      <Explore id={route.id} query={route.query ?? null} view={route.view ?? 'species'} photoId={route.photoId ?? null} />
     {:else if route.screen === 'species'}
       <Species id={route.id} photoId={route.photoId ?? null} tag={route.tag ?? null} place={route.place ?? null} type={route.type ?? null} />
     {:else if route.screen === 'deleted'}

@@ -40,9 +40,11 @@
    * `count`, `pending`, `countError` and `printed` (the filter as printed) are bound by the screen for its own actions.
    * `editable` (Explore) lets the viewer edit the photos: after an edit the results and the count are read again, and a
    * photo the edit took out of the filter (or moved, or deleted) gives way to the next one, chosen before the reload.
+   * Without `results` (an Explore page with no filter of its own) only the filter row and presets show and nothing is
+   * asked; `seed` names what the filter starts with ({ taxa: [taxon] }) before any count has named it.
    */
   let {
-    query: queryProp, view: viewProp = 'species', photoId: photoProp = null, delay = 200, resultsHref, photoHref, actions, editable = false,
+    query: queryProp, view: viewProp = 'species', photoId: photoProp = null, delay = 200, resultsHref, photoHref, actions, editable = false, results = true, seed = null,
     count = $bindable(null), pending = $bindable(true), countError = $bindable(''), printed = $bindable(''),
   } = $props();
 
@@ -62,6 +64,9 @@
     printed = query;
   });
   let names = $state(mergeNames(undefined, {}));
+  $effect(() => {
+    if (seed) names = mergeNames(untrack(() => names), seed);
+  });
   let tags = $state([]);
   // What the server changed in the filter's places (Phase 5c `placeNotes`: merged into a survivor, or gone), with the
   // filter they belong to (the one it used): they stay while the address is that filter, after its rewrite too.
@@ -209,6 +214,7 @@
   // for the old address are its own).
   $effect(() => {
     const now = query;
+    if (!results) return;
     untrack(() => {
       if (now === adopted) {
         adopted = null;
@@ -223,6 +229,7 @@
   // Another view: load it (the first, and one that comes with a new filter, are loaded by the query's effect).
   $effect(() => {
     const which = view;
+    if (!results) return;
     untrack(() => {
       if (which !== shownView) loadView(which);
     });
@@ -331,6 +338,7 @@
     // The library changed: count again and load the view again; loaded photos are loaded again in place, so the grid
     // and the scroll position stay.
     const onChange = () => {
+      if (!results) return;
       counter.ask(query);
       if (view === 'photos' && shownView === 'photos' && pages.loaded) pages.reload(query);
       else loadView(view);
@@ -351,9 +359,13 @@
 <section class="ex-filter" aria-label="Filter">
   <FilterRow {filter} {names} {manualSpecies} onChange={go} onEdit={openEditor} />
   <Presets {filter} onChange={go} />
-  <CountLine {count} {pending} error={countError} />
-  {#each noteLines as line (line)}<p class="ex-note">{line}</p>{/each}
+  {#if results}
+    <CountLine {count} {pending} error={countError} />
+    {#each noteLines as line (line)}<p class="ex-note">{line}</p>{/each}
+  {/if}
 </section>
+
+{#if results}
 
 <div class="ex-bar">
   <div class="seg" role="group" aria-label="View">
@@ -376,6 +388,8 @@
   {:else}
     <PhotoResults photos={pages.photos} {query} {photoHref} hasMore={pages.next !== null} loading={pages.loading} error={pages.error} focusId={photoId} onMore={morePhotos} onRetry={retryPhotos} />
   {/if}
+{/if}
+
 {/if}
 
 {#if editing === 'taxa'}
