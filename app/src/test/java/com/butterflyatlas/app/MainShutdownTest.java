@@ -55,7 +55,7 @@ class MainShutdownTest {
         quit.join(30_000);
         assertThat(quit.isAlive()).isFalse();
 
-        AtlasServices next = TestServices.configured(home);
+        AtlasServices next = TestServices.restarted(home);
         try (Imports imports = next.imports()) {
             imports.startup();
             List<Imports.Working> stopped = imports.stopped();
@@ -132,7 +132,7 @@ class MainShutdownTest {
         ExportStore.Run cut = services.exports().store().run(id);
         assertThat(List.of(cut.state(), String.valueOf(cut.done()))).as("the current file finished and was saved")
                 .containsExactly("running", "2");
-        AtlasServices next = TestServices.configured(home);
+        AtlasServices next = TestServices.restarted(home);
         try (Exports exports = next.exports()) {
             assertThat(exports.startup()).isEqualTo(1);
             assertThat(exports.store().run(id)).extracting(ExportStore.Run::state, ExportStore.Run::pausedBy)
