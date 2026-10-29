@@ -1,12 +1,11 @@
 <script>
   import { onDestroy, onMount, tick, untrack } from 'svelte';
   import ZoomPan from './ZoomPan.svelte';
-  import { fileLines, viewerProps } from './raw.js';
+  import { viewerProps } from './raw.js';
   import { status as appStatus } from './status.svelte.js';
   import { fileTypeLabel } from './filter.js';
-  import { deletePhotos, movePhotos, displayUrl, photoThumb, placePhotos, setCover, setPhotoTags, unplacePhotos } from './api.js';
-  import SpeciesPicker, { addedButFailed } from './SpeciesPicker.svelte';
-  import PlacePicker from './PlacePicker.svelte';
+  import { displayUrl, photoThumb } from './api.js';
+  import PhotoEdits from './PhotoEdits.svelte';
   import { growFrom, takeRect } from './flip.js';
   import { isTopModal, modal } from './modal.js';
   import { reducedMotion } from './motion.js';
@@ -15,17 +14,15 @@
   import { parseRoute } from './route.js';
   import { labeller } from './tags.js';
   import { atPlace, nameAt } from './places.js';
-  import { showToast } from './toast.svelte.js';
   import { STEP } from './zoom.js';
   import { thumbRetry } from './thumbRetry.js';
-  import { ABOUT_THIS_PHOTO, CLOSE, NEXT_PHOTO, PREVIOUS_PHOTO, REMOVE, UNKNOWN_PLACE, viewerLabel } from './messages.js';
+  import { ABOUT_THIS_PHOTO, CLOSE, NEXT_PHOTO, PREVIOUS_PHOTO, UNKNOWN_PLACE, viewerLabel } from './messages.js';
 
   /**
    * Full-screen photo viewer over the species page (prototype openLB), always dark. It opens by growing
    * out of the clicked thumbnail; ← → keys, swipes and the strip move between photos; + − 0 zoom. The
-   * side panel edits the photo's tags, shows where it was taken (the place, and whether it came from the photo's
-   * GPS or was set by the user) with Change (the place picker) and Remove, sets it as the species cover, moves it to
-   * another species or deletes it. After a change the page reads the photos again (`onChanged`).
+   * side panel (lib/PhotoEdits) edits the photo's tags and place, sets it as the species cover, moves it to another
+   * species or deletes it. After a change the page reads the photos again (`onChanged`).
    *
    * `tag` and `place` are the gallery filters from the address (?tag=, ?place=<id|unknown>): paging stays within the
    * photos matching both, and `type` (?type=, a file type, Phase 7a) to photos of that type. A filter the photo no
@@ -37,11 +34,6 @@
   let closeButton = $state(null);
   let strip = $state(null);
   let zoompan = $state(null);
-  let busy = $state(false);
-  let error = $state('');
-  let moving = $state(false);
-  let placing = $state(false);
-  let changeButton = $state(null);
   let shownId = untrack(() => photoId);
 
   let current = $derived(photos.find((p) => p.id === photoId));
@@ -116,67 +108,16 @@
     }
   }
 
-  async function act(change, message) {
-    if (busy) return;
-    busy = true;
-    error = '';
-    try {
-      await change();
-      await onChanged();
-      if (message) showToast(message);
-    } catch (e) {
-      error = e.message;
-    } finally {
-      busy = false;
-    }
-  }
-
-  const toggleTag = (key) => act(() => setPhotoTags(photo.id, photo.tags.includes(key) ? photo.tags.filter((k) => k !== key) : [...photo.tags, key]));
-  const makeCover = () => act(() => setCover(taxon.id, photo.id), `This photo is now the cover of ${title}.`);
-  const automaticCover = () => act(() => setCover(taxon.id, null), `${title} picks its cover by itself again.`);
-
-  /** Moving or deleting takes the photo out of this species: show the next one (or close), then reload. */
-  /** `failed(message)` words a failure (by default the message as it is). */
-  async function takeOut(change, message, failed = (m) => m) {
-    if (busy) return;
-    const gone = photo;
+  /** Moved or deleted (lib/PhotoEdits): show the next photo (or close), then reload. */
+  async function leave() {
     const next = list.length > 1 ? list[(index + 1) % list.length] : null;
-    busy = true;
-    error = '';
-    try {
-      await change(gone.id);
-    } catch (e) {
-      error = failed(e.message);
-      busy = false;
-      moving = false; // so the alert below is live, not behind the picker
-      return;
-    }
-    busy = false;
-    moving = false;
-    showToast(message);
-    // The Delete button's page is going away: keep keyboard focus inside the viewer.
+    // The pressed button's page is going away: keep keyboard focus inside the viewer.
     closeButton?.focus();
     if (next) showAt(next);
     else onClose();
     await onChanged();
   }
 
-  /** The picker closes either way: a refusal shows in the panel, as for Move. */
-  async function setPlace(place) {
-    await act(() => placePhotos([photo.id], place.id));
-    placing = false;
-  }
-
-  async function removePlace() {
-    await act(() => unplacePhotos([photo.id]));
-    // The Remove button is gone once the photo has no place: keep keyboard focus beside it.
-    if (!photo?.place) changeButton?.focus();
-  }
-
-  const remove = () => takeOut((photoId) => deletePhotos([photoId]), 'Photo moved to Recently deleted.');
-  // A species just added from the picker (`how.added`) exists even if the move fails: the message says so.
-  const moveTo = (hit, how) => takeOut((photoId) => movePhotos([photoId], hit.id), `Photo moved to ${hit.common || hit.name}.`,
-    (m) => (how?.added ? addedButFailed(hit, m) : m));
 </script>
 
 <svelte:window onkeydown={onKey} />
@@ -198,36 +139,7 @@
       {#if list.length > 1}<button class="lb-nav n" type="button" aria-label={NEXT_PHOTO} onclick={() => go(1)}>›</button>{/if}
     </div>
     <aside class="lb-side" aria-label={ABOUT_THIS_PHOTO}>
-      <h3>Tags</h3>
-      <div class="chips" role="group" aria-label="Tags on this photo">
-        {#each tags as tag (tag.key)}
-          <button class="chip" type="button" class:on={photo.tags.includes(tag.key)} aria-pressed={photo.tags.includes(tag.key)}
-                  aria-disabled={busy} onclick={() => toggleTag(tag.key)}>{tag.label}</button>
-        {/each}
-      </div>
-      {#if !photo.tags.length}<p class="muted">Untagged</p>{/if}
-      <h3>Place</h3>
-      {#if photo.place}
-        <p class="place">{photo.place.path.join(', ')} <span class="muted">{photo.place.source === 'user' ? 'set by you' : 'from GPS'}</span></p>
-      {:else}
-        <p class="muted">{UNKNOWN_PLACE}</p>
-      {/if}
-      <div class="lb-place">
-        <button class="btn ghost" type="button" bind:this={changeButton} aria-disabled={busy} onclick={() => { if (!busy) placing = true; }}>Change</button>
-        {#if photo.place}<button class="btn ghost" type="button" aria-disabled={busy} onclick={removePlace}>{REMOVE}</button>{/if}
-      </div>
-      <h3>File</h3>
-      <p class="fp">{photo.relPath}</p>
-      {#each fileLines(photo) as line (line)}<p class="muted">{line}</p>{/each}
-      <div class="lb-acts">
-        {#if photo.isCover}<span class="tg">Species cover</span>{/if}
-        <button class="btn ghost" type="button" aria-disabled={busy} onclick={photo.isCover ? automaticCover : makeCover}>
-          {photo.isCover ? 'Choose the cover automatically' : 'Set as cover'}
-        </button>
-        <button class="btn ghost" type="button" aria-disabled={busy} onclick={() => { if (!busy) moving = true; }}>Move…</button>
-        <button class="btn ghost" type="button" aria-disabled={busy} onclick={remove}>Delete</button>
-      </div>
-      {#if error}<p class="problem" role="alert">{error}</p>{/if}
+      <PhotoEdits {photo} species={taxon} {tags} {onChanged} onLeft={leave} />
       <p class="muted keys">← → photos · + − zoom · 0 fit · Esc close</p>
     </aside>
     <div class="lb-strip" bind:this={strip}>
@@ -238,11 +150,5 @@
         </button>
       {/each}
     </div>
-  {/if}
-  {#if moving}
-    <SpeciesPicker title="Move this photo to another species" exclude={taxon.id} onPick={moveTo} onClose={() => (moving = false)} />
-  {/if}
-  {#if placing}
-    <PlacePicker count={1} onChoose={setPlace} onPlacesChanged={onChanged} returnFocus={() => changeButton} onClose={() => (placing = false)} />
   {/if}
 </div>
