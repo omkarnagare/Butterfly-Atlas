@@ -205,9 +205,9 @@ class PhotoApiTest {
         JsonNode list = get("api/tags").get("tags");
         assertThat(list.size()).isEqualTo(10);
         assertThat(list.get(9).toString())
-                .isEqualTo("{\"id\":10,\"key\":\"unconfirmed\",\"label\":\"Unconfirmed\",\"source\":\"builtin\",\"photoCount\":0}");
+                .isEqualTo("{\"id\":10,\"key\":\"unconfirmed\",\"label\":\"unconfirmed\",\"source\":\"builtin\",\"photoCount\":0}");
         assertThat(list.get(3).toString())
-                .isEqualTo("{\"id\":4,\"key\":\"upper_wing\",\"label\":\"upper wing\",\"source\":\"builtin\",\"photoCount\":0}");
+                .isEqualTo("{\"id\":4,\"key\":\"upper_wing\",\"label\":\"upper_wing\",\"source\":\"builtin\",\"photoCount\":0}");
 
         JsonNode created = ok(send("POST", "api/tags", "{\"label\":\"Mud-puddling\"}"));
         assertThat(created.get("key").asText()).isEqualTo("mud_puddling");

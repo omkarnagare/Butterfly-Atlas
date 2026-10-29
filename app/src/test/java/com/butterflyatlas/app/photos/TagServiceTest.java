@@ -41,7 +41,7 @@ class TagServiceTest {
         assertThat(tags.list()).extracting(Tag::key).containsExactly(
                 "egg", "larva", "pupa", "upper_wing", "under_wing", "male", "female", "dsf", "wsf", "unconfirmed");
         assertThat(tags.list()).extracting(Tag::label).containsExactly(
-                "egg", "larva", "pupa", "upper wing", "under wing", "male", "female", "DSF", "WSF", "Unconfirmed");
+                "egg", "larva", "pupa", "upper_wing", "under_wing", "male", "female", "DSF", "WSF", "unconfirmed");
         assertThat(tags.list()).allSatisfy(t -> {
             assertThat(t.source()).isEqualTo("builtin");
             assertThat(t.photoCount()).isZero();
