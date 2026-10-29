@@ -313,6 +313,28 @@ test('+ Add filter → Life stages: Missing or Complete, and its chip switches b
   expect(window.location.hash).toBe('#/export?stages=missing');
 });
 
+test('an address with Life stages and Tags or Photo status drops them, rewrites the address and says so; the note goes at the next change', async () => {
+  window.location.hash = '#/export?tags=egg&status=not&stages=missing';
+  const { rerender } = show({ query: 'tags=egg&status=not&stages=missing' });
+
+  await vi.waitFor(() => expect(window.location.hash).toBe('#/export?stages=missing'));
+  expect(screen.queryByRole('button', { name: /^Remove Tags/ })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Remove Not photographed' })).toBeNull();
+  expect(screen.getByText("Removed Tags and Photo status: Life stages can't be combined with them.")).toBeTruthy();
+  await vi.waitFor(() => expect(filterCount).toHaveBeenCalledWith('stages=missing', expect.anything()));
+  expect(filterCount.mock.calls.map(([query]) => query).filter((query) => query.includes('tags='))).toEqual([]);
+
+  await rerender({ query: 'stages=missing' });
+  expect(screen.getByText(/^Removed Tags and Photo status/)).toBeTruthy();
+  await fireEvent.click(screen.getByRole('button', { name: 'Remove Life stages: missing' }));
+  expect(screen.queryByText(/^Removed/)).toBeNull();
+
+  // another address (Back) with the mix
+  await rerender({ query: 'tags=egg&stages=complete' });
+  await vi.waitFor(() => expect(screen.getByText("Removed Tags: Life stages can't be combined with it.")).toBeTruthy());
+  expect(window.location.hash).toBe('#/export?stages=complete');
+});
+
 test('the Tags popover uses the tags the screen has read, without asking again', async () => {
   window.location.hash = '#/export?tags=larva';
   show({ query: 'tags=larva' });

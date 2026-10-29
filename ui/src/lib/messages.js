@@ -58,6 +58,11 @@ export const FILE_TYPE = 'File type';
 export const LIFE_STAGES = 'Life stages';
 export const NOT_WITH_LIFE_STAGES = 'Not with Life stages';
 export const NOT_WITH_TAGS_OR_STATUS = 'Not with Tags or Photo status';
+/** The line for filters an address had alongside Life stages and the screen took out ('tags', 'status'). */
+export function removedForLifeStages(kinds) {
+  const named = kinds.map((kind) => (kind === 'tags' ? 'Tags' : PHOTO_STATUS));
+  return `Removed ${named.join(' and ')}: ${LIFE_STAGES} can't be combined with ${named.length > 1 ? 'them' : 'it'}.`;
+}
 export const NOTHING_MATCHES = 'Nothing matches these filters.';
 export const PLACE_PROMPT = 'Type a district, state or country';
 

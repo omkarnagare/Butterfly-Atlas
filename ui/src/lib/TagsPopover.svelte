@@ -57,6 +57,5 @@
     {/each}
   </div>
   {#if loading}<p class="muted" role="status">Loading tags…</p>{/if}
-  {#if filter.stages === 'missing'}<p class="muted">Tags are not used with Missing life stages.</p>{/if}
   {#if error}<p class="problem" role="alert">{error}</p>{/if}
 </Popover>

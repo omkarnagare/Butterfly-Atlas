@@ -42,11 +42,6 @@ test('Match any / Match all set the tag mode', async () => {
   expect(onChange).toHaveBeenCalledWith({ ...EMPTY, tags: ['larva', 'pupa'], tagMode: 'all' }, {});
 });
 
-test('with Missing life stages it says the tags are not used', async () => {
-  render(TagsPopover, { filter: { ...EMPTY, stages: 'missing' }, onChange: vi.fn(), onClose: vi.fn() });
-  expect(screen.getByText('Tags are not used with Missing life stages.')).toBeTruthy();
-});
-
 test('a failure to read the tags shows its message', async () => {
   getTags.mockRejectedValue(new Error('Butterfly Atlas could not reach its service.'));
   render(TagsPopover, { filter: EMPTY, onChange: vi.fn(), onClose: vi.fn() });

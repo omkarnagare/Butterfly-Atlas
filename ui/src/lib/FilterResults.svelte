@@ -13,14 +13,14 @@
   import PlaceResults from './PlaceResults.svelte';
   import ExportViewer from './ExportViewer.svelte';
   import FileTypePopover from './FileTypePopover.svelte';
-  import { SOURCE_OPTIONS, mergeNames, parseFilter, placeNoteLines, printFilter } from './filter.js';
+  import { SOURCE_OPTIONS, mergeNames, parseFilter, placeNoteLines, printFilter, settle } from './filter.js';
   import { liveCount } from './liveCount.js';
   import { PhotoPages } from './photoPages.svelte.js';
   import { LIBRARY_CHANGED } from './status.svelte.js';
   import { loadProblem } from './problems.js';
   import { closeViewerTo } from './viewer.js';
   import { showToast } from './toast.svelte.js';
-  import { LIFE_STAGES, NOT_PHOTOGRAPHED, PHOTOGRAPHED, PHOTO_STATUS } from './messages.js';
+  import { LIFE_STAGES, NOT_PHOTOGRAPHED, PHOTOGRAPHED, PHOTO_STATUS, removedForLifeStages } from './messages.js';
 
   /**
    * A filter and its results (Phase 4a contract §4; moved out of the Export screen for Explore, filters-in-Explore
@@ -30,7 +30,9 @@
    * changes while it is open count as one), so Back and Forward step through filters and a reload restores one. The
    * screen says how they are written: `resultsHref(query, view)` and `photoHref(photoId, query)`. The count answer's
    * `filter.query` replaces the address when the server dropped something (a place deleted since); the places it
-   * changed (merged into another, or gone: Phase 5c) are said in lines under the count. With `photoId` the viewer opens
+   * changed (merged into another, or gone: Phase 5c) are said in lines under the count. An address with Life stages and
+   * Tags or Photo status (which the server refuses together) loses them at once, its address is replaced, and a line
+   * says so until the filter changes. With `photoId` the viewer opens
    * over the Photos view's loaded photos. `delay` is the wait after a change before asking (200 ms).
    *
    * The component's own `filter` is the one everything shows and every change starts from: a change sets it at once and
@@ -59,7 +61,7 @@
   const VIEWS = [{ key: 'species', label: 'Species' }, { key: 'photos', label: 'Photos' }, { key: 'places', label: 'Places' }];
   const wait = untrack(() => delay);
 
-  let filter = $state(parseFilter(untrack(() => queryProp)));
+  let filter = $state(settle(parseFilter(untrack(() => queryProp))).filter);
   let query = $derived(printFilter(filter));
   $effect(() => {
     printed = query;
@@ -74,6 +76,9 @@
   let placeNotes = $state([]);
   let notesFor = null;
   let noteLines = $derived(placeNoteLines(placeNotes));
+  // What an address had alongside Life stages and was taken out, with the filter it was taken out of.
+  let removed = $state(null);
+  let removedLine = $derived(removed?.for === query ? removedForLifeStages(removed.kinds) : '');
   let manualSpecies = $derived(count?.manualSpecies ?? false);
 
   // Each view's rows with the query they answer, and the query the views were last asked for (`viewAsked`): rows that
@@ -96,7 +101,14 @@
   $effect(() => {
     const fromAddress = address;
     untrack(() => {
-      if (fromAddress !== printFilter(filter)) filter = parseFilter(fromAddress);
+      if (fromAddress === printFilter(filter)) return;
+      const read = settle(parseFilter(fromAddress));
+      filter = read.filter;
+      if (read.dropped.length) {
+        const settled = printFilter(read.filter);
+        removed = { kinds: read.dropped, for: settled };
+        window.location.replace(photoId !== null ? photoHref(photoId, settled) : resultsHref(settled, view));
+      }
     });
   });
 
@@ -360,6 +372,7 @@
 <section class="ex-filter" aria-label="Filter">
   <FilterRow {filter} {names} {manualSpecies} onChange={go} onEdit={openEditor} />
   <Presets {filter} onChange={go} />
+  {#if removedLine}<p class="ex-note" role="status">{removedLine}</p>{/if}
   {#if results}
     <CountLine {count} {pending} error={countError} />
     {#each noteLines as line (line)}<p class="ex-note">{line}</p>{/each}
