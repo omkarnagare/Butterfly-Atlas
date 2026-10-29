@@ -212,7 +212,7 @@ class PhotoApiTest {
         JsonNode created = ok(send("POST", "api/tags", "{\"label\":\"Mud-puddling\"}"));
         assertThat(created.get("key").asText()).isEqualTo("mud_puddling");
         long tagId = created.get("id").asLong();
-        assertThat(ok(send("PATCH", "api/tags/" + tagId, "{\"label\":\"Puddling\"}")).get("label").asText()).isEqualTo("Puddling");
+        assertThat(ok(send("PATCH", "api/tags/" + tagId, "{\"label\":\"Puddling\"}")).get("label").asText()).isEqualTo("puddling");
 
         long photo = added("A5", TestImages.jpeg(40, 30)).get("id").asLong();
         ok(send("PATCH", "api/photos/" + photo, "{\"tags\":[\"mud_puddling\"]}"));

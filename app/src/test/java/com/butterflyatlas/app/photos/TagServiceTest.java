@@ -61,34 +61,40 @@ class TagServiceTest {
     }
 
     @Test
-    void createsUserTagsWithAKeyMadeFromTheLabel() {
+    void createsUserTagsWithTheNameInItsFormAndAKeyMadeFromIt() {
         Tag created = tags.create("  Mud-puddling  ");
         tags.create("basking");
 
         assertThat(created.key()).isEqualTo("mud_puddling");
-        assertThat(created.label()).isEqualTo("Mud-puddling");
+        assertThat(created.label()).isEqualTo("mud_puddling");
         assertThat(created.source()).isEqualTo("user");
         assertThat(tags.list()).extracting(Tag::key).endsWith("wsf", "unconfirmed", "basking", "mud_puddling");
     }
 
     @Test
     void keysStayUniqueAndLabelsMustBeNew() {
-        tags.create("Mud-puddling");
+        Tag mud = tags.create("Mud-puddling");
+        tags.rename(mud.id(), "puddling");
 
         assertThat(tags.create("mud puddling").key()).isEqualTo("mud_puddling-2");
-        assertThat(tags.create("!!!").key()).isEqualTo("tag");
-        assertThatThrownBy(() -> tags.create("MUD-PUDDLING")).isInstanceOfSatisfying(AtlasException.class, e -> {
+        assertThatThrownBy(() -> tags.create("PUDDLING")).isInstanceOfSatisfying(AtlasException.class, e -> {
             assertThat(e.kind()).isEqualTo(AtlasException.Kind.INVALID);
-            assertThat(e.getMessage()).isEqualTo("There is already a tag called \"MUD-PUDDLING\".");
+            assertThat(e.getMessage()).isEqualTo("There is already a tag called \"puddling\".");
         });
-        assertThatThrownBy(() -> tags.create("Upper Wing")).isInstanceOf(AtlasException.class);
+        assertThatThrownBy(() -> tags.create("Puddling!")).isInstanceOf(AtlasException.class);
+        assertThatThrownBy(() -> tags.create("Male")).isInstanceOf(AtlasException.class);
     }
 
     @Test
     void labelsAreTidiedAndChecked() {
-        assertThat(tags.create("  Basking \t in   sun ").label()).isEqualTo("Basking in sun");
-        assertThatThrownBy(() -> tags.create("   ")).isInstanceOfSatisfying(AtlasException.class,
-                e -> assertThat(e.getMessage()).isEqualTo("Type a name for the tag."));
+        assertThat(tags.create("  Basking \t in   sun ").label()).isEqualTo("basking_in_sun");
+        assertThat(tags.create("UV light").label()).isEqualTo("UV_light");
+        for (String empty : List.of("   ", "!!!")) {
+            assertThatThrownBy(() -> tags.create(empty)).isInstanceOfSatisfying(AtlasException.class,
+                    e -> assertThat(e.getMessage()).isEqualTo("Type a name for the tag."));
+        }
+        assertThatThrownBy(() -> tags.create("mud puddling wet sand")).isInstanceOfSatisfying(AtlasException.class,
+                e -> assertThat(e.getMessage()).isEqualTo("Keep tag names to 3 words or fewer."));
         assertThatThrownBy(() -> tags.create("x".repeat(41))).isInstanceOfSatisfying(AtlasException.class,
                 e -> assertThat(e.getMessage()).isEqualTo("Keep tag names to 40 characters or fewer."));
     }
@@ -100,9 +106,10 @@ class TagServiceTest {
         Tag renamed = tags.rename(dsf.id(), "dry season form");
 
         assertThat(renamed.key()).isEqualTo("dsf");
-        assertThat(renamed.label()).isEqualTo("dry season form");
+        assertThat(renamed.label()).isEqualTo("dry_season_form");
         assertThat(renamed.source()).isEqualTo("builtin");
-        assertThat(tags.rename(dsf.id(), "Dry Season Form").label()).isEqualTo("Dry Season Form");
+        assertThat(tags.rename(dsf.id(), "Dry-Season Form").label()).isEqualTo("dry_season_form");
+        assertThatThrownBy(() -> tags.rename(dsf.id(), "dry season form two")).isInstanceOf(AtlasException.class);
         assertThatThrownBy(() -> tags.rename(dsf.id(), "WSF")).isInstanceOf(AtlasException.class);
     }
 
@@ -217,7 +224,9 @@ class TagServiceTest {
 
         assertThatThrownBy(() -> tags.rename(mud.id(), "BASKING")).isInstanceOfSatisfying(AtlasException.class,
                 e -> assertThat(e.kind()).isEqualTo(AtlasException.Kind.INVALID));
-        assertThat(tags.rename(basking.id(), "Basking").label()).isEqualTo("Basking");
+        assertThat(tags.rename(basking.id(), "Basking").label()).isEqualTo("basking");
+        assertThat(tags.rename(basking.id(), "SUN").label()).isEqualTo("SUN");
+        assertThat(tags.rename(basking.id(), "sun").label()).isEqualTo("sun");
         assertThat(tags.rename(mud.id(), "Mud Puddling").key()).isEqualTo("mud_puddling");
     }
 
@@ -225,7 +234,7 @@ class TagServiceTest {
     void labelsAreNormalisedSoLookAlikesClash() {
         Tag created = tags.create("Caf\u0065\u0301");
 
-        assertThat(created.label()).isEqualTo("Caf\u00e9");
+        assertThat(created.label()).isEqualTo("caf\u00e9");
         assertThatThrownBy(() -> tags.create("CAF\u00c9")).isInstanceOf(AtlasException.class);
     }
 }

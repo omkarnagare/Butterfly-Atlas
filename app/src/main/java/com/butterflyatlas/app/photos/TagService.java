@@ -8,7 +8,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -21,11 +20,11 @@ import java.util.regex.Pattern;
 /**
  * Tags on photos (design P6). Built-in tags can be relabelled but not deleted; the user's own tags
  * can be created, renamed and deleted (photos keep, the tag comes off them). A tag's key never
- * changes once made, so renaming is safe for everything that refers to it.
+ * changes once made, so renaming is safe for everything that refers to it. Names are saved in their one form
+ * ({@link TagNames}).
  */
 public final class TagService {
 
-    public static final int MAX_LENGTH = 40;
     public static final String BUILTIN = "builtin";
     /** The tags' order, on {@code tag t}: built-in first by their order, then the user's by label. */
     public static final String ORDER = "t.source = 'user', t.sort_order, t.label COLLATE NOCASE";
@@ -35,7 +34,6 @@ public final class TagService {
     public static final Set<String> ADULT_KEYS = PhotoRows.ADULT_KEYS;
 
     private static final int USER_SORT_ORDER = 1000;
-    private static final Pattern WHITESPACE = Pattern.compile("\\s+", Pattern.UNICODE_CHARACTER_CLASS);
     private static final Pattern NOT_ALPHANUMERIC = Pattern.compile("[^\\p{L}\\p{N}]+");
 
     /** {@code photoCount} counts live photos (not those in Recently deleted). */
@@ -54,7 +52,7 @@ public final class TagService {
     }
 
     public Tag create(String rawLabel) {
-        String label = clean(rawLabel);
+        String label = TagNames.check(rawLabel);
         return library.get().database().write(c -> {
             requireNewLabel(c, label, null);
             String key = uniqueKey(c, keyFor(label));
@@ -75,7 +73,7 @@ public final class TagService {
     }
 
     public Tag rename(long id, String rawLabel) {
-        String label = clean(rawLabel);
+        String label = TagNames.check(rawLabel);
         return library.get().database().write(c -> {
             tag(c, id);
             requireNewLabel(c, label, id);
@@ -193,17 +191,6 @@ public final class TagService {
         return key.isEmpty() ? "tag" : key;
     }
 
-    static String clean(String raw) {
-        String label = raw == null ? "" : WHITESPACE.matcher(Normalizer.normalize(raw, Normalizer.Form.NFC).strip()).replaceAll(" ");
-        if (label.isEmpty()) {
-            throw AtlasException.invalid("Type a name for the tag.");
-        }
-        if (label.length() > MAX_LENGTH) {
-            throw AtlasException.invalid("Keep tag names to " + MAX_LENGTH + " characters or fewer.");
-        }
-        return label;
-    }
-
     private static List<String> distinct(List<String> keys) {
         if (keys == null) {
             return List.of();
@@ -236,7 +223,7 @@ public final class TagService {
             while (rs.next()) {
                 boolean same = except != null && rs.getLong(1) == except;
                 if (!same && rs.getString(2).toLowerCase(Locale.ROOT).equals(wanted)) {
-                    throw AtlasException.invalid("There is already a tag called \"" + label + "\".");
+                    throw AtlasException.invalid("There is already a tag called \"" + rs.getString(2) + "\".");
                 }
             }
         }
