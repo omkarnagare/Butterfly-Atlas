@@ -431,7 +431,8 @@ public final class SmokeTest {
             expect(!before.bool("configured"), "a new config folder says the library is already set up");
             Json inspect = Json.parse(http.call("GET /api/setup/inspect", "/api/setup/inspect?path=" + enc(library.toString()),
                     null, 200).text());
-            expect(inspect.bool("absolute") && inspect.bool("writable"), "setup/inspect does not accept " + library + ": " + inspect);
+            expect(inspect.bool("absolute") && "create".equals(inspect.str("kind"))
+                    && library.toString().equals(inspect.str("libraryFolder")), "setup/inspect does not accept " + library + ": " + inspect);
             Resp done = http.call("POST /api/setup", "/api/setup", "{\"dataFolder\":" + Json.quote(library.toString()) + "}", 200);
             expect(Json.parse(done.text()).bool("configured"), "setup did not configure the library: " + done.text());
             http.call("POST /api/setup/retry", "/api/setup/retry", "{}", null);
