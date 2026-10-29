@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { DOUBLE, FIT, clamp, fitSize, maxScale, pan, pinch, toggleAt, wheelFactor, zoomAt } from './zoom.js';
+import { DOUBLE, FIT, clamp, fitSize, maxScale, pan, pinch, placement, toggleAt, wheelFactor, zoomAt } from './zoom.js';
 
 const stage = { w: 1000, h: 800 };
 const natural = { w: 4000, h: 3000 };
@@ -68,4 +68,11 @@ test('pinching zooms around the fingers and follows them when they move together
 
   const moved = pinch(spread, [{ x: -100, y: 0 }, { x: 100, y: 0 }], [{ x: -60, y: 30 }, { x: 140, y: 30 }], fit, stage, max);
   expect(moved).toEqual({ scale: 2, x: 40, y: 30 });
+});
+
+test('the photo is laid out at its zoomed size and moved by the view\'s offset, so it is drawn from its own pixels', () => {
+  const fit = { w: 1000, h: 750 };
+
+  expect(placement(FIT, fit)).toEqual({ w: 1000, h: 750, x: 0, y: 0 });
+  expect(placement({ scale: 2.5, x: -120, y: 40 }, fit)).toEqual({ w: 2500, h: 1875, x: -120, y: 40 });
 });

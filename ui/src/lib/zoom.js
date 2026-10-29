@@ -1,8 +1,10 @@
 /*
  * Zoom and pan for the photo viewer, as pure functions so the maths is tested without a browser.
- * A view is { scale, x, y }: the photo is laid out at its fitted size in the middle of the stage, then
- * moved by (x, y) pixels and scaled about its own centre (CSS `translate(x, y) scale(s)` with the
- * default transform-origin). Points are measured from the centre of the stage.
+ * A view is { scale, x, y }: the photo, at its fitted size scaled by `scale` about its centre, sits in the
+ * middle of the stage moved by (x, y) pixels. Points are measured from the centre of the stage.
+ * It is drawn laid out at that zoomed size (`placement`), not scaled with a CSS transform: a transform
+ * scales the raster of the fitted size, which looks pixelated, while a layout at the zoomed size is drawn
+ * from the full-size image. Both put every pixel in the same place.
  */
 export const FIT = Object.freeze({ scale: 1, x: 0, y: 0 });
 /** One press of + or -. */
@@ -20,6 +22,11 @@ export function fitSize(natural, stage) {
 /** The deepest zoom: 4×, or further if that is needed to see the photo's own pixels. */
 export function maxScale(natural, fit) {
   return fit.w ? Math.max(4, natural.w / fit.w) : 4;
+}
+
+/** Where the photo is laid out for a view: its zoomed size, centred on the stage's centre moved by (x, y). */
+export function placement(view, fit) {
+  return { w: fit.w * view.scale, h: fit.h * view.scale, x: view.x, y: view.y };
 }
 
 /** Keeps the scale between fit and `max` and the photo's edges from leaving gaps; smaller than the stage = centred. */

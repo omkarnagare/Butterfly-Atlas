@@ -35,9 +35,9 @@ test('keeps the preview when the full-size image cannot be shown, and double-cli
   expect(container.querySelector('img.orig')).toBeNull();
 
   await fireEvent.dblClick(container.querySelector('.zp'), { clientX: 0, clientY: 0 });
-  expect(photo.style.transform).toContain('scale(2.5)');
+  expect(photo.dataset.scale).toBe('2.5');
   await fireEvent.dblClick(container.querySelector('.zp'), { clientX: 0, clientY: 0 });
-  expect(photo.style.transform).toContain('scale(1)');
+  expect(photo.dataset.scale).toBe('1');
 });
 
 // A 1000 x 800 stage; the 4000 x 3000 photo then fits at 1000 x 750.
@@ -54,7 +54,8 @@ function stageOf(container) {
 const pointer = (stage, type, x, y) =>
   fireEvent(stage, Object.assign(new MouseEvent(type, { bubbles: true, clientX: x, clientY: y }), { pointerId: 1 }));
 
-const scaleOf = (container) => container.querySelector('.zp-photo').style.transform;
+const scaleOf = (container) => Number(container.querySelector('.zp-photo').dataset.scale);
+const offsetOf = (container) => container.querySelector('.zp-photo').style.transform;
 
 test('a WebKit trackpad pinch zooms by the change in the gesture scale', async () => {
   const { container } = render(ZoomPan, props);
@@ -68,16 +69,15 @@ test('a WebKit trackpad pinch zooms by the change in the gesture scale', async (
     stage.dispatchEvent(change);
   }
   await Promise.resolve();
-  expect(scaleOf(container)).toContain('scale(2)');
+  expect(scaleOf(container)).toBe(2);
 });
 
 test('ctrl+wheel (a Chromium pinch) zooms more strongly than a plain wheel; a plain wheel pans a zoomed photo', async () => {
   const { container } = render(ZoomPan, props);
   const stage = stageOf(container);
-  const factor = (transform) => Number(/scale\(([\d.]+)\)/.exec(transform)[1]);
 
   await fireEvent.wheel(stage, { deltaY: -10, clientX: 500, clientY: 400 });
-  const plain = factor(scaleOf(container));
+  const plain = scaleOf(container);
   await fireEvent.dblClick(stage, { clientX: 500, clientY: 400 }); // back to fit
   await fireEvent.dblClick(stage, { clientX: 500, clientY: 400 });
   await fireEvent.dblClick(stage, { clientX: 500, clientY: 400 });
@@ -85,12 +85,13 @@ test('ctrl+wheel (a Chromium pinch) zooms more strongly than a plain wheel; a pl
 
   await fireEvent.dblClick(stage, { clientX: 500, clientY: 400 });
   await fireEvent.wheel(stage, { deltaY: -10, ctrlKey: true, clientX: 500, clientY: 400 });
-  expect(factor(scaleOf(container))).toBeGreaterThan(plain);
+  expect(scaleOf(container)).toBeGreaterThan(plain);
 
   const before = scaleOf(container);
+  const at = offsetOf(container);
   await fireEvent.wheel(stage, { deltaY: 40, deltaX: 0, clientX: 500, clientY: 400 });
-  expect(scaleOf(container)).toContain(`scale(${factor(before)})`);
-  expect(scaleOf(container)).not.toBe(before); // moved, not zoomed
+  expect(scaleOf(container)).toBe(before);
+  expect(offsetOf(container)).not.toBe(at); // moved, not zoomed
 });
 
 test('a double-click after two quick drags does not zoom', async () => {
@@ -103,14 +104,14 @@ test('a double-click after two quick drags does not zoom', async () => {
     await pointer(stage, 'pointerup', x + 30, 100);
   }
   await fireEvent.dblClick(stage, { clientX: 150, clientY: 100 });
-  expect(scaleOf(container)).toContain('scale(1)');
+  expect(scaleOf(container)).toBe(1);
 
   for (let i = 0; i < 2; i++) {
     await pointer(stage, 'pointerdown', 100, 100);
     await pointer(stage, 'pointerup', 100, 100);
   }
   await fireEvent.dblClick(stage, { clientX: 100, clientY: 100 });
-  expect(scaleOf(container)).toContain('scale(2.5)');
+  expect(scaleOf(container)).toBe(2.5);
 });
 
 test('a photo of unknown size takes the size of the loaded image', async () => {
@@ -204,4 +205,35 @@ test('a HEIC display whose why can\'t be asked, or comes back unreadable, says B
   await vi.waitFor(() => expect(screen.getByRole('status').textContent).toBe(NOT_ANSWERING));
   expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
   vi.unstubAllGlobals();
+});
+
+test('zoomed in, the photo is laid out at the zoomed size and only moved, so the browser draws it from the full-size image', async () => {
+  const { container } = render(ZoomPan, props);
+  const stage = stageOf(container);
+  const photo = container.querySelector('.zp-photo');
+  await vi.waitFor(() => expect(photo.style.width).toBe('1000px'));
+  expect(photo.style.marginLeft).toBe('-500px');
+  expect(photo.style.marginTop).toBe('-375px');
+
+  await fireEvent.wheel(stage, { deltaY: -200, ctrlKey: true, clientX: 500, clientY: 400 });
+  const scale = scaleOf(container);
+  expect(scale).toBeGreaterThan(1);
+  expect(parseFloat(photo.style.width)).toBeCloseTo(1000 * scale);
+  expect(parseFloat(photo.style.height)).toBeCloseTo(750 * scale);
+  expect(parseFloat(photo.style.marginLeft)).toBeCloseTo(-500 * scale);
+  expect(photo.style.transform).toMatch(/^translate\(/);
+  expect(photo.style.transform).not.toContain('scale(');
+});
+
+test('a quarter-turned preview zoomed in is laid out at the zoomed size too', async () => {
+  const { container } = render(ZoomPan, { ...props, width: 1080, height: 1616, orientation: 6 });
+  const stage = stageOf(container);
+  await new Promise((r) => setTimeout(r));
+  await fireEvent.dblClick(stage, { clientX: 500, clientY: 400 });
+
+  const box = container.querySelector('.zp-photo');
+  const original = container.querySelector('img.orig');
+  expect(box.style.height).toBe('2000px');
+  expect(original.style.width).toBe(box.style.height);
+  expect(original.style.height).toBe(box.style.width);
 });

@@ -1,6 +1,6 @@
 <script>
   import { untrack } from 'svelte';
-  import { FIT, clamp, fitSize, maxScale, pan, pinch, toggleAt, wheelFactor, zoomAt } from './zoom.js';
+  import { FIT, clamp, fitSize, maxScale, pan, pinch, placement, toggleAt, wheelFactor, zoomAt } from './zoom.js';
   import { orientTransform, turned } from './raw.js';
   import { BUSY } from './codes.js';
 
@@ -50,13 +50,14 @@
   let stage = $derived({ w: stageW, h: stageH });
   let fit = $derived(fitSize(natural, stage));
   let max = $derived(maxScale(natural, fit));
+  let placed = $derived(placement(view, fit));
   let gone = $derived(broken || failed);
   // A quarter turn lays the image out at the frame's height by its width, centred, then turns it.
   let origStyle = $derived.by(() => {
     const turn = orientTransform(orientation);
     if (!turn) return '';
     if (!quarter) return `transform:${turn}`;
-    return `inset:auto;left:50%;top:50%;width:${fit.h}px;height:${fit.w}px;transform:translate(-50%, -50%) ${turn}`;
+    return `inset:auto;left:50%;top:50%;width:${placed.h}px;height:${placed.w}px;transform:translate(-50%, -50%) ${turn}`;
   });
 
   // A new photo starts fitted, with its full-size image still to load.
@@ -261,7 +262,8 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="zp" class:zoomed={view.scale > 1} bind:this={stageEl}
      onpointerdown={onDown} onpointermove={onMove} onpointerup={onUp} onpointercancel={onUp} ondblclick={onDouble}>
-  <div class="zp-photo" class:glide style="width:{fit.w}px;height:{fit.h}px;transform:translate({view.x}px, {view.y}px) scale({view.scale})">
+  <div class="zp-photo" class:glide data-scale={view.scale}
+       style="width:{placed.w}px;height:{placed.h}px;margin:{-placed.h / 2}px 0 0 {-placed.w / 2}px;transform:translate({placed.x}px, {placed.y}px)">
     <img class="ph" src={placeholder} alt={loaded ? '' : alt} draggable="false" />
     {#if !gone}
       <img class="orig" class:on={loaded} src={shownSrc} alt={loaded ? alt : ''} draggable="false" decoding="async" style={origStyle}

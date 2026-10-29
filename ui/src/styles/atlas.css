@@ -532,8 +532,10 @@ a.lb-name:hover span, a.lb-name:focus-visible span { text-decoration: underline;
   -webkit-user-select: none; user-select: none; }
 .zp.zoomed { cursor: grab; }
 .zp.zoomed:active { cursor: grabbing; }
-.zp-photo { position: relative; }
-.zp-photo.glide { transition: transform .25s cubic-bezier(.2,.8,.2,1); }
+/* laid out at the zoomed size around the stage's centre (lib/zoom.js placement), so zoom is drawn from the full-size image */
+.zp-photo { position: absolute; left: 50%; top: 50%; }
+.zp-photo.glide { transition: transform .25s cubic-bezier(.2,.8,.2,1), width .25s cubic-bezier(.2,.8,.2,1),
+  height .25s cubic-bezier(.2,.8,.2,1), margin .25s cubic-bezier(.2,.8,.2,1); }
 .zp-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; border-radius: 6px; -webkit-user-drag: none; }
 .zp-photo .orig { opacity: 0; transition: opacity .3s; }
 .zp-photo .orig.on { opacity: 1; }

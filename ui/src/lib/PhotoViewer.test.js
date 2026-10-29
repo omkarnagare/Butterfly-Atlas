@@ -112,9 +112,9 @@ test('Escape closes it, and + - 0 zoom the photo', async () => {
   const box = container.querySelector('.zp-photo');
 
   await fireEvent.keyDown(window, { key: '+' });
-  expect(box.style.transform).toContain('scale(1.25)');
+  expect(box.dataset.scale).toBe('1.25');
   await fireEvent.keyDown(window, { key: '0' });
-  expect(box.style.transform).toContain('scale(1)');
+  expect(box.dataset.scale).toBe('1');
   await fireEvent.keyDown(window, { key: 'Escape' });
   expect(onClose).toHaveBeenCalledOnce();
 });
