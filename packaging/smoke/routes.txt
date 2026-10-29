@@ -66,6 +66,8 @@ GET /api/tags | tags
 POST /api/tags | tags
 DELETE /api/tags/{id} | tags
 PATCH /api/tags/{id} | tags
+GET /api/tag-names | tags
+POST /api/tag-names/dismiss | tags
 
 POST /api/places | places
 GET /api/places/mine | places

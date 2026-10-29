@@ -4,10 +4,15 @@ import com.butterflyatlas.app.AtlasException;
 import com.butterflyatlas.app.library.Library;
 import com.butterflyatlas.app.library.OpenImports;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -39,6 +44,20 @@ public final class TagService {
     /** {@code photoCount} counts live photos (not those in Recently deleted). */
     public record Tag(long id, String key, String label, String source, int photoCount) {
     }
+
+    /** What V15 merged and numbered apart (tag-names design §4), the tags of more than 3 words now, and whether dismissed. */
+    public record Note(List<Merged> merged, List<Numbered> numbered, List<String> longNames, boolean dismissed) {
+    }
+
+    /** A tag V15 merged into another; {@code photos} the live photos that had it. */
+    public record Merged(String from, String into, int photos) {
+    }
+
+    /** A built-in V15 renamed apart from another built-in of the same name. */
+    public record Numbered(String from, String to) {
+    }
+
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final Supplier<Library> library;
 
@@ -84,6 +103,49 @@ public final class TagService {
             }
             return tag(c, id);
         });
+    }
+
+    /** The Home note of tag names. */
+    public Note note() {
+        return library.get().database().read(TagService::note);
+    }
+
+    /** Dismiss: the merged and numbered part is no longer shown (the tags over 3 words stay until renamed). */
+    public Note dismissNote() {
+        return library.get().database().write(c -> {
+            try (PreparedStatement ps = c.prepareStatement("UPDATE tag_name_note SET dismissed_at = ? WHERE id = 1")) {
+                ps.setString(1, Instant.now().toString());
+                ps.executeUpdate();
+            }
+            return note(c);
+        });
+    }
+
+    private static Note note(Connection c) throws SQLException {
+        List<Merged> merged = new ArrayList<>();
+        List<Numbered> numbered = new ArrayList<>();
+        boolean dismissed = false;
+        try (PreparedStatement ps = c.prepareStatement("SELECT payload_json, dismissed_at FROM tag_name_note WHERE id = 1");
+             ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                JsonNode payload;
+                try {
+                    payload = JSON.readTree(rs.getString(1));
+                } catch (JsonProcessingException e) {
+                    throw new SQLException("The tag names note is not readable: " + e.getOriginalMessage(), e);
+                }
+                for (JsonNode m : payload.path("merged")) {
+                    merged.add(new Merged(m.path("from").asText(), m.path("into").asText(), m.path("photos").asInt()));
+                }
+                for (JsonNode n : payload.path("numbered")) {
+                    numbered.add(new Numbered(n.path("from").asText(), n.path("to").asText()));
+                }
+                dismissed = rs.getString(2) != null;
+            }
+        }
+        List<String> longNames = tags(c, "", ps -> { }).stream().map(Tag::label)
+                .filter(label -> TagNames.words(label) > TagNames.MAX_WORDS).toList();
+        return new Note(List.copyOf(merged), List.copyOf(numbered), longNames, dismissed);
     }
 
     /** Deletes a user tag and returns how many (live) photos it was taken off. */

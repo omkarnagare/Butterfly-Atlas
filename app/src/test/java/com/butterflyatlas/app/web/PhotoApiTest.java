@@ -201,6 +201,14 @@ class PhotoApiTest {
     }
 
     @Test
+    void theTagNamesNoteAndItsDismiss() throws Exception {
+        assertThat(get("api/tag-names").toString())
+                .isEqualTo("{\"merged\":[],\"numbered\":[],\"long\":[],\"dismissed\":false}");
+        assertThat(ok(send("POST", "api/tag-names/dismiss", "{}")).toString())
+                .isEqualTo("{\"merged\":[],\"numbered\":[],\"long\":[],\"dismissed\":false}");
+    }
+
+    @Test
     void tagsCanBeListedCreatedRenamedAndDeleted() throws Exception {
         JsonNode list = get("api/tags").get("tags");
         assertThat(list.size()).isEqualTo(10);

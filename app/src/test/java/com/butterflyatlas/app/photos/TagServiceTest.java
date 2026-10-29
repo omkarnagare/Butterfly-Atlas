@@ -237,4 +237,43 @@ class TagServiceTest {
         assertThat(created.label()).isEqualTo("caf\u00e9");
         assertThatThrownBy(() -> tags.create("CAF\u00c9")).isInstanceOf(AtlasException.class);
     }
+
+    private void sql(String statement) {
+        library.database().write(c -> {
+            try (var st = c.createStatement()) {
+                st.executeUpdate(statement);
+            }
+            return null;
+        });
+    }
+
+    @Test
+    void aLibraryWithNothingToSayHasAnEmptyNote() {
+        assertThat(tags.note()).isEqualTo(new TagService.Note(List.of(), List.of(), List.of(), false));
+        assertThat(tags.dismissNote()).isEqualTo(new TagService.Note(List.of(), List.of(), List.of(), false));
+    }
+
+    @Test
+    void theNoteSaysWhatV15MergedAndNumberedAndWhichTagsHaveMoreThan3Words() {
+        sql("INSERT INTO tag_name_note (id, payload_json) VALUES (1, '{\"merged\":[{\"from\":\"mud-puddling\","
+                + "\"into\":\"mud_puddling\",\"photos\":2}],\"numbered\":[{\"from\":\"Under-wing\",\"to\":\"under_wing_2\"}]}')");
+        sql("INSERT INTO tag (key, label, source, sort_order) VALUES ('b', 'mud_puddling_on_wet_sand', 'user', 1000),"
+                + " ('a', 'a_b_c_d', 'user', 1000), ('c', 'a_b_c', 'user', 1000)");
+
+        TagService.Note note = tags.note();
+
+        assertThat(note.merged()).containsExactly(new TagService.Merged("mud-puddling", "mud_puddling", 2));
+        assertThat(note.numbered()).containsExactly(new TagService.Numbered("Under-wing", "under_wing_2"));
+        assertThat(note.longNames()).containsExactly("a_b_c_d", "mud_puddling_on_wet_sand");
+        assertThat(note.dismissed()).isFalse();
+
+        TagService.Note dismissed = tags.dismissNote();
+
+        assertThat(dismissed.dismissed()).isTrue();
+        assertThat(dismissed.merged()).hasSize(1);
+        assertThat(tags.note().dismissed()).isTrue();
+        Tag longOne = tags.list().stream().filter(t -> t.key().equals("a")).findFirst().orElseThrow();
+        tags.rename(longOne.id(), "a b");
+        assertThat(tags.note().longNames()).containsExactly("mud_puddling_on_wet_sand");
+    }
 }
