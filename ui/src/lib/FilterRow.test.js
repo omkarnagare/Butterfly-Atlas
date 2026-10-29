@@ -14,12 +14,12 @@ test('one chip per active filter, each with a remove button, then + Add filter',
   render(FilterRow, { filter, names, onChange: () => {}, onEdit: () => {} });
   const row = screen.getByRole('list', { name: 'Filters' });
   expect([...row.querySelectorAll('li')].map((li) => li.textContent.replace(/\s+/g, ' ').trim())).toEqual([
-    'Taxa: Lycaenidae, Danaus ×', 'Tags: larva or pupa ×', 'Place: Maharashtra, Unknown place ×', 'Not photographed ×', 'Missing life stages ×', '+ Add filter',
+    'Taxa: Lycaenidae, Danaus ×', 'Tags: larva or pupa ×', 'Place: Maharashtra, Unknown place ×', 'Not photographed ×', 'Life stages: missing ×', '+ Add filter',
   ]);
   expect(screen.getByRole('button', { name: 'Remove Taxa: Lycaenidae, Danaus' })).toBeTruthy();
-  expect(screen.getByRole('button', { name: 'Remove Missing life stages' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Remove Life stages: missing' })).toBeTruthy();
   // Missing life stages is set only by its preset: nothing to edit, only to remove
-  expect(screen.queryByRole('button', { name: 'Missing life stages' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Life stages: missing' })).toBeNull();
 });
 
 test('× clears that filter only, and focus moves to the next chip (or + Add filter)', async () => {

@@ -122,6 +122,12 @@
       "printed": "taxa=A1&stages=missing&types=raw,jpeg,png"
     },
     {
+      "name": "Life stages: complete",
+      "query": "stages=complete&places=P4",
+      "filter": { "taxa": [], "tags": [], "tagMode": "any", "places": ["P4"], "status": "all", "source": "all", "stages": "complete" },
+      "printed": "places=P4&stages=complete"
+    },
+    {
       "name": "an empty types is every file type",
       "query": "types=&tags=egg",
       "filter": { "taxa": [], "tags": ["egg"], "tagMode": "any", "places": [], "status": "all", "source": "all", "stages": null, "types": [] },

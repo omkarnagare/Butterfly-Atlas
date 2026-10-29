@@ -55,6 +55,9 @@ export const PHOTOGRAPHED = 'Photographed';
 export const NOT_PHOTOGRAPHED = 'Not photographed';
 export const PHOTO_STATUS = 'Photo status';
 export const FILE_TYPE = 'File type';
+export const LIFE_STAGES = 'Life stages';
+export const NOT_WITH_LIFE_STAGES = 'Not with Life stages';
+export const NOT_WITH_TAGS_OR_STATUS = 'Not with Tags or Photo status';
 export const NOTHING_MATCHES = 'Nothing matches these filters.';
 export const PLACE_PROMPT = 'Type a district, state or country';
 
