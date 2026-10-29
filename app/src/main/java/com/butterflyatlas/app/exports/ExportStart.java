@@ -156,7 +156,7 @@ public final class ExportStart {
         try {
             List<ExportStore.NewItem> items = choices.photos() ? items(plan, choices, exportFolder) : List.of();
             if (choices.csv()) {
-                csv = writeCsv(set, choices, filter.byStages(),
+                csv = writeCsv(set, choices, filter.missingStages(),
                         exportFolder != null ? exportFolder.resolve(ExportNames.CSV_IN_FOLDER) : null, dest, day);
             }
             String folderName = (exportFolder != null ? exportFolder : csv).getFileName().toString();

@@ -127,6 +127,20 @@ class FilterSpeciesTest {
     }
 
     @Test
+    void completeLifeStagesListsSpeciesWithEggLarvaAndPupaWhateverTheirOtherTags() {
+        f.photo("A5", "P4", "egg");
+        f.photo("A5", "P4", "larva", "male");
+        f.photo("A5", "P5", "pupa");
+        f.photo("A6", "P4", "egg", "larva", "pupa");
+        f.photo("A8", "P4", "egg", "larva");
+        f.photo("A12", "P5");
+
+        assertThat(rows("stages=complete")).containsExactly("A5 3", "A6 1");
+        assertThat(rows("stages=complete&places=P4")).as("A5's pupa is elsewhere").containsExactly("A6 1");
+        assertThat(rows("stages=complete&taxa=A12")).isEmpty();
+    }
+
+    @Test
     void deletedPhotosNeverCount() {
         long gone = f.photo("A5", "P4");
         f.delete(gone);

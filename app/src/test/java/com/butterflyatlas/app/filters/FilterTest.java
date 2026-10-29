@@ -100,7 +100,18 @@ class FilterTest {
         refused("stages=missing&status=photographed", message);
         refused("stages=missing&status=not", message);
         refused("stages=missing&tags=male&tagMode=all&status=not", message);
+        refused("stages=complete&tags=egg", message);
+        refused("stages=complete&status=photographed", message);
         assertThat(Filter.parse("stages=missing&status=all&tags=").stages()).isEqualTo("missing");
+    }
+
+    @Test
+    void completeLifeStagesIsReadAndPrinted() {
+        Filter filter = Filter.parse("types=raw&stages=complete&places=P4&taxa=A1");
+
+        assertThat(filter.stages()).isEqualTo("complete");
+        assertThat(filter.byStages()).isTrue();
+        assertThat(filter.query()).isEqualTo("taxa=A1&places=P4&stages=complete&types=raw");
     }
 
     @Test

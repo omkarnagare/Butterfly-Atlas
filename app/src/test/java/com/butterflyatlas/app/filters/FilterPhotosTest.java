@@ -246,8 +246,8 @@ class FilterPhotosTest {
     }
 
     @Test
-    void notPhotographedHasNoPhotosAndMissingStagesHasThoseSpeciesPhotos() {
-        f.photo("A5", "P4", "egg", "larva", "pupa");
+    void notPhotographedHasNoPhotosAndLifeStagesHaveThoseSpeciesPhotos() {
+        long a5 = f.photo("A5", "P4", "egg", "larva", "pupa");
         long a6 = f.photo("A6", "P4", "egg");
         long a6b = f.photo("A6", "P5", "male");
         f.photo("A12", null);
@@ -255,6 +255,7 @@ class FilterPhotosTest {
         assertThat(page("status=not", null, 200).photos()).isEmpty();
         assertThat(page("status=not", null, 200).next()).isNull();
         assertThat(ids(page("stages=missing&places=P2", null, 200))).containsExactly(a6, a6b);
+        assertThat(ids(page("stages=complete", null, 200))).containsExactly(a5);
     }
 
     @Test

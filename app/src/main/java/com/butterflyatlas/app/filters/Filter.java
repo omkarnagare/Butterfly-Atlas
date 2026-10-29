@@ -16,7 +16,7 @@ import java.util.Set;
 /**
  * The shared filter of the Export screen (4a contract §1), as the UI's address and every {@code /api/filter/*} request
  * carry it in a query string. {@code taxa} are taxon ids at any rank, {@code tags} tag keys, {@code places} place ids
- * and/or {@code unknown}; each list once per id, in the order given. {@code stages} is null or {@code "missing"}.
+ * and/or {@code unknown}; each list once per id, in the order given. {@code stages} is null, {@code "missing"} or {@code "complete"}.
  * {@code types} are file types ({@code jpeg png tiff webp raw heic}, 7a contract §4, Phase 7b contract §5), once each in
  * the order given; none = all.
  */
@@ -30,6 +30,7 @@ public record Filter(List<String> taxa, List<String> tags, String tagMode, List<
     public static final String OFFICIAL = "official";
     public static final String MANUAL = "manual";
     public static final String MISSING = "missing";
+    public static final String COMPLETE = "complete";
     /** The place "id" of photos with no place. */
     public static final String UNKNOWN = "unknown";
     /** The most taxa, and the most places, one filter may name. */
@@ -38,7 +39,7 @@ public record Filter(List<String> taxa, List<String> tags, String tagMode, List<
     private static final List<String> TAG_MODES = List.of(ANY, ALL);
     private static final List<String> STATUSES = List.of(ALL, PHOTOGRAPHED, NOT);
     private static final List<String> SOURCES = List.of(ALL, OFFICIAL, MANUAL);
-    private static final List<String> STAGES = List.of(MISSING);
+    private static final List<String> STAGES = List.of(MISSING, COMPLETE);
     /** The File type choices (contract §0). */
     public static final List<String> TYPES = List.of("jpeg", "png", "tiff", "webp", "raw", "heic");
 
@@ -64,6 +65,11 @@ public record Filter(List<String> taxa, List<String> tags, String tagMode, List<
      */
     public boolean byStages() {
         return stages != null;
+    }
+
+    /** Life stages: Missing (the species list then has a Missing column). */
+    public boolean missingStages() {
+        return MISSING.equals(stages);
     }
 
     /** This filter with other ids (the ones actually used); everything else as it is. */

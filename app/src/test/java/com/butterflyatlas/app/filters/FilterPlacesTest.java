@@ -95,6 +95,7 @@ class FilterPlacesTest {
         assertThat(rows("stages=missing&places=P4")).as("A5 and A6 both lack a stage in Alpha").containsExactly("P4 2 3");
         f.photo("A6", "P4", "larva", "pupa");
         assertThat(rows("stages=missing&places=P4")).containsExactly("P4 1 2");
+        assertThat(rows("stages=complete&places=P4")).as("A6 now has every stage in Alpha").containsExactly("P4 1 2");
     }
 
     @Test
