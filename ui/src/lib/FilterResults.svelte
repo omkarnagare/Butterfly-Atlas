@@ -20,7 +20,7 @@
   import { loadProblem } from './problems.js';
   import { closeViewerTo } from './viewer.js';
   import { showToast } from './toast.svelte.js';
-  import { NOT_PHOTOGRAPHED, PHOTOGRAPHED, PHOTO_STATUS } from './messages.js';
+  import { LIFE_STAGES, NOT_PHOTOGRAPHED, PHOTOGRAPHED, PHOTO_STATUS } from './messages.js';
 
   /**
    * A filter and its results (Phase 4a contract §4; moved out of the Export screen for Explore, filters-in-Explore
@@ -55,6 +55,7 @@
   let photoId = $derived(photoProp);
 
   const STATUS = [{ value: 'all', label: 'All' }, { value: 'photographed', label: PHOTOGRAPHED }, { value: 'not', label: NOT_PHOTOGRAPHED }];
+  const STAGES = [{ value: 'missing', label: 'Missing' }, { value: 'complete', label: 'Complete' }];
   const VIEWS = [{ key: 'species', label: 'Species' }, { key: 'photos', label: 'Photos' }, { key: 'places', label: 'Places' }];
   const wait = untrack(() => delay);
 
@@ -401,6 +402,9 @@
 {:else if editing === 'status'}
   <ChoicePopover title={PHOTO_STATUS} options={STATUS} value={filter.status} anchor={opener} returnFocus={back}
                  onPick={(status) => edit({ ...filter, status })} onClose={closeEditor} />
+{:else if editing === 'stages'}
+  <ChoicePopover title={LIFE_STAGES} options={STAGES} value={filter.stages ?? 'missing'} anchor={opener} returnFocus={back}
+                 onPick={(stages) => edit({ ...filter, stages })} onClose={closeEditor} />
 {:else if editing === 'source'}
   <ChoicePopover title="Source" options={SOURCE_OPTIONS} value={filter.source} anchor={opener} returnFocus={back}
                  onPick={(source) => edit({ ...filter, source })} onClose={closeEditor} />

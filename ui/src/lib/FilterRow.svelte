@@ -1,15 +1,16 @@
 <script>
   import { tick, untrack } from 'svelte';
   import Popover from './Popover.svelte';
-  import { chips, without } from './filter.js';
-  import { FILE_TYPE, PHOTO_STATUS } from './messages.js';
+  import { blocked, chips, without } from './filter.js';
+  import { FILE_TYPE, LIFE_STAGES, PHOTO_STATUS } from './messages.js';
 
   /**
    * The Export screen's filter row (contract §4): one chip per active filter, worded from `names` (lib/filter.js
    * `chips`), each opening its popover (`onEdit(kind, chip)`) and with × to remove it (`onChange(filter)`); then
-   * "+ Add filter", a menu of Taxa, Tags, Place, Photo status, Source (only while `manualSpecies`) and File type (Phase 7a), which
-   * opens the chosen popover (`onEdit(kind, addButton)`). Missing life stages is set only by its preset, so its chip
-   * can only be removed. Chips pop in as they appear (CSS, off under reduced motion).
+   * "+ Add filter", a menu of Taxa, Tags, Place, Photo status, Life stages, Source (only while `manualSpecies`) and File
+   * type (Phase 7a), which opens the chosen popover (`onEdit(kind, addButton)`). What the filter cannot take (Life stages
+   * with Tags or Photo status, lib/filter.js `blocked`) stays in the menu, disabled and saying why. Chips pop in as they
+   * appear (CSS, off under reduced motion).
    */
   let { filter, names, manualSpecies = false, onChange, onEdit } = $props();
 
@@ -18,11 +19,13 @@
   let add = $state(null);
   let menu = $state(false);
   let list = $derived(chips(filter, names));
+  let why = $derived(blocked(filter));
   let items = $derived([
     { kind: 'taxa', label: 'Taxa' },
     { kind: 'tags', label: 'Tags' },
     { kind: 'places', label: 'Place' },
     { kind: 'status', label: PHOTO_STATUS },
+    { kind: 'stages', label: LIFE_STAGES },
     ...(manualSpecies ? [{ kind: 'source', label: 'Source' }] : []),
     { kind: 'types', label: FILE_TYPE },
   ]);
@@ -71,11 +74,7 @@
 <ul class="frow" bind:this={row} aria-label="Filters">
   {#each list as chip (chip.kind)}
     <li class="chip fchip">
-      {#if chip.kind === 'stages'}
-        <span>{chip.label}</span>
-      {:else}
-        <button type="button" class="fchip-l" aria-haspopup="dialog" onclick={(e) => onEdit(chip.kind, e.currentTarget)}>{chip.label}</button>
-      {/if}
+      <button type="button" class="fchip-l" aria-haspopup="dialog" onclick={(e) => onEdit(chip.kind, e.currentTarget)}>{chip.label}</button>
       <button type="button" class="fchip-x" aria-label="Remove {chip.label}" onclick={() => remove(chip.kind)}>×</button>
     </li>
   {/each}
@@ -90,7 +89,12 @@
     <!-- svelte-ignore a11y_interactive_supports_focus -->
     <div class="fmenu" id="{uid}-menu" role="menu" aria-label="Add filter" tabindex="-1" onkeydown={onMenuKey}>
       {#each items as item (item.kind)}
-        <button type="button" role="menuitem" onclick={() => choose(item.kind)}>{item.label}</button>
+        {#if why[item.kind]}
+          <button type="button" role="menuitem" aria-disabled="true" aria-label={item.label} aria-describedby="{uid}-{item.kind}-why"
+                  class="fmenu-off">{item.label}<span class="fmenu-why" id="{uid}-{item.kind}-why">{why[item.kind]}</span></button>
+        {:else}
+          <button type="button" role="menuitem" onclick={() => choose(item.kind)}>{item.label}</button>
+        {/if}
       {/each}
     </div>
   </Popover>
@@ -110,4 +114,6 @@
   .fmenu { display: grid; gap: 2px; outline: none; }
   .fmenu button { text-align: left; padding: 9px 10px; border-radius: 10px; font-weight: 600; }
   .fmenu button:hover, .fmenu button:focus-visible { background: var(--surface-2); }
+  .fmenu .fmenu-off { color: var(--muted); cursor: default; }
+  .fmenu-why { display: block; font-size: 12px; font-weight: 400; }
 </style>

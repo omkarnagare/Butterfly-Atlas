@@ -297,6 +297,22 @@ test('a chip opens its popover and focus returns to the chip; Source is offered 
   expect(within(source).getAllByRole('radio').map((radio) => radio.textContent)).toEqual(['All', 'Official', 'Custom']);
 });
 
+test('+ Add filter → Life stages: Missing or Complete, and its chip switches between them', async () => {
+  window.location.hash = '#/export';
+  const { rerender } = show();
+  await fireEvent.click(screen.getByRole('button', { name: '+ Add filter' }));
+  await fireEvent.click(screen.getByRole('menuitem', { name: 'Life stages' }));
+  const group = await screen.findByRole('radiogroup', { name: 'Life stages' });
+  expect(within(group).getAllByRole('radio').map((radio) => radio.textContent)).toEqual(['Missing', 'Complete']);
+  await fireEvent.click(within(group).getByRole('radio', { name: 'Complete' }));
+  expect(window.location.hash).toBe('#/export?stages=complete');
+
+  await rerender({ query: 'stages=complete' });
+  await fireEvent.click(await screen.findByRole('button', { name: 'Life stages: complete' }));
+  await fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Life stages' })).getByRole('radio', { name: 'Missing' }));
+  expect(window.location.hash).toBe('#/export?stages=missing');
+});
+
 test('the Tags popover uses the tags the screen has read, without asking again', async () => {
   window.location.hash = '#/export?tags=larva';
   show({ query: 'tags=larva' });

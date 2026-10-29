@@ -18,8 +18,7 @@ test('one chip per active filter, each with a remove button, then + Add filter',
   ]);
   expect(screen.getByRole('button', { name: 'Remove Taxa: Lycaenidae, Danaus' })).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Remove Life stages: missing' })).toBeTruthy();
-  // Missing life stages is set only by its preset: nothing to edit, only to remove
-  expect(screen.queryByRole('button', { name: 'Life stages: missing' })).toBeNull();
+  expect(screen.getByRole('button', { name: 'Life stages: missing' }).getAttribute('aria-haspopup')).toBe('dialog');
 });
 
 test('× clears that filter only, and focus moves to the next chip (or + Add filter)', async () => {
@@ -71,7 +70,7 @@ test('+ Add filter opens a menu; Source only while there are manual species, Fil
   const menu = screen.getByRole('menu', { name: 'Add filter' });
   expect(add.getAttribute('aria-expanded')).toBe('true');
   expect(add.getAttribute('aria-controls')).toBe(menu.id);
-  expect([...menu.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent)).toEqual(['Taxa', 'Tags', 'Place', 'Photo status', 'File type']);
+  expect([...menu.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent)).toEqual(['Taxa', 'Tags', 'Place', 'Photo status', 'Life stages', 'File type']);
   await vi.waitFor(() => expect(document.activeElement.textContent).toBe('Taxa'));
 
   await fireEvent.keyDown(document.activeElement, { key: 'ArrowDown' });
@@ -83,6 +82,7 @@ test('+ Add filter opens a menu; Source only while there are manual species, Fil
   expect(document.activeElement.textContent).toBe('Taxa');
   await fireEvent.keyDown(document.activeElement, { key: 'ArrowUp' });
   await fireEvent.keyDown(document.activeElement, { key: 'ArrowUp' });
+  await fireEvent.keyDown(document.activeElement, { key: 'ArrowUp' });
   await fireEvent.click(document.activeElement);
   expect(screen.queryByRole('menu')).toBeNull();
   await vi.waitFor(() => expect(onEdit).toHaveBeenCalledWith('status', add));
@@ -90,7 +90,49 @@ test('+ Add filter opens a menu; Source only while there are manual species, Fil
   await rerender({ manualSpecies: true });
   await fireEvent.click(add);
   expect([...screen.getByRole('menu').querySelectorAll('[role="menuitem"]')].map((item) => item.textContent))
-    .toEqual(['Taxa', 'Tags', 'Place', 'Photo status', 'Source', 'File type']);
+    .toEqual(['Taxa', 'Tags', 'Place', 'Photo status', 'Life stages', 'Source', 'File type']);
+});
+
+test('with Life stages on, Tags and Photo status are in the menu but disabled, saying why; choosing one does nothing', async () => {
+  const onEdit = vi.fn();
+  render(FilterRow, { filter: { ...EMPTY, stages: 'complete' }, names, onChange: () => {}, onEdit });
+  await fireEvent.click(screen.getByRole('button', { name: '+ Add filter' }));
+  for (const name of ['Tags', 'Photo status']) {
+    const item = screen.getByRole('menuitem', { name });
+    expect(item.getAttribute('aria-disabled')).toBe('true');
+    expect(item.getAttribute('aria-describedby') && document.getElementById(item.getAttribute('aria-describedby')).textContent)
+      .toBe('Not with Life stages');
+    await fireEvent.click(item);
+  }
+  expect(screen.getByRole('menu')).toBeTruthy();
+  expect(onEdit).not.toHaveBeenCalled();
+  // arrows still reach them, so the reason can be read
+  const taxa = screen.getByRole('menuitem', { name: 'Taxa' });
+  taxa.focus();
+  await fireEvent.keyDown(taxa, { key: 'ArrowDown' });
+  expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Tags' }));
+  expect(screen.getByRole('menuitem', { name: 'Place' }).getAttribute('aria-disabled')).toBeNull();
+  expect(screen.getByRole('menuitem', { name: 'Life stages' }).getAttribute('aria-disabled')).toBeNull();
+});
+
+test('with Tags or a Photo status on, Life stages is disabled, saying why', async () => {
+  const onEdit = vi.fn();
+  render(FilterRow, { filter: { ...EMPTY, tags: ['egg'] }, names, onChange: () => {}, onEdit });
+  await fireEvent.click(screen.getByRole('button', { name: '+ Add filter' }));
+  const item = screen.getByRole('menuitem', { name: 'Life stages' });
+  expect(item.getAttribute('aria-disabled')).toBe('true');
+  expect(document.getElementById(item.getAttribute('aria-describedby')).textContent).toBe('Not with Tags or Photo status');
+  await fireEvent.click(item);
+  expect(onEdit).not.toHaveBeenCalled();
+  expect(screen.getByRole('menuitem', { name: 'Photo status' }).getAttribute('aria-disabled')).toBeNull();
+});
+
+test('the Life stages chip opens its popover', async () => {
+  const onEdit = vi.fn();
+  render(FilterRow, { filter: { ...EMPTY, stages: 'missing' }, names, onChange: () => {}, onEdit });
+  const chip = screen.getByRole('button', { name: 'Life stages: missing' });
+  await fireEvent.click(chip);
+  expect(onEdit).toHaveBeenCalledWith('stages', chip);
 });
 
 test('Escape closes the menu and focus goes back to + Add filter', async () => {
