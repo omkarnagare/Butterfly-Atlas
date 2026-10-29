@@ -385,6 +385,17 @@ class ExportStartTest {
     }
 
     @Test
+    void completeLifeStagesHasNoMissingColumn() throws Exception {
+        TestBundles.tagImage(f.db, tiger1, "egg", "larva");
+        TestBundles.tagImage(f.db, tiger2, "pupa");
+        Exports.Export export = f.exports.start(new Exports.Request("stages=complete", "csv", f.dest.toString(), null, null,
+                null));
+
+        assertThat(Files.readString(f.dest.resolve(export.csv()))).contains(",Photo count,Tags present,Source,")
+                .doesNotContain("Missing");
+    }
+
+    @Test
     void aSpeciesListOnItsOwnIsDoneInTheAnswerAndASecondOneGetsANumber() throws Exception {
         Exports.Export first = f.exports.start(new Exports.Request("stages=missing", "csv", f.dest.toString(), null, null,
                 "country"));

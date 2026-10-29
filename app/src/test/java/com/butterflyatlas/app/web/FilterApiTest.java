@@ -179,6 +179,8 @@ class FilterApiTest {
             refused(get("api/filter/" + route + "?tagMode=most"), "Unknown tag mode “most”.");
             refused(get("api/filter/" + route + "?source=inat"), "Unknown source “inat”.");
             refused(get("api/filter/" + route + "?stages=some"), "Unknown stages “some”.");
+            refused(get("api/filter/" + route + "?tags=egg&stages=missing"),
+                    "Life stages can't be combined with Tags or Photo status.");
             refused(get("api/filter/" + route + "?taxa=" + many), "Choose at most 200 taxa.");
             refused(get("api/filter/" + route + "?places=" + many.toString().replace('A', 'P')), "Choose at most 200 places.");
         }

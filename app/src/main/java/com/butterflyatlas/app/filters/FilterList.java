@@ -29,7 +29,7 @@ final class FilterList {
 
     static List<ListRow> rows(Connection c, Result result, int depth) throws SQLException {
         Resolved r = result.resolved();
-        PhotoMatch match = PhotoMatch.of(r, !r.used().missingStages());
+        PhotoMatch match = PhotoMatch.of(r, !r.used().byStages());
         Map<String, List<FilterPlaces.AtDepth>> places = FilterPlaces.atDepth(c, match, depth);
         Map<Long, String> labels = labels(c);
         Taxa taxa = r.all();

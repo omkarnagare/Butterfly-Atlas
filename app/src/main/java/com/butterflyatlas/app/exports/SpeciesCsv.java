@@ -25,7 +25,7 @@ public final class SpeciesCsv {
 
     /**
      * Writes the header and the rows; the place columns go down to {@code depth} (0 none, 1 country, 2 state, 3
-     * district) and the Missing column is there with Missing life stages. The stream is flushed, not closed.
+     * district) and the Missing column is there with Life stages: Missing. The stream is flushed, not closed.
      */
     public static void write(OutputStream out, List<ListRow> rows, int depth, boolean missing) throws IOException {
         Writer writer = new BufferedWriter(new OutputStreamWriter(out, StandardCharsets.UTF_8));

@@ -26,7 +26,7 @@ record PhotoMatch(String from, String where, List<Object> params) {
      */
     static final String UNKNOWN_PLACE = "(i.place_id IS NULL OR NOT EXISTS (SELECT 1 FROM place u WHERE u.id = i.place_id))";
 
-    /** Matching photos of a resolved filter; {@code withTags} false leaves the tags out (Missing life stages). */
+    /** Matching photos of a resolved filter; {@code withTags} false leaves the tags out (Life stages). */
     static PhotoMatch of(Resolved r, boolean withTags) {
         List<Object> params = new ArrayList<>();
         StringBuilder where = new StringBuilder("i.deleted_at IS NULL");

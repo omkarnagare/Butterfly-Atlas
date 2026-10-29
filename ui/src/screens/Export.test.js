@@ -297,6 +297,44 @@ test('a chip opens its popover and focus returns to the chip; Source is offered 
   expect(within(source).getAllByRole('radio').map((radio) => radio.textContent)).toEqual(['All', 'Official', 'Custom']);
 });
 
+test('+ Add filter → Life stages: Missing or Complete, and its chip switches between them', async () => {
+  window.location.hash = '#/export';
+  const { rerender } = show();
+  await fireEvent.click(screen.getByRole('button', { name: '+ Add filter' }));
+  await fireEvent.click(screen.getByRole('menuitem', { name: 'Life stages' }));
+  const group = await screen.findByRole('radiogroup', { name: 'Life stages' });
+  expect(within(group).getAllByRole('radio').map((radio) => radio.textContent)).toEqual(['Missing', 'Complete']);
+  await fireEvent.click(within(group).getByRole('radio', { name: 'Complete' }));
+  expect(window.location.hash).toBe('#/export?stages=complete');
+
+  await rerender({ query: 'stages=complete' });
+  await fireEvent.click(await screen.findByRole('button', { name: 'Life stages: complete' }));
+  await fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Life stages' })).getByRole('radio', { name: 'Missing' }));
+  expect(window.location.hash).toBe('#/export?stages=missing');
+});
+
+test('an address with Life stages and Tags or Photo status drops them, rewrites the address and says so; the note goes at the next change', async () => {
+  window.location.hash = '#/export?tags=egg&status=not&stages=missing';
+  const { rerender } = show({ query: 'tags=egg&status=not&stages=missing' });
+
+  await vi.waitFor(() => expect(window.location.hash).toBe('#/export?stages=missing'));
+  expect(screen.queryByRole('button', { name: /^Remove Tags/ })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Remove Not photographed' })).toBeNull();
+  expect(screen.getByText("Removed Tags and Photo status: Life stages can't be combined with them.")).toBeTruthy();
+  await vi.waitFor(() => expect(filterCount).toHaveBeenCalledWith('stages=missing', expect.anything()));
+  expect(filterCount.mock.calls.map(([query]) => query).filter((query) => query.includes('tags='))).toEqual([]);
+
+  await rerender({ query: 'stages=missing' });
+  expect(screen.getByText(/^Removed Tags and Photo status/)).toBeTruthy();
+  await fireEvent.click(screen.getByRole('button', { name: 'Remove Life stages: missing' }));
+  expect(screen.queryByText(/^Removed/)).toBeNull();
+
+  // another address (Back) with the mix
+  await rerender({ query: 'tags=egg&stages=complete' });
+  await vi.waitFor(() => expect(screen.getByText("Removed Tags: Life stages can't be combined with it.")).toBeTruthy());
+  expect(window.location.hash).toBe('#/export?stages=complete');
+});
+
 test('the Tags popover uses the tags the screen has read, without asking again', async () => {
   window.location.hash = '#/export?tags=larva';
   show({ query: 'tags=larva' });

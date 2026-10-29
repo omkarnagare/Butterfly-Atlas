@@ -30,7 +30,7 @@ import java.util.function.Supplier;
  */
 public final class FilterQuery {
 
-    /** The life stages Missing life stages looks for, in the order {@code missing} lists them. */
+    /** The life stages the Life stages filter looks for, in the order {@code missing} lists them. */
     static final List<String> STAGES = PhotoQueries.Stages.EARLY_KEYS;
     /** The photos a page holds when the request names no {@code limit}. */
     public static final int DEFAULT_LIMIT = 200;
@@ -75,7 +75,7 @@ public final class FilterQuery {
 
     /**
      * A species of the result: {@code family}…{@code genus} are names (null where its line has no such rank),
-     * {@code photos} its matching photos, {@code missing} the absent stages with Missing life stages (else empty).
+     * {@code photos} its matching photos, {@code missing} the absent stages with Life stages: Missing (else empty).
      */
     public record SpeciesRow(String id, String name, String common, String family, String subfamily, String tribe,
                              String genus, int photos, List<String> missing, String source, boolean active) {
@@ -108,7 +108,7 @@ public final class FilterQuery {
      * A row of an export's species list (4b contract §4): the species with its family…genus names (null where its line
      * has none), the row's place names down to the chosen depth (all null without places, for Unknown place, or for a
      * species with no matching photo), its matching photos there and the labels of their tags in tag order, the missing
-     * stages with Missing life stages (else empty), and the source.
+     * stages with Life stages: Missing (else empty), and the source.
      */
     public record ListRow(String id, String family, String subfamily, String tribe, String genus, String name,
                           String common, String country, String state, String district, int photos, List<String> tags,
@@ -305,7 +305,7 @@ public final class FilterQuery {
     private static int[] exact(Connection c, Result result, String fileType) throws SQLException {
         Set<String> species = new HashSet<>();
         result.hits().forEach(h -> species.add(h.taxon().id()));
-        PhotoMatch match = PhotoMatch.of(result.resolved(), !result.resolved().used().missingStages());
+        PhotoMatch match = PhotoMatch.of(result.resolved(), !result.resolved().used().byStages());
         int[] raw = new int[3];
         try (PreparedStatement ps = c.prepareStatement("SELECT i.taxon_id, CASE WHEN m.json IS NOT NULL AND json_valid(m.json)"
                 + " THEN json_type(m.json, '$.gps') END IS NOT NULL, m.json IS NULL OR NOT json_valid(m.json) FROM "
@@ -339,26 +339,26 @@ public final class FilterQuery {
                 f.source(), f.stages(), r.notes(), f.types());
     }
 
-    /** The species in the result (per status, or Missing life stages), each with its matching photos. */
+    /** The species in the result (per status, or per Life stages), each with its matching photos. */
     static Result result(Connection c, Filter filter) throws SQLException {
         return result(c, Resolved.resolve(c, filter));
     }
 
     /** As {@link #result(Connection, Filter)}, for a filter already resolved on this connection. */
     static Result result(Connection c, Resolved r) throws SQLException {
-        boolean missingStages = r.used().missingStages();
-        Map<String, long[]> tallies = tallies(c, r, missingStages);
+        boolean byStages = r.used().byStages();
+        Map<String, long[]> tallies = tallies(c, r, byStages);
         List<Hit> hits = new ArrayList<>();
         for (Taxon species : r.universe()) {
             long[] tally = tallies.get(species.id());
-            if (missingStages) {
+            if (byStages) {
                 List<String> missing = new ArrayList<>();
                 for (int n = 0; tally != null && n < STAGES.size(); n++) {
                     if (tally[2 + n] == 0) {
                         missing.add(STAGES.get(n));
                     }
                 }
-                if (!missing.isEmpty()) {
+                if (tally != null && missing.isEmpty() == Filter.COMPLETE.equals(r.used().stages())) {
                     hits.add(new Hit(species, (int) tally[0], tally[1], List.copyOf(missing)));
                 }
                 continue;

@@ -1,5 +1,7 @@
 import { bareName } from './places.js';
-import { NOTHING_MATCHES, NOT_PHOTOGRAPHED, PHOTOGRAPHED, UNKNOWN_PLACE } from './messages.js';
+import {
+  LIFE_STAGES, NOTHING_MATCHES, NOT_PHOTOGRAPHED, NOT_WITH_LIFE_STAGES, NOT_WITH_TAGS_OR_STATUS, PHOTOGRAPHED, UNKNOWN_PLACE,
+} from './messages.js';
 /**
  * The shared filter of the Export screen (Phase 4a contract §1, §4). One filter is
  * `{ taxa, tags, tagMode, places, status, source, stages, types }` (`types`, the file types, Phase 7a contract §4); it is parsed from and printed to the query string used in
@@ -25,7 +27,7 @@ const CHOICES = {
   tagMode: ['any', 'all'],
   status: ['all', 'photographed', 'not'],
   source: ['all', 'official', 'manual'],
-  stages: ['missing'],
+  stages: ['missing', 'complete'],
 };
 
 /** decodeURIComponent, or the text as it is when it is not well encoded (a stray "%"). Shared with route.js. */
@@ -137,7 +139,7 @@ export function chips(filter, names) {
   if (filter.status !== 'all') out.push({ kind: 'status', label: STATUS[filter.status] });
   if (filter.source !== 'all') out.push({ kind: 'source', label: SOURCE[filter.source] });
   if (filter.types?.length) out.push({ kind: 'types', label: `File type: ${filter.types.map((type) => TYPE_LABEL[type] ?? type).join(', ')}` });
-  if (filter.stages) out.push({ kind: 'stages', label: 'Missing life stages' });
+  if (filter.stages) out.push({ kind: 'stages', label: `${LIFE_STAGES}: ${filter.stages}` });
   return out;
 }
 
@@ -151,6 +153,32 @@ export function without(filter, kind) {
   if (kind === 'stages') return { ...filter, stages: null };
   if (kind === 'types') return { ...filter, types: [] };
   return filter;
+}
+
+/**
+ * A filter with Life stages and without what it cannot be combined with (the server refuses tags or a photo status
+ * with it): `{ filter, dropped }`, `dropped` the chip kinds cleared ('tags', 'status'), [] when nothing was.
+ */
+export function settle(filter) {
+  if (!filter.stages) return { filter, dropped: [] };
+  const dropped = [];
+  let settled = filter;
+  if (filter.tags.length) {
+    dropped.push('tags');
+    settled = { ...settled, tags: [], tagMode: 'any' };
+  }
+  if (filter.status !== 'all') {
+    dropped.push('status');
+    settled = { ...settled, status: 'all' };
+  }
+  return { filter: settled, dropped };
+}
+
+/** The chip kinds + Add filter must not offer to this filter, each with its reason: Life stages excludes tags and status, and the other way round. */
+export function blocked(filter) {
+  if (filter.stages) return { tags: NOT_WITH_LIFE_STAGES, status: NOT_WITH_LIFE_STAGES };
+  if (filter.tags.length || filter.status !== 'all') return { stages: NOT_WITH_TAGS_OR_STATUS };
+  return {};
 }
 
 /** The presets line (contract §4): each keeps the taxa, places, source and file types; Clear clears everything. */
@@ -200,7 +228,8 @@ export function formatBytes(bytes) {
  * The count line (contract §4) from a count answer, as parts: strings, and `{ n }` for each number (so the line can
  * count them up). "3 photos of 2 species, 2 KB" (the species with matching photos: `photographedSpecies`), and with
  * status all, when the list has more species, " · 1,139 species in the list"; "No photos · 1,139 species in the list";
- * "212 species not yet photographed"; "31 species missing life stages"; "Nothing matches these filters.". Status and
+ * "212 species not yet photographed"; "31 species missing life stages"; "12 species with every life stage"; "Nothing
+ * matches these filters.". Status and
  * stages are read from the filter the server used.
  */
 export function countLine(count) {
@@ -209,6 +238,7 @@ export function countLine(count) {
   const used = count.filter ?? EMPTY;
   if (!species) return [NOTHING_MATCHES];
   if (used.stages === 'missing') return [{ n: species }, ' species missing life stages'];
+  if (used.stages === 'complete') return [{ n: species }, ' species with every life stage'];
   if (used.status === 'not') return [{ n: species }, ' species not yet photographed'];
   const rest = used.status === 'all' && species > photographed ? [' · ', { n: species }, ' species in the list'] : [];
   if (!photos) return ['No photos', ...rest];
@@ -244,12 +274,12 @@ export function placeNoteLines(notes = []) {
 
 /**
  * Where a species row of the results goes: its page with the gallery chips pre-set (design D2): `tag` only when exactly
- * one tag is chosen (and not with Missing life stages), `place` only when exactly one place is, `type` (Phase 7a) only
+ * one tag is chosen (and not with Life stages), `place` only when exactly one place is, `type` (Phase 7a) only
  * when exactly one file type is.
  */
 export function speciesHref(taxonId, filter) {
   const params = [];
-  if (filter.tags.length === 1 && filter.stages !== 'missing') params.push(`tag=${encodeURIComponent(filter.tags[0])}`);
+  if (filter.tags.length === 1 && !filter.stages) params.push(`tag=${encodeURIComponent(filter.tags[0])}`);
   if (filter.places.length === 1) params.push(`place=${encodeURIComponent(filter.places[0])}`);
   if (filter.types?.length === 1) params.push(`type=${filter.types[0]}`);
   return `#/species/${encodeURIComponent(taxonId)}${params.length ? `?${params.join('&')}` : ''}`;

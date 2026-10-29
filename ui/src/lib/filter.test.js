@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
-  EMPTY, FILE_TYPES, SOURCE_OPTIONS, applyPreset, chips, countLine, formatBytes, mergeNames, parseFilter, placeNoteLines, placesLine, printFilter, speciesHref, without,
+  EMPTY, FILE_TYPES, SOURCE_OPTIONS, applyPreset, blocked, chips, countLine, formatBytes, mergeNames, parseFilter, placeNoteLines, placesLine, printFilter, settle, speciesHref, without,
 } from './filter.js';
 
 const full = {
@@ -76,7 +76,8 @@ test('one chip per active filter, worded as the contract says', () => {
   expect(chips({ ...EMPTY, tags: ['larva', 'pupa'], status: 'not', source: 'official' }, names).map((c) => c.label))
     .toEqual(['Tags: larva or pupa', 'Not photographed', 'Official']);
   expect(chips({ ...EMPTY, tags: ['egg', 'larva', 'upper_wing'] }, names)[0].label).toBe('Tags: egg, larva or upper_wing');
-  expect(chips({ ...EMPTY, stages: 'missing' }, names)).toEqual([{ kind: 'stages', label: 'Missing life stages' }]);
+  expect(chips({ ...EMPTY, stages: 'missing' }, names)).toEqual([{ kind: 'stages', label: 'Life stages: missing' }]);
+  expect(chips({ ...EMPTY, stages: 'complete' }, names)).toEqual([{ kind: 'stages', label: 'Life stages: complete' }]);
   expect(chips(EMPTY, names)).toEqual([]);
 });
 
@@ -131,6 +132,8 @@ test('the count line: photos of the photographed species and size; the rest of t
 test('the count line: not photographed, missing life stages and nothing are as before', () => {
   expect(text(countLine(answer(0, 212, 0, 0, { status: 'not' })))).toBe('212 species not yet photographed');
   expect(text(countLine(answer(90, 31, 31, 10, { stages: 'missing' })))).toBe('31 species missing life stages');
+  expect(text(countLine(answer(90, 12, 12, 10, { stages: 'complete' })))).toBe('12 species with every life stage');
+  expect(text(countLine(answer(9, 1, 1, 10, { stages: 'complete' })))).toBe('1 species with every life stage');
   expect(text(countLine(answer(0, 0, 0, 0)))).toBe('Nothing matches these filters.');
   expect(text(countLine(answer(0, 0, 0, 0, { status: 'not' })))).toBe('Nothing matches these filters.');
 });
@@ -162,6 +165,7 @@ test('a species row links with its tag chip only for exactly one tag (not with m
   expect(speciesHref('A1042', { ...EMPTY, tags: ['larva'], places: ['P20'] })).toBe('#/species/A1042?tag=larva&place=P20');
   expect(speciesHref('A1042', { ...EMPTY, tags: ['larva', 'pupa'], places: ['unknown'] })).toBe('#/species/A1042?place=unknown');
   expect(speciesHref('A1042', { ...EMPTY, tags: ['larva'], stages: 'missing', places: ['P20', 'P21'] })).toBe('#/species/A1042');
+  expect(speciesHref('A1042', { ...EMPTY, tags: ['larva'], stages: 'complete' })).toBe('#/species/A1042');
   expect(speciesHref('A:1', { ...EMPTY, tags: ['a&b'] })).toBe('#/species/A%3A1?tag=a%26b');
 });
 
@@ -224,4 +228,30 @@ test('a species row carries one chosen file type to the species page, as it carr
   expect(speciesHref('A5', { ...EMPTY, types: ['raw'] })).toBe('#/species/A5?type=raw');
   expect(speciesHref('A5', { ...EMPTY, tags: ['larva'], places: ['P20'], types: ['raw'] })).toBe('#/species/A5?tag=larva&place=P20&type=raw');
   expect(speciesHref('A5', { ...EMPTY, types: ['raw', 'jpeg'] })).toBe('#/species/A5');
+});
+
+test('Life stages: Complete is read and printed; anything else is no stages', () => {
+  expect(parseFilter('stages=complete&taxa=A1')).toEqual({ ...EMPTY, taxa: ['A1'], stages: 'complete' });
+  expect(printFilter({ ...EMPTY, stages: 'complete', places: ['P4'] })).toBe('places=P4&stages=complete');
+  expect(parseFilter('stages=all').stages).toBeNull();
+});
+
+test('settle drops tags and photo status from a filter with Life stages, naming what it dropped', () => {
+  expect(settle({ ...EMPTY, tags: ['egg'], tagMode: 'all', status: 'not', stages: 'missing', taxa: ['A1'] })).toEqual({
+    filter: { ...EMPTY, stages: 'missing', taxa: ['A1'] }, dropped: ['tags', 'status'],
+  });
+  expect(settle({ ...EMPTY, tags: ['egg'], stages: 'complete' })).toEqual({ filter: { ...EMPTY, stages: 'complete' }, dropped: ['tags'] });
+  expect(settle({ ...EMPTY, status: 'photographed', stages: 'missing' }).dropped).toEqual(['status']);
+  const alone = { ...EMPTY, tags: ['egg'], status: 'not' };
+  expect(settle(alone)).toEqual({ filter: alone, dropped: [] });
+  const stages = { ...EMPTY, stages: 'missing', tagMode: 'all', places: ['P4'] };
+  expect(settle(stages)).toEqual({ filter: stages, dropped: [] });
+});
+
+test('blocked names the filters + Add filter must not offer, with the reason, both ways', () => {
+  expect(blocked(EMPTY)).toEqual({});
+  expect(blocked({ ...EMPTY, stages: 'complete', places: ['P4'] })).toEqual({ tags: 'Not with Life stages', status: 'Not with Life stages' });
+  expect(blocked({ ...EMPTY, tags: ['egg'] })).toEqual({ stages: 'Not with Tags or Photo status' });
+  expect(blocked({ ...EMPTY, status: 'not' })).toEqual({ stages: 'Not with Tags or Photo status' });
+  expect(blocked({ ...EMPTY, tagMode: 'all' })).toEqual({});
 });

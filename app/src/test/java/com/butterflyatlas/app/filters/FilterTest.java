@@ -71,20 +71,47 @@ class FilterTest {
             assertThat(filter).isEqualTo(NONE);
             assertThat(filter.query()).isEmpty();
         }
-        assertThat(NONE.missingStages()).isFalse();
+        assertThat(NONE.byStages()).isFalse();
     }
 
     @Test
     void everyKeyIsReadAndPrintedInTheContractOrder() {
-        Filter filter = Filter.parse("stages=missing&source=manual&status=not&places=P20,unknown&tagMode=all"
+        Filter filter = Filter.parse("source=manual&status=not&places=P20,unknown&tagMode=all"
                 + "&tags=egg,larva&taxa=A12,A230");
 
         assertThat(filter).isEqualTo(new Filter(List.of("A12", "A230"), List.of("egg", "larva"), "all",
-                List.of("P20", "unknown"), "not", "manual", "missing"));
-        assertThat(filter.missingStages()).isTrue();
+                List.of("P20", "unknown"), "not", "manual", null));
+        assertThat(filter.byStages()).isFalse();
         assertThat(filter.query()).isEqualTo("taxa=A12,A230&tags=egg,larva&tagMode=all&places=P20,unknown&status=not"
-                + "&source=manual&stages=missing");
+                + "&source=manual");
         assertThat(Filter.parse(filter.query())).isEqualTo(filter);
+
+        Filter stages = Filter.parse("stages=missing&tagMode=all&source=manual&places=P20&taxa=A12");
+        assertThat(stages).isEqualTo(new Filter(List.of("A12"), List.of(), "all", List.of("P20"), "all", "manual",
+                "missing"));
+        assertThat(stages.byStages()).isTrue();
+        assertThat(stages.query()).isEqualTo("taxa=A12&tagMode=all&places=P20&source=manual&stages=missing");
+    }
+
+    @Test
+    void lifeStagesAreRefusedWithTagsOrAPhotoStatus() {
+        String message = "Life stages can't be combined with Tags or Photo status.";
+        refused("tags=egg&stages=missing", message);
+        refused("stages=missing&status=photographed", message);
+        refused("stages=missing&status=not", message);
+        refused("stages=missing&tags=male&tagMode=all&status=not", message);
+        refused("stages=complete&tags=egg", message);
+        refused("stages=complete&status=photographed", message);
+        assertThat(Filter.parse("stages=missing&status=all&tags=").stages()).isEqualTo("missing");
+    }
+
+    @Test
+    void completeLifeStagesIsReadAndPrinted() {
+        Filter filter = Filter.parse("types=raw&stages=complete&places=P4&taxa=A1");
+
+        assertThat(filter.stages()).isEqualTo("complete");
+        assertThat(filter.byStages()).isTrue();
+        assertThat(filter.query()).isEqualTo("taxa=A1&places=P4&stages=complete&types=raw");
     }
 
     @Test

@@ -145,14 +145,14 @@ final class FilterPlaces {
 
     /** The rows of {@link FilterQuery#places} for a filter resolved on {@code c}. */
     static List<PlaceRow> places(Connection c, Resolved r) throws SQLException {
-        boolean missingStages = r.used().missingStages();
-        if (!missingStages && Filter.NOT.equals(r.used().status())) {
+        boolean byStages = r.used().byStages();
+        if (!byStages && Filter.NOT.equals(r.used().status())) {
             return List.of();
         }
-        // Missing life stages counts only the photos of species missing a stage; otherwise matching photos are
+        // Life stages counts only the photos of the species it lists (missing a stage, or complete); otherwise matching photos are
         // exactly those of the species in the result.
         List<List<String>> chunks = new ArrayList<>();
-        if (missingStages) {
+        if (byStages) {
             List<String> species = FilterQuery.result(c, r).hits().stream().filter(h -> h.photos() > 0)
                     .map(h -> h.taxon().id()).toList();
             if (species.isEmpty()) {
@@ -162,7 +162,7 @@ final class FilterPlaces {
         } else {
             chunks.add(List.of());
         }
-        PhotoMatch match = PhotoMatch.of(r, !missingStages);
+        PhotoMatch match = PhotoMatch.of(r, !byStages);
         Map<String, int[]> counts = new LinkedHashMap<>();
         boolean several = r.used().places().size() > 1;
         for (List<String> chunk : chunks) {

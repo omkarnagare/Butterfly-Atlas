@@ -288,6 +288,18 @@ test('adding a filter on a group page stays on it; removing the group\'s chip wi
   expect(window.location.hash).toBe('#/explore');
 });
 
+test('an Explore address with Life stages and Tags drops the tags and says so', async () => {
+  getTaxon.mockResolvedValue(family());
+  getChildren.mockResolvedValue([]);
+  window.location.hash = '#/explore/A1?tags=egg&stages=missing';
+  render(Explore, { id: 'A1', query: 'tags=egg&stages=missing', view: 'species', delay: 0 });
+
+  await vi.waitFor(() => expect(window.location.hash).toBe('#/explore/A1?stages=missing'));
+  await vi.waitFor(() => expect(filterSpecies).toHaveBeenCalledWith('taxa=A1&stages=missing', expect.anything()));
+  expect(filterSpecies.mock.calls.map(([query]) => query).filter((query) => query.includes('tags='))).toEqual([]);
+  expect(screen.getByText("Removed Tags: Life stages can't be combined with it.")).toBeTruthy();
+});
+
 test('the filter and view live in the address: another address (Back, Forward) shows its filter', async () => {
   getTaxon.mockResolvedValue(family());
   getChildren.mockResolvedValue([]);
