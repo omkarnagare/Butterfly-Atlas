@@ -253,7 +253,7 @@ public final class SmokeTest {
             zip.stream().map(ZipEntry::getName).forEach(names::add);
             for (String must : List.of("db/migration/V12__backup.sql", "db/migration/V1__core_schema.sql",
                     "places/places.sha256", "places/NOTICE.txt", "taxonomy/bundles.sha256", "heif/probe-rot.heic",
-                    "heif/probe-mirror.heic", "db/migration/V14__heic_photos.sql")) {
+                    "heif/probe-mirror.heic", "db/migration/V14__heic_photos.sql", "db/migration/V15__TagNames.class")) {
                 if (!names.contains(must)) {
                     throw new Fail("the app's jar has no " + must + " (data files must stay plain resources)");
                 }
@@ -577,7 +577,14 @@ public final class SmokeTest {
             long tagId = (long) tagJson.num("id");
             String tagKey = tagJson.str("key");
             http.call("GET /api/tags", "/api/tags", null, 200);
-            http.call("PATCH /api/tags/{id}", "/api/tags/" + tagId, "{\"label\":\"smoke_tag_two\"}", 200);
+            Json names = Json.parse(http.call("GET /api/tag-names", "/api/tag-names", null, 200).text());
+            names.list("merged");
+            names.list("numbered");
+            names.list("long"); // each throws when the list is missing
+            expect(!names.isNull("dismissed"), "the tag names note has no dismissed: " + names);
+            http.call("POST /api/tag-names/dismiss", "/api/tag-names/dismiss", "{}", 200);
+            Json renamed = Json.parse(http.call("PATCH /api/tags/{id}", "/api/tags/" + tagId, "{\"label\":\"smoke tag two\"}", 200).text());
+            expect("smoke_tag_two".equals(renamed.str("label")), "a renamed tag's name is not in its one form: " + renamed);
             long first = photoIds.keySet().iterator().next();
             http.call("PATCH /api/photos/{id}", "/api/photos/" + first, "{\"tags\":[" + Json.quote(tagKey) + "]}", 200);
             http.call("POST /api/photos/tags", "/api/photos/tags", "{\"ids\":[" + first + "],\"add\":[\"egg\"],\"remove\":[]}", 200);
@@ -1183,9 +1190,9 @@ public final class SmokeTest {
                         expect(r.next() && "ok".equals(r.getString(1)), "the copied " + db + " fails integrity_check");
                     }
                     try (ResultSet r = s.executeQuery("SELECT MAX(CAST(version AS INTEGER)) FROM flyway_schema_history WHERE success = 1")) {
-                        // The newest migration (V14, Phase 7b): raise this with every new migration.
-                        expect(r.next() && r.getInt(1) == 14, "the copied database is at schema version "
-                                + (r.getInt(1)) + ", not 14");
+                        // The newest migration (V15, tag names): raise this with every new migration.
+                        expect(r.next() && r.getInt(1) == 15, "the copied database is at schema version "
+                                + (r.getInt(1)) + ", not 15");
                     }
                     try (ResultSet r = s.executeQuery("SELECT COUNT(*) FROM image")) {
                         expect(r.next() && r.getInt(1) == 4, "the copied database has " + r.getInt(1) + " photos, not 4");

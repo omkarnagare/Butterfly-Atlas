@@ -201,18 +201,26 @@ class PhotoApiTest {
     }
 
     @Test
+    void theTagNamesNoteAndItsDismiss() throws Exception {
+        assertThat(get("api/tag-names").toString())
+                .isEqualTo("{\"merged\":[],\"numbered\":[],\"long\":[],\"dismissed\":false}");
+        assertThat(ok(send("POST", "api/tag-names/dismiss", "{}")).toString())
+                .isEqualTo("{\"merged\":[],\"numbered\":[],\"long\":[],\"dismissed\":false}");
+    }
+
+    @Test
     void tagsCanBeListedCreatedRenamedAndDeleted() throws Exception {
         JsonNode list = get("api/tags").get("tags");
         assertThat(list.size()).isEqualTo(10);
         assertThat(list.get(9).toString())
-                .isEqualTo("{\"id\":10,\"key\":\"unconfirmed\",\"label\":\"Unconfirmed\",\"source\":\"builtin\",\"photoCount\":0}");
+                .isEqualTo("{\"id\":10,\"key\":\"unconfirmed\",\"label\":\"unconfirmed\",\"source\":\"builtin\",\"photoCount\":0}");
         assertThat(list.get(3).toString())
-                .isEqualTo("{\"id\":4,\"key\":\"upper_wing\",\"label\":\"upper wing\",\"source\":\"builtin\",\"photoCount\":0}");
+                .isEqualTo("{\"id\":4,\"key\":\"upper_wing\",\"label\":\"upper_wing\",\"source\":\"builtin\",\"photoCount\":0}");
 
         JsonNode created = ok(send("POST", "api/tags", "{\"label\":\"Mud-puddling\"}"));
         assertThat(created.get("key").asText()).isEqualTo("mud_puddling");
         long tagId = created.get("id").asLong();
-        assertThat(ok(send("PATCH", "api/tags/" + tagId, "{\"label\":\"Puddling\"}")).get("label").asText()).isEqualTo("Puddling");
+        assertThat(ok(send("PATCH", "api/tags/" + tagId, "{\"label\":\"Puddling\"}")).get("label").asText()).isEqualTo("puddling");
 
         long photo = added("A5", TestImages.jpeg(40, 30)).get("id").asLong();
         ok(send("PATCH", "api/photos/" + photo, "{\"tags\":[\"mud_puddling\"]}"));

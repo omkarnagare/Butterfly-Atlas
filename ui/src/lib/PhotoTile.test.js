@@ -9,18 +9,18 @@ const photo = {
 };
 afterEach(() => vi.useRealTimers());
 
-const label = (key) => ({ larva: 'larva', upper_wing: 'upper wing' })[key];
+const label = (key) => ({ larva: 'larva', upper_wing: 'upper_wing' })[key];
 
 test('links to the viewer with a lazy thumbnail, its tags and its proportions', () => {
   const { container } = render(PhotoTile, { photo, label, fresh: true });
 
-  const link = screen.getByRole('link', { name: 'Open Danaus_chrysippus_01.jpg, larva, upper wing' });
+  const link = screen.getByRole('link', { name: 'Open Danaus_chrysippus_01.jpg, larva, upper_wing' });
   expect(link.getAttribute('href')).toBe('#/species/A5/photo/12');
   expect(link.getAttribute('style')).toContain('aspect-ratio: 4000 / 3000');
   const img = container.querySelector('img');
   expect(img.getAttribute('src')).toBe('./api/photos/12/thumb?v=1791700000000');
   expect(img.getAttribute('loading')).toBe('lazy');
-  expect([...container.querySelectorAll('.tt span')].map((s) => s.textContent)).toEqual(['larva', 'upper wing']);
+  expect([...container.querySelectorAll('.tt span')].map((s) => s.textContent)).toEqual(['larva', 'upper_wing']);
   expect(screen.getByText('New')).toBeTruthy();
   expect(container.textContent).not.toContain('Pune'); // the place is shown in the viewer, not on the tile
 });
@@ -100,7 +100,7 @@ test('a HEIC photo carries a HEIC badge (Phase 7b)', () => {
 
 test('a photo whose thumbnail cannot be made says so instead of a grey tile, whatever its format', () => {
   const { container } = render(PhotoTile, { photo: { ...photo, fileType: 'tiff', unreadable: true }, label });
-  const link = screen.getByRole('link', { name: "Open Danaus_chrysippus_01.jpg, larva, upper wing, can't show this photo" });
+  const link = screen.getByRole('link', { name: "Open Danaus_chrysippus_01.jpg, larva, upper_wing, can't show this photo" });
   expect(link.querySelector('img')).toBeNull();
   expect(link.classList.contains('waiting')).toBe(false);
   expect(container.querySelector('.cant').textContent).toBe("Can't show this photo");

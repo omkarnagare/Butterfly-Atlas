@@ -421,6 +421,7 @@ kbd { font: 500 11px/1 var(--mono); border: 1px solid var(--line); border-bottom
 .tag-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 10px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
 .tag-name { font-weight: 600; flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .tag-n { font: 500 12px var(--mono); color: var(--muted); }
+.tag-long { font-size: 12px; color: var(--muted); padding: 1px 8px; border-radius: 999px; border: 1px dashed var(--line); }
 .tag-name .pl-in { font-weight: 400; font-size: 13px; }
 .tag-row .btn { padding: 6px 10px; font-size: 13px; }
 .tag-row .field { flex: 1; min-width: 120px; padding: 6px 10px; }

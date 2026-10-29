@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import {
-  ApiError, addSearchWord, createTag, deletePhotos, deleteTag, editTags, emptyDeleted, fetchHealth, getDeleted, getPhotos,
+  ApiError, addSearchWord, createTag, deletePhotos, deleteTag, dismissTagNames, getTagNames, editTags, emptyDeleted, fetchHealth, getDeleted, getPhotos,
   getStatus, getTags, movePhotos, photoThumb, removeSearchWord, renameTag, restorePhotos, search, setCover, setPhotoTags,
   thumbUrl, uploadPhoto, PHOTO_ACCEPT, photoType, putImportPairs,
   acceptSuggestions, assignItems, discardImport, fileImport, finishImport, getFsRoots, getImport, getImportItems, getImportResult,
@@ -203,6 +203,8 @@ test('photo and tag changes use the agreed methods, paths and bodies', async () 
   await createTag('mud-puddling');
   await renameTag(10, 'puddling');
   await expect(deleteTag(10)).resolves.toBe(4);
+  await getTagNames();
+  await dismissTagNames();
   await getStatus();
 
   const calls = fetchMock.mock.calls.map(([url, init]) => [init.method, url.replace('./api/', ''), init.body ?? null]);
@@ -221,6 +223,8 @@ test('photo and tag changes use the agreed methods, paths and bodies', async () 
     ['POST', 'tags', '{"label":"mud-puddling"}'],
     ['PATCH', 'tags/10', '{"label":"puddling"}'],
     ['DELETE', 'tags/10', null],
+    ['GET', 'tag-names', null],
+    ['POST', 'tag-names/dismiss', '{}'],
     ['GET', 'status', null],
   ]);
 });

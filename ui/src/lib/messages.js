@@ -70,3 +70,11 @@ export const APPEARANCE_NOTE = 'Until you choose, Butterfly Atlas matches your c
 
 // A page with no session (api.js's refusal and the NoSession page; app SessionGuard.MESSAGE says the same).
 export const NO_SESSION_WORDS = 'To open Butterfly Atlas, use its icon, or New window in a Butterfly Atlas window.';
+
+// Tag names (tag-names design §2, §5): the server's refusals, said before Add or Save, and the name it will be saved as.
+export const TAG_NAME_EMPTY = 'Type a name for the tag.';
+export const TAG_NAME_TOO_MANY_WORDS = 'Keep tag names to 3 words or fewer.';
+export const TAG_NAME_TOO_LONG = 'Keep tag names to 40 characters or fewer.';
+export const tagNameTaken = (name) => `There is already a tag called "${name}".`;
+export const tagSavedAs = (name) => `Saved as: ${name}`;
+export const OVER_3_WORDS = 'over 3 words';

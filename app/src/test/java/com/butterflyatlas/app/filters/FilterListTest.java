@@ -62,7 +62,7 @@ class FilterListTest {
         f.photo("A6", "P3", "female", "upper_wing");
 
         assertThat(rows("status=photographed&tags=female", 0)).containsExactly("A5 1 [female] official",
-                "A6 1 [upper wing, female] official");
+                "A6 1 [upper_wing, female] official");
         assertThat(rows("places=P2&status=photographed", 0)).containsExactly("A5 1 [larva, male] official");
         assertThat(rows("status=not&taxa=A4&tags=male", 0)).containsExactly("A6 0 [] official");
     }

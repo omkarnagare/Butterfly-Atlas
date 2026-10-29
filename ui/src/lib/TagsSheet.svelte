@@ -4,11 +4,16 @@
   import Dialog from './Dialog.svelte';
   import { isTopModal, modal } from './modal.js';
   import { showToast } from './toast.svelte.js';
+  import { TAG_NAME_MAX_WORDS, checkTagName, tagWords } from './tags.js';
+  import { OVER_3_WORDS, tagSavedAs } from './messages.js';
 
   /**
    * Manage tags (design P6): built-in tags can be renamed, not deleted; the user's own tags can be added,
    * renamed and deleted. Deleting says how many photos carry the tag first; the photos stay. A refused delete (an
    * import filing with the tag, several-windows A17) says why on the tag's row, and focus goes back to its Delete.
+   * The add and rename fields keep what is typed; under them, the name it will be saved as ("Saved as: mud_puddling")
+   * when it differs, or why it can't be (the server's words), with Add / Save disabled (tag-names design §5). A tag
+   * of more than 3 words (one from before the limit) is marked on its row.
    */
   let { onChanged = () => {}, onClose } = $props();
 
@@ -27,6 +32,12 @@
   let builtin = $derived((tags ?? []).filter((t) => t.source === 'builtin'));
   let mine = $derived((tags ?? []).filter((t) => t.source === 'user'));
   const photos = (n) => (n === 1 ? '1 photo' : `${n} photos`);
+  // What a field's name will be saved as, or why not; null while the field is empty.
+  let addCheck = $derived(draft.trim() ? checkTagName(draft, tags) : null);
+  let renameCheck = $derived(renaming !== null && newLabel.trim() ? checkTagName(newLabel, tags, renaming) : null);
+  const hint = (check, typed) => check?.problem || (check && check.name !== typed.trim() ? tagSavedAs(check.name) : '');
+  let addHint = $derived(hint(addCheck, draft));
+  let renameHint = $derived(hint(renameCheck, newLabel));
 
   onMount(async () => {
     addInput?.focus();
@@ -65,7 +76,7 @@
   async function add(event) {
     event.preventDefault();
     const label = draft.trim();
-    if (!label) return;
+    if (!label || addCheck?.problem) return;
     if (await change(() => createTag(label))) {
       draft = '';
       addInput?.focus();
@@ -89,7 +100,8 @@
 
   async function saveRename(tag) {
     const label = newLabel.trim();
-    if (!label || label === tag.label) {
+    if (renameCheck?.problem) return;
+    if (!label || renameCheck?.name === tag.label) {
       stopRename(tag);
       return;
     }
@@ -137,13 +149,18 @@
   <li class="tag-row">
     {#if renaming === tag.id}
       <input class="field" id="{uid}-rename" bind:value={newLabel} maxlength="60" aria-label="New name for {tag.label}"
-             aria-invalid={error && errorAt === tag.id ? 'true' : undefined} aria-describedby={error && errorAt === tag.id ? `${uid}-err` : undefined}
+             aria-invalid={(error && errorAt === tag.id) || renameCheck?.problem ? 'true' : undefined}
+             aria-describedby={error && errorAt === tag.id ? `${uid}-err` : renameHint ? `${uid}-rename-hint` : undefined}
              oninput={() => (error = '')} onkeydown={(e) => renameKey(e, tag)} />
-      <button class="btn" type="button" aria-disabled={busy} onclick={() => saveRename(tag)}>Save</button>
+      <button class="btn" type="button" disabled={!!renameCheck?.problem} aria-disabled={busy} onclick={() => saveRename(tag)}>Save</button>
       <button class="btn ghost" type="button" onclick={() => stopRename(tag)}>Cancel</button>
+      {#if renameHint && !(error && errorAt === tag.id)}
+        <p class={renameCheck?.problem ? 'problem' : 'muted'} id="{uid}-rename-hint" aria-live="polite" style="flex-basis: 100%">{renameHint}</p>
+      {/if}
       {#if error && errorAt === tag.id}<p class="problem" id="{uid}-err" role="alert" style="flex-basis: 100%">{error}</p>{/if}
     {:else}
       <span class="tag-name">{tag.label}</span>
+      {#if tagWords(tag.label) > TAG_NAME_MAX_WORDS}<span class="tag-long">{OVER_3_WORDS}</span>{/if}
       <span class="tag-n">{photos(tag.photoCount)}</span>
       <button class="btn ghost" type="button" aria-label="Rename {tag.label}" data-rename={tag.id} onclick={() => startRename(tag)}>Rename</button>
       {#if tag.source === 'builtin'}
@@ -169,10 +186,14 @@
     <div class="sh-b">
       <form class="tag-add" onsubmit={add}>
         <input class="field" bind:this={addInput} bind:value={draft} maxlength="60" aria-label="New tag"
-               aria-invalid={error && (errorAt === 'add') ? 'true' : undefined} aria-describedby={error && errorAt === 'add' ? `${uid}-err` : undefined}
-               placeholder="For example “mud-puddling”" oninput={() => (error = '')} />
-        <button class="btn" type="submit" disabled={!draft.trim()} aria-disabled={busy}>Add</button>
+               aria-invalid={(error && errorAt === 'add') || addCheck?.problem ? 'true' : undefined}
+               aria-describedby={error && errorAt === 'add' ? `${uid}-err` : addHint ? `${uid}-add-hint` : undefined}
+               placeholder="For example “mud_puddling”" oninput={() => (error = '')} />
+        <button class="btn" type="submit" disabled={!draft.trim() || !!addCheck?.problem} aria-disabled={busy}>Add</button>
       </form>
+      {#if addHint && !(error && errorAt === 'add')}
+        <p class={addCheck?.problem ? 'problem' : 'muted'} id="{uid}-add-hint" aria-live="polite">{addHint}</p>
+      {/if}
       {#if error && (errorAt === 'add' || errorAt === '')}<p class="problem" id="{uid}-err" role="alert">{error}</p>{/if}
       {#if tags === null && !error}
         <p class="muted" role="status">Loading tags…</p>

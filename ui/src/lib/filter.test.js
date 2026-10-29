@@ -75,7 +75,7 @@ test('one chip per active filter, worded as the contract says', () => {
   ]);
   expect(chips({ ...EMPTY, tags: ['larva', 'pupa'], status: 'not', source: 'official' }, names).map((c) => c.label))
     .toEqual(['Tags: larva or pupa', 'Not photographed', 'Official']);
-  expect(chips({ ...EMPTY, tags: ['egg', 'larva', 'upper_wing'] }, names)[0].label).toBe('Tags: egg, larva or upper wing');
+  expect(chips({ ...EMPTY, tags: ['egg', 'larva', 'upper_wing'] }, names)[0].label).toBe('Tags: egg, larva or upper_wing');
   expect(chips({ ...EMPTY, stages: 'missing' }, names)).toEqual([{ kind: 'stages', label: 'Missing life stages' }]);
   expect(chips(EMPTY, names)).toEqual([]);
 });
@@ -83,7 +83,7 @@ test('one chip per active filter, worded as the contract says', () => {
 test('a taxon or place whose name is not known yet reads "…" (never left out); a tag reads as its key', () => {
   const names = mergeNames(undefined, { places: [{ id: 'P20', name: 'Maharashtra' }] });
   expect(chips({ ...EMPTY, taxa: ['A99'], tags: ['upper_wing'], places: ['P7', 'P20'] }, names).map((c) => c.label))
-    .toEqual(['Taxa: …', 'Tags: upper wing', 'Place: …, Maharashtra']);
+    .toEqual(['Taxa: …', 'Tags: upper_wing', 'Place: …, Maharashtra']);
 });
 
 test('names are remembered across answers; a later answer renames', () => {

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import Home from './Home.svelte';
-import { cancelBackup, cancelExport, checkBackup, dismissPlaceUpdate, dismissRescanLeft, getBackups, getFsRoots, listFolder, resumeBackup, setBackupPreference, getPlaceUpdate, getSplits, getStatus, getSummary, getTags, resumeExport } from '../lib/api.js';
+import { cancelBackup, cancelExport, checkBackup, dismissPlaceUpdate, dismissRescanLeft, getBackups, getFsRoots, listFolder, resumeBackup, setBackupPreference, getPlaceUpdate, getSplits, getStatus, getSummary, getTagNames, getTags, resumeExport } from '../lib/api.js';
 import { resetStatus, status } from '../lib/status.svelte.js';
 import { modal } from '../lib/modal.js';
 import { resetAsk } from '../lib/backups.js';
@@ -12,7 +12,7 @@ vi.mock('../lib/api.js', () => ({
   getSplits: vi.fn(), getCustomMatches: vi.fn(), retryUpdate: vi.fn(), mergeCustomMatch: vi.fn(), declineCustomMatch: vi.fn(),
   getPlaceUpdate: vi.fn(), dismissPlaceUpdate: vi.fn(), getBackups: vi.fn(), getBackup: vi.fn(), resumeBackup: vi.fn(), cancelBackup: vi.fn(), pauseBackup: vi.fn(),
   setBackupPreference: vi.fn(), checkBackup: vi.fn(), startBackup: vi.fn(), getFsRoots: vi.fn(), listFolder: vi.fn(),
-  dismissRescanLeft: vi.fn(), checkHeic: vi.fn(),
+  dismissRescanLeft: vi.fn(), checkHeic: vi.fn(), getTagNames: vi.fn(), dismissTagNames: vi.fn(),
   photoThumb: (photo) => `./api/photos/${photo.id}/thumb?v=1`,
   thumbUrl: (id, v) => `./api/photos/${id}/thumb?v=${v}`,
 }));
@@ -22,6 +22,7 @@ beforeEach(() => {
   resetStatus();
   resetAsk();
   getTags.mockResolvedValue([{ id: 2, key: 'larva', label: 'larva', source: 'builtin', photoCount: 1 }]);
+  getTagNames.mockResolvedValue({ merged: [], numbered: [], long: [], dismissed: false });
 });
 
 const summary = {

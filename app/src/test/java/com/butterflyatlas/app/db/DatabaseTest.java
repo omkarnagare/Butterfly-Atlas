@@ -192,7 +192,7 @@ class DatabaseTest {
 
         assertThat(query(again, "SELECT id FROM taxon")).containsExactly("G:butterflies");
         assertThat(query(again, "SELECT version FROM flyway_schema_history WHERE success = 1"))
-                .containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14");
+                .containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15");
     }
 
     @Test
@@ -200,9 +200,9 @@ class DatabaseTest {
         Database db = open();
 
         assertThat(query(db, "SELECT key || '|' || label || '|' || source FROM tag ORDER BY sort_order")).containsExactly(
-                "egg|egg|builtin", "larva|larva|builtin", "pupa|pupa|builtin", "upper_wing|upper wing|builtin",
-                "under_wing|under wing|builtin", "male|male|builtin", "female|female|builtin", "dsf|DSF|builtin",
-                "wsf|WSF|builtin", "unconfirmed|Unconfirmed|builtin");
+                "egg|egg|builtin", "larva|larva|builtin", "pupa|pupa|builtin", "upper_wing|upper_wing|builtin",
+                "under_wing|under_wing|builtin", "male|male|builtin", "female|female|builtin", "dsf|DSF|builtin",
+                "wsf|WSF|builtin", "unconfirmed|unconfirmed|builtin");
     }
 
     @Test
