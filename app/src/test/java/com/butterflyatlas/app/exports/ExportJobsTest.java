@@ -801,13 +801,14 @@ class ExportJobsTest {
         small.exports.nanos(() -> 0L);
         small.exports.opener(part -> {
             if (part.getFileName().toString().startsWith("Danaus_chrysippus_02")) {
+                // The drive fills as this photo is written (set here, not after start: the export may get here first).
+                small.free.set(10);
                 throw new IOException("No space left on device");
             }
             return Files.newOutputStream(part, StandardOpenOption.CREATE_NEW);
         });
         try {
             long id = small.exports.start(small.request("", "photos")).id();
-            small.free.set(10);
             assertThat(small.exports.awaitIdle(Duration.ofSeconds(20))).isTrue();
 
             assertThat(small.exports.store().run(id).notice()).as("5 KB still to copy, not the first photo's 298 KB")
