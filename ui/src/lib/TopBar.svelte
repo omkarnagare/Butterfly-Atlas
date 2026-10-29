@@ -2,6 +2,7 @@
   import Oakblue from './Oakblue.svelte';
   import { openWindow } from './api.js';
   import { LINK_MS, showToast } from './toast.svelte.js';
+  import { forgetPassedOn, passOn } from './newWindow.js';
 
   /** @type {{ current?: 'home' | 'explore' | 'export' | 'import' | 'settings', onSearch?: () => void }} */
   let { current = 'home', onSearch = () => {} } = $props();
@@ -10,14 +11,19 @@
 
   // New window (several-windows contract §8, A13): "Opening…" (aria-disabled) until the app answers, which can take a
   // few seconds while the browser starts; then a toast either way, a refusal in the server's words, long enough to read.
+  // The new window opens at this window's address (filters-in-Explore design §7).
   let opening = $state(false);
   async function newWindow() {
     if (opening) return;
     opening = true;
+    // The new window opens where this one is (lib/newWindow.js).
+    const passed = passOn(window.location.hash);
     try {
       await openWindow();
-      showToast('A new window is opening.');
+      showToast(passed ? 'A new window is opening.'
+        : "A new window is opening on Home: this browser didn't let Butterfly Atlas pass on where you were.");
     } catch (e) {
+      forgetPassedOn();
       showToast(e?.message ?? String(e), { ms: LINK_MS });
     } finally {
       opening = false;
