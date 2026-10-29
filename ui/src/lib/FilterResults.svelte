@@ -19,6 +19,7 @@
   import { LIBRARY_CHANGED } from './status.svelte.js';
   import { loadProblem } from './problems.js';
   import { closeViewerTo } from './viewer.js';
+  import { showToast } from './toast.svelte.js';
   import { NOT_PHOTOGRAPHED, PHOTOGRAPHED, PHOTO_STATUS } from './messages.js';
 
   /**
@@ -37,9 +38,11 @@
    * sets it in turn. So a second change made before the address is back starts from the first.
    *
    * `count`, `pending`, `countError` and `printed` (the filter as printed) are bound by the screen for its own actions.
+   * `editable` (Explore) lets the viewer edit the photos: after an edit the results and the count are read again, and a
+   * photo the edit took out of the filter (or moved, or deleted) gives way to the next one, chosen before the reload.
    */
   let {
-    query: queryProp, view: viewProp = 'species', photoId: photoProp = null, delay = 200, resultsHref, photoHref, actions,
+    query: queryProp, view: viewProp = 'species', photoId: photoProp = null, delay = 200, resultsHref, photoHref, actions, editable = false,
     count = $bindable(null), pending = $bindable(true), countError = $bindable(''), printed = $bindable(''),
   } = $props();
 
@@ -268,11 +271,48 @@
 
   /* ---------- the viewer ---------- */
 
-  let viewing = $derived(photoId !== null && pages.photos.some((photo) => photo.id === photoId));
+  // While an edit's reload decides where the viewer goes, it keeps the photos it showed (`held`, for photo `heldFor`).
+  let held = $state(null);
+  let heldFor = null;
+  let viewerPhotos = $derived(held ?? pages.photos);
+  let viewing = $derived(photoId !== null && viewerPhotos.some((photo) => photo.id === photoId));
+
+  // The viewer has moved on (or closed): it shows the results as they are.
+  $effect(() => {
+    const now = photoId;
+    untrack(() => {
+      if (held && now !== heldFor) held = null;
+    });
+  });
+
+  /**
+   * After an edit in the viewer: the results and the count are read again. A photo no longer in them (`left`: moved or
+   * deleted, already said; else the edit took it out of the filter, said here) gives way to the next one, or the one
+   * before when it was the last, or the viewer closes.
+   */
+  async function edited({ left = false } = {}) {
+    const shown = photoId;
+    const before = pages.photos;
+    const at = before.findIndex((photo) => photo.id === shown);
+    const order = [...before.slice(at + 1), ...before.slice(0, Math.max(0, at)).reverse()].map((photo) => photo.id);
+    held = before;
+    heldFor = shown;
+    counter.ask(query);
+    await pages.reload(query);
+    const now = pages.photos;
+    if (pages.reloadFailed || (!left && now.some((photo) => photo.id === shown))) {
+      held = null;
+      return;
+    }
+    if (!left) showToast('This photo no longer matches the filter.');
+    const next = order.find((id) => now.some((photo) => photo.id === id));
+    if (next !== undefined) window.location.replace(photoHref(next, query));
+    else closeViewerTo(resultsHref(query, 'photos'));
+  }
 
   // A photo not loaded yet: load on until it is there; one the results do not have shows the Photos view.
   $effect(() => {
-    if (photoId === null || viewing || !pages.loaded || pages.loading || pages.error) return;
+    if (photoId === null || viewing || held || !pages.loaded || pages.loading || pages.error) return;
     untrack(() => {
       if (pages.next !== null) loadPhotos(false);
       else window.location.replace(resultsHref(query, 'photos'));
@@ -355,7 +395,7 @@
 {/if}
 
 {#if viewing}
-  <ExportViewer photos={pages.photos} {photoId} {query} {tags} total={count?.photos ?? pages.photos.length} hasMore={pages.next !== null} loading={pages.loading}
+  <ExportViewer photos={viewerPhotos} {photoId} {query} {tags} {editable} onEdited={edited} {photoHref} total={count?.photos ?? pages.photos.length} hasMore={pages.next !== null} loading={pages.loading}
                 error={pages.error} onMore={() => loadPhotos(false)} onRetry={retryViewerPage}
                 returnFocus={(id) => document.querySelector(`.fgrid [data-photo-id="${id}"]`)} onClose={() => closeViewerTo(resultsHref(query, 'photos'))} />
 {/if}
