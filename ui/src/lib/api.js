@@ -274,6 +274,9 @@ export const getTags = ({ signal } = {}) => request('tags', { signal }).then((r)
 export const createTag = (label) => request('tags', { method: 'POST', body: { label } });
 export const renameTag = (tagId, label) => request(`tags/${id(tagId)}`, { method: 'PATCH', body: { label } });
 export const deleteTag = (tagId) => request(`tags/${id(tagId)}`, { method: 'DELETE' }).then((r) => r.removedFromPhotos);
+/** The Home note of tag names (tag-names design §4): `{ merged, numbered, long, dismissed }`. */
+export const getTagNames = () => request('tag-names');
+export const dismissTagNames = () => request('tag-names/dismiss', { method: 'POST', body: {} });
 export const getStatus = () => request('status');
 
 /* ---------- HEIC decoder (Phase 7b) ---------- */

@@ -32,6 +32,7 @@
   import UpdateCards from '../lib/UpdateCards.svelte';
   import PlaceUpdateNote from '../lib/PlaceUpdateNote.svelte';
   import RescanLeftNote from '../lib/RescanLeftNote.svelte';
+  import TagNamesNote from '../lib/TagNamesNote.svelte';
   import { thumbRetry } from '../lib/thumbRetry.js';
   import { PAUSED, PENDING, RUNNING, WAITING } from '../lib/states.js';
   import { IMPORTS_THAT_STOPPED, PAUSED_EXPORT } from '../lib/messages.js';
@@ -161,6 +162,7 @@
   <UpdateCards />
   <PlaceUpdateNote />
   <RescanLeftNote />
+  <TagNamesNote />
   {#if showLine}
     <p class="muted bk-line">{homeLine(backups)}
       <button class="bk-link" type="button" bind:this={backUpButton} onclick={() => (sheetOpen = true)}>Back up now</button></p>
