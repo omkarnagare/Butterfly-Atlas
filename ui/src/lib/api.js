@@ -89,8 +89,12 @@ export const getSession = () => request('session');
  */
 export const openWindow = () => request('window', { method: 'POST', body: {} });
 export const getSetup = () => request('setup');
-export const inspectFolder = (path) => request(`setup/inspect?path=${q(path)}`);
-export const setUpLibrary = (dataFolder) => request('setup', { method: 'POST', body: { dataFolder } });
+/**
+ * Setup's check of a folder, and setting the library up there (setup design §3). `exact`: the folder is the library
+ * folder (the suggested one); false: the library is kept in it (the folder browser).
+ */
+export const inspectFolder = (path, exact = true) => request(`setup/inspect?path=${q(path)}${exact ? '' : '&exact=false'}`);
+export const setUpLibrary = (dataFolder, exact = true) => request('setup', { method: 'POST', body: { dataFolder, exact } });
 /**
  * Opens the remembered library again after it failed to open (Phase 5c: a place step that failed): the Setup status as
  * it is now (409 `not_failed` when nothing failed).

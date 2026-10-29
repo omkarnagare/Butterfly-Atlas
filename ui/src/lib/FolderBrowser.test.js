@@ -1,9 +1,9 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { beforeEach, expect, test, vi } from 'vitest';
 import FolderBrowser from './FolderBrowser.svelte';
-import { getFsRoots, listFolder } from './api.js';
+import { getFsRoots, inspectFolder, listFolder } from './api.js';
 
-vi.mock('./api.js', () => ({ getFsRoots: vi.fn(), listFolder: vi.fn() }));
+vi.mock('./api.js', () => ({ getFsRoots: vi.fn(), listFolder: vi.fn(), inspectFolder: vi.fn() }));
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -390,4 +390,74 @@ test('for a backup it is titled "Choose where to back up", chooses with "Back up
   render(FolderBrowser, { backup: true, startPath: '/Users/you/Pictures/Atlas', onChoose, onClose: vi.fn() });
   expect(await screen.findByText("That's your library folder. Choose a folder outside the library.")).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Back up here' }).getAttribute('aria-disabled')).toBe('true');
+});
+
+// ---- setup (choosing where to keep the library) ----
+
+const documents = folder('/Users/you/Documents', {
+  folders: [{ name: 'Old', path: '/Users/you/Documents/Old', folders: 1, photos: 240 }],
+  photos: 12,
+});
+const inspected = (path, kind, extra = {}) => ({ path, absolute: true, libraryFolder: `${path}/Butterfly_Atlas`, kind, unfinished: null, ...extra });
+
+function setUpForSetup(checks) {
+  getFsRoots.mockResolvedValue([...roots, { name: 'Documents', path: '/Users/you/Documents', kind: 'documents' }]);
+  const byPath = new Map([pictures, documents, folder('/Users/you/Documents/Old')].map((f) => [f.path, f]));
+  listFolder.mockImplementation(async (path) => byPath.get(path));
+  inspectFolder.mockImplementation(async (path) => checks[path]);
+}
+
+test('for setup it is titled "Choose where to keep your library", opens at Documents, and says the library is made inside', async () => {
+  setUpForSetup({ '/Users/you/Documents': inspected('/Users/you/Documents', 'create') });
+  const onChoose = vi.fn();
+  render(FolderBrowser, { setup: true, onChoose, onClose: vi.fn() });
+
+  expect(screen.getByRole('dialog', { name: 'Choose where to keep your library' })).toBeTruthy();
+  const here = await screen.findByText('Your library will be created in /Users/you/Documents/Butterfly_Atlas.');
+  expect(inspectFolder).toHaveBeenCalledWith('/Users/you/Documents', false);
+  const rows = within(screen.getByRole('list', { name: 'Folders in Documents' })).getAllByRole('button')
+    .map((b) => b.textContent.replace(/\s+/g, ' ').trim());
+  expect(rows).toEqual(['Old 1 folder']);
+  expect(screen.queryByText(/photos/)).toBeNull();
+  const button = screen.getByRole('button', { name: 'Use this folder' });
+  expect(button.getAttribute('aria-describedby')).toBe(here.id);
+  await fireEvent.click(button);
+  expect(onChoose).toHaveBeenCalledWith(expect.objectContaining({ path: '/Users/you/Documents' }));
+});
+
+test('for setup a folder with a library opens it, saying what unfinished work will be cleared', async () => {
+  setUpForSetup({
+    '/Users/you/Documents': inspected('/Users/you/Documents', 'create'),
+    '/Users/you/Documents/Old': inspected('/Users/you/Documents/Old', 'existing', {
+      libraryFolder: '/Users/you/Documents/Old', unfinished: { imports: 1, exports: 1, backups: 0 },
+    }),
+  });
+  render(FolderBrowser, { setup: true, onChoose: vi.fn(), onClose: vi.fn() });
+
+  await fireEvent.click(await screen.findByRole('button', { name: /^Old/ }));
+
+  expect(await screen.findByText(/^This folder already has a Butterfly Atlas library\. It will open as it is, except for work left unfinished where it was used before: 1 import and 1 paused export\./))
+    .toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Open this existing library' }).getAttribute('aria-disabled')).toBe('false');
+});
+
+test('for setup a folder that cannot hold the library cannot be chosen, and says why', async () => {
+  setUpForSetup({ '/Users/you/Documents': inspected('/Users/you/Documents', 'taken') });
+  const onChoose = vi.fn();
+  render(FolderBrowser, { setup: true, onChoose, onClose: vi.fn() });
+
+  await screen.findByText("/Users/you/Documents/Butterfly_Atlas already exists and isn't a Butterfly Atlas library. Choose another folder.");
+  const button = screen.getByRole('button', { name: 'Use this folder' });
+  expect(button.getAttribute('aria-disabled')).toBe('true');
+  await fireEvent.click(button);
+  expect(onChoose).not.toHaveBeenCalled();
+});
+
+test('for setup a folder whose check fails says why and cannot be chosen', async () => {
+  setUpForSetup({});
+  inspectFolder.mockRejectedValue(new Error('Butterfly Atlas is not responding.'));
+  render(FolderBrowser, { setup: true, onChoose: vi.fn(), onClose: vi.fn() });
+
+  expect((await screen.findByRole('alert')).textContent).toBe('Butterfly Atlas is not responding.');
+  expect(screen.getByRole('button', { name: 'Use this folder' }).getAttribute('aria-disabled')).toBe('true');
 });

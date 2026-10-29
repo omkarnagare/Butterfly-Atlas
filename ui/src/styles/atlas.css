@@ -73,7 +73,6 @@ kbd { font: 500 11px/1 var(--mono); border: 1px solid var(--line); border-bottom
 .setup .choice { display: grid; gap: 12px; }
 .setup .path { font-size: 14px; padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line);
   overflow-wrap: anywhere; }
-.setup label { font-weight: 650; font-size: 14px; }
 .setup .actions { display: flex; flex-wrap: wrap; gap: 10px; }
 @media (max-width: 760px) { .setup { grid-template-columns: 1fr; } }
 

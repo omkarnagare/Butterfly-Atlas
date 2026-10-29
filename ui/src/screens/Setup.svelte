@@ -1,9 +1,11 @@
 <script>
-  import { onDestroy, tick } from 'svelte';
+  import { onMount, tick } from 'svelte';
+  import FolderBrowser from '../lib/FolderBrowser.svelte';
   import Oakblue from '../lib/Oakblue.svelte';
   import { inspectFolder, retrySetup, setUpLibrary } from '../lib/api.js';
   import { USE_THIS_FOLDER } from '../lib/messages.js';
   import { meadow } from '../lib/meadow.js';
+  import { setupHere } from '../lib/setupView.js';
 
   /**
    * `status.retry` (Phase 5c): the remembered library failed to open (a place-data step that failed, rolled back):
@@ -31,53 +33,33 @@
   let folder = $derived((retried ?? status).dataFolder ?? null);
   let canRetry = $derived(Boolean((retried ?? status).retry) || Boolean(retryError));
 
+  // "Choose a different folder": the folder browser in setup mode (setup design §2) is open.
   let choosing = $state(false);
-  let path = $state('');
-  let check = $state(null);
   let error = $state('');
   let busy = $state(false);
-  let timer;
-  let input = $state();
   let chooseButton = $state();
+  // The suggested folder holds a library with unfinished work: what opening it clears (setup design §2), else ''.
+  let suggestedNote = $state('');
 
-  onDestroy(() => clearTimeout(timer));
+  onMount(async () => {
+    try {
+      const check = await inspectFolder(status.suggestedFolder, true);
+      if (check?.kind === 'existing' && check.unfinished && Object.values(check.unfinished).some(Boolean)) {
+        suggestedNote = setupHere(check);
+      }
+    } catch {
+      // the note is a courtesy: Use this folder still says why it can't be used, if it can't
+    }
+  });
 
   function choose() {
+    error = '';
     choosing = true;
-    tick().then(() => input?.focus());
   }
 
   function back() {
-    clearTimeout(timer);
-    check = null;
     choosing = false;
-    error = '';
     tick().then(() => chooseButton?.focus());
-  }
-
-  function onInput(event) {
-    const value = event.currentTarget.value;
-    clearTimeout(timer);
-    check = null;
-    error = '';
-    if (!value.trim()) return;
-    timer = setTimeout(async () => {
-      try {
-        const result = await inspectFolder(value);
-        if (value === path) check = result;
-      } catch {
-        check = null;
-      }
-    }, 250);
-  }
-
-  function hint(c) {
-    if (!c) return '';
-    if (!c.absolute) return 'Enter the full path of a folder.';
-    if (c.hasLibrary) return 'This folder already has a Butterfly Atlas library. It will open as it is.';
-    if (c.exists && !c.folder) return 'That is a file, not a folder.';
-    if (c.exists) return c.writable ? 'This folder will hold your library.' : 'Butterfly Atlas cannot save files in this folder.';
-    return c.writable ? 'Butterfly Atlas will create this folder.' : 'Butterfly Atlas cannot create a folder here.';
   }
 
   async function retry() {
@@ -117,7 +99,7 @@
     busy = true;
     error = '';
     try {
-      await setUpLibrary(folder);
+      await setUpLibrary(folder, true);
       onDone();
     } catch (e) {
       if (e?.code === 'already_configured') onDone();
@@ -125,6 +107,16 @@
     } finally {
       busy = false;
     }
+  }
+
+  /** The folder browser's choice: the library is kept in that folder; a refusal shows in the browser. */
+  async function useChosen(listing) {
+    try {
+      await setUpLibrary(listing.path, false);
+    } catch (e) {
+      if (e?.code !== 'already_configured') throw e;
+    }
+    onDone();
   }
 </script>
 
@@ -145,29 +137,18 @@
       <p class="retried" role="status">{retryNote}</p>
     {/if}
     <p class="muted">Your library is an ordinary folder on this computer, with a folder for each species you photograph.</p>
-    {#if !choosing}
-      <div class="choice" aria-busy={busy}>
-        <span class="path mono">{status.suggestedFolder}</span>
-        <div class="actions">
-          <button class="btn" type="button" disabled={busy} onclick={() => use(status.suggestedFolder)}>{busy ? 'Setting up…' : USE_THIS_FOLDER}</button>
-          <button class="btn ghost" type="button" bind:this={chooseButton} disabled={busy} onclick={choose}>Choose a different folder</button>
-        </div>
+    <div class="choice" aria-busy={busy}>
+      <span class="path mono">{status.suggestedFolder}</span>
+      {#if suggestedNote}<p class="hint">{suggestedNote}</p>{/if}
+      <div class="actions">
+        <button class="btn" type="button" disabled={busy} onclick={() => use(status.suggestedFolder)}>{busy ? 'Setting up…' : USE_THIS_FOLDER}</button>
+        <button class="btn ghost" type="button" bind:this={chooseButton} disabled={busy} onclick={choose}>Choose a different folder</button>
       </div>
-    {:else}
-      <form class="choice" aria-busy={busy} onsubmit={(e) => { e.preventDefault(); use(path); }}>
-        <label for="folder">Folder path</label>
-        <input id="folder" class="field mono" bind:this={input} bind:value={path} oninput={onInput} aria-describedby="folder-hint"
-               placeholder="For example, /Volumes/Photos/Butterflies"
-               autocomplete="off" spellcheck="false" />
-        <p class="hint" id="folder-hint" aria-live="polite">{hint(check)}</p>
-        <div class="actions">
-          <button class="btn" type="submit" disabled={busy || !path.trim()}>
-            {busy ? 'Setting up…' : check?.hasLibrary ? 'Open this existing library' : USE_THIS_FOLDER}
-          </button>
-          <button class="btn ghost" type="button" disabled={busy} onclick={back}>Back</button>
-        </div>
-      </form>
-    {/if}
+    </div>
     {#if error}<p class="problem" role="alert">{error}</p>{/if}
   </div>
 </main>
+
+{#if choosing}
+  <FolderBrowser setup returnFocus={() => chooseButton} onChoose={useChosen} onClose={back} />
+{/if}

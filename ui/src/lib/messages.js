@@ -57,6 +57,7 @@ export const PLACE_PROMPT = 'Type a district, state or country';
 
 // Setup.
 export const USE_THIS_FOLDER = 'Use this folder';
+export const OPEN_EXISTING_LIBRARY = 'Open this existing library';
 
 // Settings: Appearance (Meadow design §6).
 export const APPEARANCE = 'Appearance';
