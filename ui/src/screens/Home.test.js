@@ -5,6 +5,7 @@ import { cancelBackup, cancelExport, checkBackup, dismissPlaceUpdate, dismissRes
 import { resetStatus, status } from '../lib/status.svelte.js';
 import { modal } from '../lib/modal.js';
 import { resetAsk } from '../lib/backups.js';
+import { forgetViewerOpen, viewerOpenedFrom } from '../lib/viewer.js';
 
 vi.mock('../lib/api.js', () => ({
   getSummary: vi.fn(), getTags: vi.fn(), getStatus: vi.fn(), resumeExport: vi.fn(), cancelExport: vi.fn(),
@@ -140,7 +141,8 @@ test('with no photos yet it offers to import a folder of photos; once there are 
   expect(screen.queryByRole('link', { name: 'Import a folder of photos' })).toBeNull();
 });
 
-test('shows the latest photo and the photos added recently, each opening the viewer', async () => {
+test('shows the latest photo, opening the viewer, and the photos added recently, each opening its species', async () => {
+  forgetViewerOpen();
   getSummary.mockResolvedValue(withPhotos);
   const { container } = render(Home);
 
@@ -150,7 +152,11 @@ test('shows the latest photo and the photos added recently, each opening the vie
   expect(latest.textContent).toContain('Plain Tiger · larva · today');
   expect(screen.getByText(/Across 7 photos/)).toBeTruthy();
   const recent = [...container.querySelectorAll('.thumb')];
-  expect(recent.map((a) => a.getAttribute('href'))).toEqual(['#/species/A5/photo/2', '#/species/A5/photo/1']);
+  expect(recent.map((a) => a.getAttribute('href'))).toEqual(['#/species/A5', '#/species/A5']);
+  expect(recent[0].querySelector('img').getAttribute('src')).toBe('./api/photos/2/thumb?v=1');
+  recent[0].addEventListener('click', (event) => event.preventDefault());
+  await fireEvent.click(recent[0]);
+  expect(viewerOpenedFrom()).toBeNull();
 });
 
 test('suggests species to find next and lists full life cycles', async () => {

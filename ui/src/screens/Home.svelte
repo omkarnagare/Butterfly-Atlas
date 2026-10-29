@@ -11,6 +11,7 @@
   import { famStyle } from '../lib/families.js';
   import { hrefFor, photoHref } from '../lib/route.js';
   import { rememberRect } from '../lib/flip.js';
+  import { rememberMorph } from '../lib/morph.js';
   import { noteViewerOpen } from '../lib/viewer.js';
   import { labeller } from '../lib/tags.js';
   import { adultSvg } from '../lib/butterfly.js';
@@ -227,8 +228,8 @@
         <div class="sec-h"><h2>Recently added</h2></div>
         <div class="strip">
           {#each summary.recent as item (item.photo.id)}
-            <a class="thumb" href={photoHref(item.taxon.id, item.photo.id)} onclick={openPhoto}>
-              <div class="cover">
+            <a class="thumb" href={hrefFor(item.taxon)} onclick={(e) => rememberMorph(e.currentTarget.querySelector('[data-morph]'))}>
+              <div class="cover" data-morph>
                 {#if item.photo.unreadable}<span class="cant">{CANT_SHOW}</span>{:else}<img src={photoThumb(item.photo)} alt="" loading="lazy" decoding="async" use:thumbRetry />{/if}
                 {#if typeBadge(item.photo)}<span class="tb"><span class={typeBadge(item.photo).toLowerCase()}>{typeBadge(item.photo)}</span></span>{/if}
               </div>
