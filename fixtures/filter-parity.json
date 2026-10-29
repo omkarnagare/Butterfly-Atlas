@@ -14,10 +14,10 @@
       "printed": ""
     },
     {
-      "name": "every key, in any order, prints in the contract order",
-      "query": "stages=missing&source=manual&status=not&places=P20,unknown&tagMode=all&tags=egg,larva&taxa=A12,A230",
-      "filter": { "taxa": ["A12", "A230"], "tags": ["egg", "larva"], "tagMode": "all", "places": ["P20", "unknown"], "status": "not", "source": "manual", "stages": "missing" },
-      "printed": "taxa=A12,A230&tags=egg,larva&tagMode=all&places=P20,unknown&status=not&source=manual&stages=missing"
+      "name": "every key, in any order, prints in the contract order (stages, which cannot sit with tags or a status, is placed by the file types case)",
+      "query": "source=manual&status=not&places=P20,unknown&tagMode=all&tags=egg,larva&taxa=A12,A230",
+      "filter": { "taxa": ["A12", "A230"], "tags": ["egg", "larva"], "tagMode": "all", "places": ["P20", "unknown"], "status": "not", "source": "manual", "stages": null },
+      "printed": "taxa=A12,A230&tags=egg,larva&tagMode=all&places=P20,unknown&status=not&source=manual"
     },
     {
       "name": "defaults given are left out when printed",

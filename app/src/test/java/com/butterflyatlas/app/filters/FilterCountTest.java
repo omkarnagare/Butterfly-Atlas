@@ -176,7 +176,7 @@ class FilterCountTest {
     }
 
     @Test
-    void missingLifeStagesUsesPlacesButNotTagsOrStatus() throws Exception {
+    void missingLifeStagesUsesPlaces() throws Exception {
         f.photo("A5", "P4", "egg");
         f.photo("A5", "P4", "larva");
         f.photo("A5", "P5", "pupa");
@@ -188,10 +188,10 @@ class FilterCountTest {
         assertThat(f.numbers("stages=missing&places=P4")).as("in Alpha A5 lacks pupa").isEqualTo("2 1 2");
         assertThat(f.numbers("stages=missing&places=P5")).isEqualTo("1 1 1");
         assertThat(f.numbers("stages=missing&places=P9")).isEqualTo("0 0 0");
-        assertThat(f.numbers("stages=missing&tags=male&tagMode=all&status=not&places=P4")).isEqualTo("2 1 2");
-        assertThat(JSON.writeValueAsString(f.count("tags=male&status=not&stages=missing").filter())).isEqualTo(
-                "{\"query\":\"tags=male&status=not&stages=missing\",\"taxa\":[],\"tags\":[{\"key\":\"male\",\"label\":\"male\"}],"
-                        + "\"tagMode\":\"any\",\"places\":[],\"status\":\"not\",\"source\":\"all\",\"stages\":\"missing\",\"placeNotes\":[],\"types\":[]}");
+        assertThat(f.numbers("stages=missing&tagMode=all&places=P4")).isEqualTo("2 1 2");
+        assertThat(JSON.writeValueAsString(f.count("tagMode=all&stages=missing").filter())).isEqualTo(
+                "{\"query\":\"tagMode=all&stages=missing\",\"taxa\":[],\"tags\":[],"
+                        + "\"tagMode\":\"all\",\"places\":[],\"status\":\"all\",\"source\":\"all\",\"stages\":\"missing\",\"placeNotes\":[],\"types\":[]}");
     }
 
     @Test

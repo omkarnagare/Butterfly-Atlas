@@ -255,7 +255,6 @@ class FilterPhotosTest {
         assertThat(page("status=not", null, 200).photos()).isEmpty();
         assertThat(page("status=not", null, 200).next()).isNull();
         assertThat(ids(page("stages=missing&places=P2", null, 200))).containsExactly(a6, a6b);
-        assertThat(ids(page("stages=missing&places=P2&tags=male", null, 200))).as("tags are not used").containsExactly(a6, a6b);
     }
 
     @Test

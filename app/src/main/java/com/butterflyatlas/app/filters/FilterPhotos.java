@@ -52,7 +52,7 @@ final class FilterPhotos {
         }
         // limit + 1 order keys from the cursor on, each species' keys ordered and cut in SQL: what is left of the
         // cursor's species, then whole species while they fit, then the first keys of the species that does not.
-        PhotoMatch match = PhotoMatch.of(r, !r.used().missingStages());
+        PhotoMatch match = PhotoMatch.of(r, !r.used().byStages());
         int wanted = limit + 1;
         List<Cursor> keys = new ArrayList<>(wanted);
         if (cursor != null && at < hits.size() && hits.get(at).taxon().id().equals(cursor.taxonId())) {
@@ -110,7 +110,7 @@ final class FilterPhotos {
         if (species.isEmpty()) {
             return List.of();
         }
-        PhotoMatch match = PhotoMatch.of(r, !r.used().missingStages());
+        PhotoMatch match = PhotoMatch.of(r, !r.used().byStages());
         record Row(Cursor key, String fileName, long bytes, String fileType) {
         }
         List<Row> rows = new ArrayList<>();

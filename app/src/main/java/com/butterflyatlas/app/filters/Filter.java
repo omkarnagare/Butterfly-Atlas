@@ -58,9 +58,12 @@ public record Filter(List<String> taxa, List<String> tags, String tagMode, List<
         this(taxa, tags, tagMode, places, status, source, stages, List.of());
     }
 
-    /** The Missing life stages preset: tags, tag mode and status are then not used (still echoed). */
-    public boolean missingStages() {
-        return MISSING.equals(stages);
+    /**
+     * The Life stages filter is on: it counts every photo of a species, so it cannot have tags or a Photo status
+     * ({@link #parse} refuses them; a tag mode is still echoed).
+     */
+    public boolean byStages() {
+        return stages != null;
     }
 
     /** This filter with other ids (the ones actually used); everything else as it is. */
@@ -101,10 +104,14 @@ public record Filter(List<String> taxa, List<String> tags, String tagMode, List<
                 throw invalid("Unknown file type “" + type + "”.");
             }
         }
-        return new Filter(taxa, ids(values.get("tags")), choice(values.get("tagMode"), TAG_MODES, ANY, "tag mode"),
+        Filter filter = new Filter(taxa, ids(values.get("tags")), choice(values.get("tagMode"), TAG_MODES, ANY, "tag mode"),
                 places, choice(values.get("status"), STATUSES, ALL, "status"),
                 choice(values.get("source"), SOURCES, ALL, "source"), choice(values.get("stages"), STAGES, null, "stages"),
                 types);
+        if (filter.byStages() && (!filter.tags().isEmpty() || !ALL.equals(filter.status()))) {
+            throw invalid("Life stages can't be combined with Tags or Photo status.");
+        }
+        return filter;
     }
 
     /** The query string of this filter: defaults left out, keys in the contract's order (§1). */

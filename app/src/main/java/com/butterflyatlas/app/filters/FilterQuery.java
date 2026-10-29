@@ -305,7 +305,7 @@ public final class FilterQuery {
     private static int[] exact(Connection c, Result result, String fileType) throws SQLException {
         Set<String> species = new HashSet<>();
         result.hits().forEach(h -> species.add(h.taxon().id()));
-        PhotoMatch match = PhotoMatch.of(result.resolved(), !result.resolved().used().missingStages());
+        PhotoMatch match = PhotoMatch.of(result.resolved(), !result.resolved().used().byStages());
         int[] raw = new int[3];
         try (PreparedStatement ps = c.prepareStatement("SELECT i.taxon_id, CASE WHEN m.json IS NOT NULL AND json_valid(m.json)"
                 + " THEN json_type(m.json, '$.gps') END IS NOT NULL, m.json IS NULL OR NOT json_valid(m.json) FROM "
@@ -346,7 +346,7 @@ public final class FilterQuery {
 
     /** As {@link #result(Connection, Filter)}, for a filter already resolved on this connection. */
     static Result result(Connection c, Resolved r) throws SQLException {
-        boolean missingStages = r.used().missingStages();
+        boolean missingStages = r.used().byStages();
         Map<String, long[]> tallies = tallies(c, r, missingStages);
         List<Hit> hits = new ArrayList<>();
         for (Taxon species : r.universe()) {

@@ -145,7 +145,7 @@ final class FilterPlaces {
 
     /** The rows of {@link FilterQuery#places} for a filter resolved on {@code c}. */
     static List<PlaceRow> places(Connection c, Resolved r) throws SQLException {
-        boolean missingStages = r.used().missingStages();
+        boolean missingStages = r.used().byStages();
         if (!missingStages && Filter.NOT.equals(r.used().status())) {
             return List.of();
         }
