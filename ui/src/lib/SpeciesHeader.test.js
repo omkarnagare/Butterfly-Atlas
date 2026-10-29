@@ -77,3 +77,14 @@ test('a split species with photos to sort says how many, with a link to sort the
   expect(screen.queryByText(/Split —/)).toBeNull();
   expect(screen.queryByRole('link', { name: 'Sort photos' })).toBeNull();
 });
+
+test('the other names sit right under the older names', () => {
+  const { container } = render(SpeciesHeader, { taxon: taxon({ synonyms: ['Danais chrysippus'], searchWords: ['Kaner'] }), photoCount: 0 });
+
+  const older = container.querySelector('.syn');
+  const other = container.querySelector('.other-names');
+  expect(older.nextElementSibling.contains(other)).toBe(true);
+  expect(other.textContent).toContain('Other names:');
+  expect(screen.getByRole('button', { name: 'Remove Kaner' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: /Search words/ })).toBeNull();
+});

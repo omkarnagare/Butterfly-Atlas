@@ -1,6 +1,6 @@
 <script>
   import Butterfly from './Butterfly.svelte';
-  import SearchWords from './SearchWords.svelte';
+  import OtherNames from './OtherNames.svelte';
   import LifeCycle from './LifeCycle.svelte';
   import { famStyle } from './families.js';
   import { morphInto } from './morph.js';
@@ -69,6 +69,7 @@
         Also known as {#each taxon.synonyms as synonym, k (synonym)}{k ? ', ' : ''}<i class="bn">{synonym}</i>{/each}
       </div>
     {/if}
+    <div style="--i:3"><OtherNames taxonId={taxon.id} words={taxon.searchWords} /></div>
     <div class="facts" style="--i:3">
       <span><b use:countUp={photoCount}>{photoCount}</b>{photoCount === 1 ? 'photo' : 'photos'}</span>
       <span><b>{stageCount}/4</b>life stages</span>
@@ -77,6 +78,5 @@
     {#if taxon.folder}
       <div class="path" style="--i:5">{photoCount ? 'Stored in' : 'Folder created with the first photo:'} {taxon.folder}</div>
     {/if}
-    <div style="--i:6"><SearchWords taxonId={taxon.id} words={taxon.searchWords} /></div>
   </div>
 </div>

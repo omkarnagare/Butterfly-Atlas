@@ -10,7 +10,9 @@
   import { growFrom, takeRect } from './flip.js';
   import { isTopModal, modal } from './modal.js';
   import { reducedMotion } from './motion.js';
-  import { forgetViewerOpen, showPhoto } from './viewer.js';
+  import { forgetViewerOpen, showPhoto, viewerOpenedFrom } from './viewer.js';
+  import ViewerTitle from './ViewerTitle.svelte';
+  import { parseRoute } from './route.js';
   import { labeller } from './tags.js';
   import { atPlace, nameAt } from './places.js';
   import { showToast } from './toast.svelte.js';
@@ -55,6 +57,14 @@
   let photo = $derived(list[index]);
   let label = $derived(labeller(tags));
   let title = $derived(taxon.common || taxon.name);
+  // Opened from another page in the app, the title leads to the species page (from the species' own page, or from the
+  // viewer's address, closing already does).
+  const from = viewerOpenedFrom();
+  let linked = $derived.by(() => {
+    if (from === null) return false;
+    const route = parseRoute(from);
+    return !(route.screen === 'species' && route.id === taxon.id);
+  });
 
   // Left by Back rather than closed: the next one opened from its address closes the same way.
   onDestroy(forgetViewerOpen);
@@ -174,7 +184,7 @@
 <div class="ov lb" bind:this={root} role="dialog" aria-modal="true" aria-label={viewerLabel(title)}
      use:modal={{ returnFocus: () => document.querySelector(`.gal [data-photo-id="${shownId}"]`) }}>
   <div class="lb-top">
-    <div class="lb-name"><span>{title}</span>{#if taxon.common}<i class="bn">{taxon.name}</i>{/if}</div>
+    <ViewerTitle taxonId={taxon.id} name={taxon.name} common={taxon.common} {linked} />
     <span class="c" aria-live="polite">{index + 1} / {list.length}{filters}</span>
     <button class="lb-x" type="button" bind:this={closeButton} aria-label={CLOSE} onclick={onClose}>×</button>
   </div>

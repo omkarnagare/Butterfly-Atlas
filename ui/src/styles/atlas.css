@@ -190,12 +190,13 @@ kbd { font: 500 11px/1 var(--mono); border: 1px solid var(--line); border-bottom
 .map text { font: 600 13px var(--body); fill: var(--ink); paint-order: stroke; stroke: var(--surface); stroke-width: 3px;
   stroke-linejoin: round; pointer-events: none; text-anchor: middle; dominant-baseline: middle; }
 
-/* search words */
-.words { display: grid; gap: 10px; justify-items: start; }
-.words-panel { display: grid; gap: 10px; width: min(420px, 100%); padding: 14px; border-radius: 16px; background: var(--surface);
-  border: 1px solid var(--line); animation: pop .22s cubic-bezier(.2,.8,.2,1.2) both; }
-.words-panel p { margin: 0; font-size: 13px; }
-.words-panel form { display: flex; gap: 8px; }
+/* a species' other names */
+.other-names { display: grid; gap: 8px; justify-items: start; }
+.other-names .on-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 14px; }
+.other-names .on-row .btn { padding: 5px 12px; font-size: 13px; }
+.other-names form { display: flex; gap: 8px; width: min(460px, 100%); }
+.other-names form .field { flex: 1; min-width: 0; }
+.other-names p { margin: 0; font-size: 13px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .chip { border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; background: var(--surface); font-size: 13px; font-weight: 600;
   display: inline-flex; gap: 6px; align-items: center; transition: border-color .2s; }
@@ -491,6 +492,8 @@ kbd { font: 500 11px/1 var(--mono); border: 1px solid var(--line); border-bottom
 .lb-name { display: grid; min-width: 0; }
 .lb-name span { font-weight: 650; }
 .lb-name .bn { font-size: 18px; }
+a.lb-name { color: inherit; text-decoration: none; }
+a.lb-name:hover span, a.lb-name:focus-visible span { text-decoration: underline; text-underline-offset: 3px; }
 .lb-top .c { font: 12px var(--mono); color: #9fb1a9; margin-left: auto; }
 .lb-x { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.08); color: #eaf1ed; font-size: 20px; }
 .lb-x:hover { background: rgba(255,255,255,.16); }
@@ -529,8 +532,10 @@ kbd { font: 500 11px/1 var(--mono); border: 1px solid var(--line); border-bottom
   -webkit-user-select: none; user-select: none; }
 .zp.zoomed { cursor: grab; }
 .zp.zoomed:active { cursor: grabbing; }
-.zp-photo { position: relative; }
-.zp-photo.glide { transition: transform .25s cubic-bezier(.2,.8,.2,1); }
+/* laid out at the zoomed size around the stage's centre (lib/zoom.js placement), so zoom is drawn from the full-size image */
+.zp-photo { position: absolute; left: 50%; top: 50%; }
+.zp-photo.glide { transition: transform .25s cubic-bezier(.2,.8,.2,1), width .25s cubic-bezier(.2,.8,.2,1),
+  height .25s cubic-bezier(.2,.8,.2,1), margin .25s cubic-bezier(.2,.8,.2,1); }
 .zp-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; border-radius: 6px; -webkit-user-drag: none; }
 .zp-photo .orig { opacity: 0; transition: opacity .3s; }
 .zp-photo .orig.on { opacity: 1; }

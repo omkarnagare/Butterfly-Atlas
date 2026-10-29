@@ -8,22 +8,29 @@ import { parseRoute, photoHref } from './route.js';
  * photos replaces the address, so Back never walks through them.
  */
 let openedInApp = false;
+// The address of the page a viewer opened in the app was opened from (its title links to the species from elsewhere).
+let openedFrom = null;
 
 export function noteViewerOpen() {
   openedInApp = true;
+  openedFrom = window.location.hash;
 }
 
 /** A viewer that closed another way (Back, an address replaced under it) no longer counts as opened in the app. */
 export function forgetViewerOpen() {
   openedInApp = false;
+  openedFrom = null;
 }
+
+/** The address the open viewer was opened from in the app; null when it was opened from its own address. */
+export const viewerOpenedFrom = () => (openedInApp ? openedFrom : null);
 
 const isViewer = (route) => route.photoId != null || route.itemId != null;
 
 // Any move to an address that is not a viewer (Back, a link, a typed address) ends the viewer opened in the app,
 // so one opened from its address later closes to the page under it instead of going back.
 window.addEventListener('hashchange', () => {
-  if (!isViewer(parseRoute(window.location.hash))) openedInApp = false;
+  if (!isViewer(parseRoute(window.location.hash))) forgetViewerOpen();
 });
 
 /** Closes a viewer whose page underneath is at `href`. */
@@ -40,4 +47,10 @@ export const closeViewer = (taxonId) => closeViewerTo(`#/species/${encodeURIComp
 
 export function showPhoto(taxonId, photoId, tag = null, place = null, type = null) {
   window.location.replace(photoHref(taxonId, photoId, tag, place, type));
+}
+
+/** The viewer's title: shows the photo's species page in place of the viewer, so Back returns to where it was opened. */
+export function leaveViewerFor(taxonId) {
+  forgetViewerOpen();
+  window.location.replace(`#/species/${encodeURIComponent(taxonId)}`);
 }

@@ -11,6 +11,9 @@ export const CLOSE = 'Close';
 export const viewerLabel = (title) => `Photo viewer: ${title}`;
 export const UNKNOWN_PLACE = 'Unknown place';
 
+// Search results (the top bar's search and the Taxa filter): a hit found by an older or the user's own name.
+export const ALSO_KNOWN_AS = 'also known as';
+
 // Progress bars and their buttons.
 export const PHOTOS_MOVED = 'Photos moved';
 export const PHOTOS_BACKED_UP = 'Photos backed up';

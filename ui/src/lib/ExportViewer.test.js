@@ -152,3 +152,14 @@ test('a JPEG that can\'t be shown says why and what to do at once (review fix U2
   expect(container.querySelector('img.orig')).toBeNull();
   expect(container.querySelector('.zp-note').textContent).toMatch(/^This photo can't be shown: its file may be damaged/);
 });
+
+test('the title always links to the photo\'s species, replacing the viewer\'s address', async () => {
+  open({ photoId: 1 });
+
+  const link = screen.getByRole('link', { name: 'Danaus genutia' });
+  expect(link.getAttribute('href')).toBe('#/species/A9');
+  expect(link.getAttribute('title')).toBe('Open Danaus genutia');
+  await fireEvent.click(link);
+
+  expect(window.location.hash).toBe('#/species/A9');
+});
