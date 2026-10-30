@@ -457,7 +457,8 @@ class ImportApiTest {
                 + "\"suggested\":1,\"assigned\":0,\"skipped\":0,\"problems\":1,\"filed\":0,\"missing\":0}");
         assertThat(fields(get("api/status"))).containsExactly("rescanning", "rescan", "previews", "deletedCount",
                 "processing", "import", "stoppedImports", "export", "taxonomyUpdate", "splitsToSort", "customMatches",
-                "library", "placeUpdate", "backup", "heic", "rescanLeft", "libraryVersion", "theme");
+                "library", "placeUpdate", "backup", "heic", "rescanLeft", "libraryVersion", "theme", "changing",
+                "libraryMoved");
     }
 
     @Test
