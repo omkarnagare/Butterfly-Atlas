@@ -1,14 +1,14 @@
 # Butterfly Atlas
 
 An offline desktop app for organising butterfly photographs by taxonomy (Family → Subfamily →
-Tribe → Genus → Species). Everything stays on your computer: the app never goes online. It opens in its own window
+Tribe → Genus → Species). Everything stays on your device: the app never goes online. It opens in its own window
 (Edge or Chrome in app mode, or a browser tab when neither is installed) and ships as an installer for Windows,
 Linux and macOS (the macOS installer is for Apple Silicon Macs only; see Requirements).
 
 ## Privacy
 
-Butterfly Atlas makes no network connections and sends nothing anywhere. It runs entirely on your computer: its window
-talks only to the app itself on this computer, and your photos, their locations and your library never leave it.
+Butterfly Atlas makes no network connections and sends nothing anywhere. It runs entirely on your device: its window
+talks only to the app itself on this device, and your photos, their locations and your library never leave it.
 
 ## What it does today
 
@@ -22,7 +22,7 @@ talks only to the app itself on this computer, and your photos, their locations 
   or import a whole folder in bulk with species suggestions. RAW files (NEF, CR2, CR3, ARW, ORF, RW2, RAF, PEF, DNG and
   others) are kept exactly as they are and shown through the JPEG preview the camera stores inside them; a RAW + JPEG
   pair of the same shot is filed as you choose (both, JPEG only or RAW only). HEIC/HEIF photos (iPhone, Android, and the
-  `.HIF` files of recent cameras) are kept exactly as they are and shown through **the computer's own decoder**, run as a
+  `.HIF` files of recent cameras) are kept exactly as they are and shown through **the device's own decoder**, run as a
   separate program: macOS's built-in `sips`; Windows' own HEIF and HEVC decoders; on Linux, `heif-convert` from your
   distribution's packages. Butterfly Atlas includes no HEVC decoder of its own (see Licence). Without a decoder, HEIC photos are still added with their details and places and say what to install;
   **Check again** in Settings → About picks the decoder up without a restart. RAW + HEIC pairs are filed like RAW + JPEG.
@@ -46,8 +46,8 @@ talks only to the app itself on this computer, and your photos, their locations 
   A Home note says what changed until you dismiss it.
 - **An app, not a web page:** double-click opens its own window (no address bar or tabs), only one copy runs at a time,
   and closing the last window quits it. Opening it again, or **New window** in the top bar, gives another window on the
-  same copy; changes that would clash (for example moving photos while a backup copies them) are refused with what to do. The local server answers only this computer and only the window that started it
-  (a per-launch secret that is never put in a program's arguments, so it is safe on a shared computer).
+  same copy; changes that would clash (for example moving photos while a backup copies them) are refused with what to do. The local server answers only this device and only the window that started it
+  (a per-launch secret that is never put in a program's arguments, so it is safe on a shared device).
 - **Backup:** Settings → Back up now copies the database, or the database and all photos, into a new folder you choose each
   time, with the space needed shown first; copies are verified and can be paused, resumed or cancelled. A reminder preference
   (Remind me, less often, or none) controls a quiet note on Home; nothing is copied by itself.
@@ -56,7 +56,7 @@ talks only to the app itself on this computer, and your photos, their locations 
 
 **Status:** Phases 0–6, 7a and 7b are done (Phase 6: the app window, one copy at a time, Backup and the installers; the
 Windows and Linux installers are built from the same steps but have not been run on those systems yet, see
-Troubleshooting. Phase 7a: camera RAW photos through their embedded previews; Phase 7b: HEIC photos through the computer's own decoder,
+Troubleshooting. Phase 7a: camera RAW photos through their embedded previews; Phase 7b: HEIC photos through the device's own decoder,
 checked on macOS only).
 
 ## Requirements
@@ -315,7 +315,7 @@ app's window quits it (wait ten seconds).
 - **Windows:** double-click the `.exe`. The installers are not signed, so SmartScreen says "Windows protected your PC":
   click **More info**, then **Run anyway**. Then accept the licence, keep or untick "Create a desktop shortcut", and click
   **Install**; no administrator password is asked for. Each Windows user installs it for themselves, and every user has
-  their own library and settings; on a shared computer, other users do not see your copy.
+  their own library and settings; on a shared device, other users do not see your copy.
   - If the installer says Butterfly Atlas is still running, or that it was "unable to automatically close all
     applications", close the app's window, wait ten seconds, then click **Next**.
   - If it says a file is in use, quit Butterfly Atlas and click **Retry**. Never skip files: that would leave a mix of two
@@ -397,11 +397,11 @@ delete them by hand).
   without the space: change `NAME` in `packaging/scripts/PackageApp.java` to `Butterfly_Atlas` for Linux only, then package again.
 - **The window stays blank, or a confined Chromium (a snap) cannot open it:** Butterfly Atlas opens its window from a small
   file in the `launch` folder of the config folder (it holds a one-use key, is readable only by you, and is deleted as soon as
-  the window has used it; no key is ever put in a program's arguments, so other people on a shared computer cannot read it
+  the window has used it; no key is ever put in a program's arguments, so other people on a shared device cannot read it
   with `ps` or Task Manager). A snap Chromium cannot read hidden folders such as `~/.config`; after 60 seconds the app opens
   your default browser the same way, and if that cannot read it either, install Google Chrome or Edge from their own
   packages. This is untested on Windows and Linux.
-- **HEIC photos say "Can't show this photo":** this computer has no HEIC decoder Butterfly Atlas can use. Settings → About
+- **HEIC photos say "Can't show this photo":** this device has no HEIC decoder Butterfly Atlas can use. Settings → About
   says which one it found, or what to install (Windows: Windows' HEVC decoder, and its HEIF decoder on editions without
   one; Linux: `heif-convert` from your distribution's packages). After installing, choose **Check again** there. The photos are kept exactly
   as they are meanwhile, with their places and details. On Windows the decoder runs through Windows PowerShell: security
@@ -451,9 +451,9 @@ Apache License, and the libraries and fonts keep their own licences: all are lis
 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt), which ships inside every installer with LICENSE and NOTICE.
 
 **HEIC photos and decoder licences.** Butterfly Atlas includes no HEIC, HEIF or HEVC picture decoder. It shows HEIC photos
-by starting, as a separate program, a decoder that the computer's vendor or the user provides (`sips` on macOS, Windows'
+by starting, as a separate program, a decoder that the device's vendor or the user provides (`sips` on macOS, Windows'
 own HEIF and HEVC decoders, `heif-convert` on Linux). Using that decoder relies on the licence of whoever provides it —
-the computer's vendor or the user — not on any licence of Butterfly Atlas. Where a decoder is restricted by patents in a
+the device's vendor or the user — not on any licence of Butterfly Atlas. Where a decoder is restricted by patents in a
 country, obtaining and using it lawfully is a matter for the user and the decoder's supplier. The app carries two tiny HEIC
 test pictures of its own (simple shapes, about 800 bytes each) only to check that the decoder works and how it turns
 pictures. Reading a HEIC file's details (date, GPS) in the app's own code is still under legal review.

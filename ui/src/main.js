@@ -10,7 +10,8 @@ import { takeOn } from './lib/newWindow.js';
 
 // Phase 6: the one session stream is opened before the page asks anything (contract §2).
 startSession();
-// Meadow: the theme this window showed last goes on the page before it is first drawn, then the server's choice.
+// Meadow: the choice this window saw last (Light, Dark, or the device's setting now) goes on the page before it is
+// first drawn, then the server's choice.
 startTheme();
 
 // A window opened by New window starts where the window that asked for it was.

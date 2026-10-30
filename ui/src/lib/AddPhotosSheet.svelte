@@ -17,7 +17,7 @@
    * batch, then each file is sent and filed as Danaus_chrysippus_NN.ext. Closes by itself when every
    * file was added; otherwise it stays open with a plain report, which also says how many added photos have
    * an unknown place. `files` are photos dropped on the page. HEIC photos added while the computer has no HEIC decoder
-   * are said in the report with what to do ("3 HEIC photos were added, but this computer can't show them yet. …"), and
+   * are said in the report with what to do ("3 HEIC photos were added, but this device can't show them yet. …"), and
    * the sheet then waits for Done (Phase 7b audit 20). Added while the decoder is still being checked, the report says
    * "Checking for a HEIC decoder…" and the line is decided once the check is over: shown (the sheet waits for Done), or
    * the sheet closes by itself as after any clean add (review fix U11). While a backup holds the photos

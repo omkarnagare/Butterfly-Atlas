@@ -434,10 +434,17 @@ public final class SmokeTest {
         }
 
         void appearance() throws Exception {
+            Resp first = http.call("GET /api/appearance", "/api/appearance", null, 200);
+            expect("device".equals(Json.parse(first.text()).str("theme")), "a new install does not match the device: "
+                    + first.text());
             Resp saved = http.call("PUT /api/appearance", "/api/appearance", "{\"theme\":\"dark\"}", 200);
             expect("dark".equals(Json.parse(saved.text()).str("theme")), "the appearance was not saved: " + saved.text());
             Resp read = http.call("GET /api/appearance", "/api/appearance", null, 200);
             expect("dark".equals(Json.parse(read.text()).str("theme")), "the saved appearance was not answered: " + read.text());
+            Resp device = http.call("PUT /api/appearance", "/api/appearance", "{\"theme\":\"device\"}", 200);
+            expect("device".equals(Json.parse(device.text()).str("theme")), "Match device was not saved: " + device.text());
+            Resp again = http.call("GET /api/appearance", "/api/appearance", null, 200);
+            expect("device".equals(Json.parse(again.text()).str("theme")), "Match device was not answered: " + again.text());
         }
 
         void setup() throws Exception {

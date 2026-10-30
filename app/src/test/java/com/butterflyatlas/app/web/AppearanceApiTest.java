@@ -18,7 +18,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** The Light or Dark choice over HTTP (Meadow UI contract §2, §3). */
+/** The Match device, Light or Dark choice over HTTP (Meadow UI contract §2, §3; match-device design §3). */
 class AppearanceApiTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -68,12 +68,12 @@ class AppearanceApiTest {
     }
 
     @Test
-    void answersNullBeforeSetupAndBeforeAnyChoice() throws Exception {
-        assertThat(get().body()).isEqualTo("{\"theme\":null}");
+    void answersDeviceBeforeSetupAndBeforeAnyChoice() throws Exception {
+        assertThat(get().body()).isEqualTo("{\"theme\":\"device\"}");
 
         chooseLibrary();
 
-        assertThat(get().body()).isEqualTo("{\"theme\":null}");
+        assertThat(get().body()).isEqualTo("{\"theme\":\"device\"}");
     }
 
     @Test
@@ -92,19 +92,34 @@ class AppearanceApiTest {
     }
 
     @Test
-    void refusesAnythingButLightOrDark() throws Exception {
+    void matchDeviceDropsTheSavedLookAndKeepsTheLibraryFolder() throws Exception {
         chooseLibrary();
-        for (String body : new String[] {"{\"theme\":\"blue\"}", "{\"theme\":\"Dark\"}", "{\"theme\":\"\"}",
-                "{\"theme\":null}", "{}", "", "not json", "{\"theme\":5}"}) {
-            assertError(put(body), 400, "invalid", "Choose Light or Dark.");
+        assertThat(put("{\"theme\":\"dark\"}").status()).isEqualTo(200);
+
+        RawHttp.Response saved = put("{\"theme\":\"device\"}");
+
+        assertThat(saved.status()).isEqualTo(200);
+        assertThat(saved.body()).isEqualTo("{\"theme\":\"device\"}");
+        assertThat(get().body()).isEqualTo("{\"theme\":\"device\"}");
+        assertThat(new ConfigStore(home.resolve("config")).load())
+                .contains(new AppConfig(home.resolve("Atlas").toString(), null));
+        assertThat(Files.readString(home.resolve("config").resolve(ConfigStore.FILE_NAME))).doesNotContain("theme");
+    }
+
+    @Test
+    void refusesAnythingButDeviceLightOrDark() throws Exception {
+        chooseLibrary();
+        for (String body : new String[] {"{\"theme\":\"blue\"}", "{\"theme\":\"Dark\"}", "{\"theme\":\"Device\"}",
+                "{\"theme\":\"\"}", "{\"theme\":null}", "{}", "", "not json", "{\"theme\":5}"}) {
+            assertError(put(body), 400, "invalid", "Choose Match device, Light or Dark.");
         }
-        assertThat(get().body()).isEqualTo("{\"theme\":null}");
+        assertThat(get().body()).isEqualTo("{\"theme\":\"device\"}");
     }
 
     @Test
     void refusesAChoiceBeforeALibraryIsChosen() throws Exception {
         assertError(put("{\"theme\":\"dark\"}"), 409, "not_set_up", "Choose where to keep your photos first.");
-        assertThat(get().body()).isEqualTo("{\"theme\":null}");
+        assertThat(get().body()).isEqualTo("{\"theme\":\"device\"}");
         assertThat(home.resolve("config").resolve(ConfigStore.FILE_NAME)).doesNotExist();
     }
 
@@ -133,7 +148,7 @@ class AppearanceApiTest {
                 Map.of("Origin", "http://evil.example", "Content-Type", "application/json"), "{\"theme\":\"dark\"}");
 
         assertThat(response.status()).isEqualTo(403);
-        assertThat(get().body()).isEqualTo("{\"theme\":null}");
+        assertThat(get().body()).isEqualTo("{\"theme\":\"device\"}");
     }
 
     @Test
@@ -153,10 +168,14 @@ class AppearanceApiTest {
     @Test
     void theStatusCarriesTheChoiceFromMemory() throws Exception {
         chooseLibrary();
-        assertThat(status().get("theme").isNull()).isTrue();
+        assertThat(status().get("theme").asText()).isEqualTo("device");
 
         put("{\"theme\":\"dark\"}");
 
         assertThat(status().get("theme").asText()).isEqualTo("dark");
+
+        put("{\"theme\":\"device\"}");
+
+        assertThat(status().get("theme").asText()).isEqualTo("device");
     }
 }

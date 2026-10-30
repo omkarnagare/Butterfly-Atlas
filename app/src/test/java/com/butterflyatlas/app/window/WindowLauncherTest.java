@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -42,7 +43,11 @@ class WindowLauncherTest {
     }
 
     private WindowLauncher launcher(Optional<Path> browser) {
-        return new WindowLauncher(browser, config.resolve("browser_profile"),
+        return launcher(browser, "Mac OS X");
+    }
+
+    private WindowLauncher launcher(Optional<Path> browser, String osName) {
+        return new WindowLauncher(browser, osName, config.resolve("browser_profile"),
                 () -> URI.create("http://127.0.0.1:7878/launch?k=key" + keys.incrementAndGet()),
                 new LaunchFiles(config, clock), command -> {
             started.add(command);
@@ -74,12 +79,30 @@ class WindowLauncherTest {
 
         Path page = redirects().get(0);
         assertThat(started).containsExactly(List.of(Path.of("/Applications/Google Chrome").toString(), "--app=" + page.toUri(),
-                "--user-data-dir=" + config.resolve("browser_profile"), "--no-first-run", "--no-default-browser-check"));
+                "--user-data-dir=" + config.resolve("browser_profile"), "--no-first-run", "--no-default-browser-check",
+                "--window-size=10000,10000"));
         assertThat(Files.readString(page)).contains("key1");
         assertThat(String.join(" ", started.get(0))).doesNotContain("key1").doesNotContain("k=");
         assertThat(config.resolve("browser_profile")).isDirectory();
         assertThat(launcher.mode()).isEqualTo(WindowLauncher.Mode.WINDOW);
         assertThat(tabs).isEmpty();
+    }
+
+    @Test
+    void theWindowOpensMaximizedOnWindowsAndLinuxAndFillsTheScreenOnMacOs() throws Exception {
+        for (String os : new String[] {"Windows 11", "Windows 10", "Linux", "FreeBSD", "Mac OS X", "mac os x"}) {
+            started.clear();
+
+            launcher(Optional.of(Path.of("/usr/bin/google-chrome")), os).open();
+
+            List<String> command = started.get(0);
+            boolean mac = os.toLowerCase(Locale.ROOT).startsWith("mac");
+            assertThat(command.get(command.size() - 1)).as(os)
+                    .isEqualTo(mac ? "--window-size=10000,10000" : "--start-maximized");
+            // a size flag would open Windows and Linux in the normal state: never both
+            assertThat(command.stream().filter(a -> a.startsWith("--window-size") || a.equals("--start-maximized")))
+                    .as(os).hasSize(1);
+        }
     }
 
     @Test

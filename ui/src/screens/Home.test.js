@@ -629,7 +629,7 @@ test('Home\'s recent photos show the HEIC badge and "Can\'t show this photo", wi
   expect(first.querySelector('.cant').textContent).toBe("Can't show this photo");
   expect(first.querySelector('.tb').textContent).toBe('HEIC');
   expect(second.querySelector('img')).toBeTruthy();
-  expect(within(section).getByText('Some photos are HEIC, which this computer can\'t show yet. See Settings → About.')).toBeTruthy();
+  expect(within(section).getByText('Some photos are HEIC, which this device can\'t show yet. See Settings → About.')).toBeTruthy();
 });
 
 test('on another system Home\'s line says there is no decoder Butterfly Atlas can use (7b review fix U11)', async () => {
@@ -638,5 +638,5 @@ test('on another system Home\'s line says there is no decoder Butterfly Atlas ca
   getSummary.mockResolvedValue({ ...withPhotos, recent: [{ photo: heic, taxon: plainTiger }] });
   getStatus.mockResolvedValue({ rescanning: false, previews: { pending: 0, done: 0 }, deletedCount: 0, heic: status.heic });
   render(Home);
-  expect(await screen.findByText('Some photos are HEIC, and this computer has no HEIC decoder Butterfly Atlas can use. See Settings → About.')).toBeTruthy();
+  expect(await screen.findByText('Some photos are HEIC, and this device has no HEIC decoder Butterfly Atlas can use. See Settings → About.')).toBeTruthy();
 });

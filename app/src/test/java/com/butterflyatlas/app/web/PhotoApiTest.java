@@ -398,7 +398,7 @@ class PhotoApiTest {
         assertThat(get("api/status").toString()).isEqualTo("{\"rescanning\":false,\"rescan\":null,"
                 + "\"previews\":{\"pending\":0,\"done\":0},\"deletedCount\":0,\"processing\":null,\"import\":null,\"stoppedImports\":[],"
                 + "\"export\":null,\"taxonomyUpdate\":null,\"splitsToSort\":0,\"customMatches\":0,\"library\":null,\"placeUpdate\":null,\"backup\":null,\"heic\":{\"state\":\"checking\",\"decoder\":null,"
-                + "\"system\":\"" + com.butterflyatlas.app.photos.HeicStatus.current().system() + "\",\"reason\":null},\"rescanLeft\":[],\"libraryVersion\":0,\"theme\":null,\"changing\":null,\"libraryMoved\":null}");
+                + "\"system\":\"" + com.butterflyatlas.app.photos.HeicStatus.current().system() + "\",\"reason\":null},\"rescanLeft\":[],\"libraryVersion\":0,\"theme\":\"device\",\"changing\":null,\"libraryMoved\":null}");
         Path copied = home.resolve("Atlas/images/Copied [A5]/mine.jpg");
         Files.createDirectories(copied.getParent());
         Files.write(copied, TestImages.jpeg(60, 40));
@@ -413,7 +413,7 @@ class PhotoApiTest {
                 + "\"rescan\":{\"checked\":1,\"total\":1,\"added\":1,\"removed\":0,\"updated\":0,\"finishedAt\":\"2026-10-09T08:00:00Z\"},"
                 + "\"previews\":{\"pending\":0,\"done\":0},\"deletedCount\":0,\"processing\":null,\"import\":null,\"stoppedImports\":[],"
                 + "\"export\":null,\"taxonomyUpdate\":null,\"splitsToSort\":0,\"customMatches\":0,\"library\":null,\"placeUpdate\":null,\"backup\":null,\"heic\":{\"state\":\"checking\",\"decoder\":null,"
-                + "\"system\":\"" + com.butterflyatlas.app.photos.HeicStatus.current().system() + "\",\"reason\":null},\"rescanLeft\":[],\"libraryVersion\":0,\"theme\":null,\"changing\":null,\"libraryMoved\":null}");
+                + "\"system\":\"" + com.butterflyatlas.app.photos.HeicStatus.current().system() + "\",\"reason\":null},\"rescanLeft\":[],\"libraryVersion\":0,\"theme\":\"device\",\"changing\":null,\"libraryMoved\":null}");
     }
 
     /** Services whose photo reads and thumbnails wait for {@code gate} while it is closed. */

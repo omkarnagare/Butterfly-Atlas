@@ -91,7 +91,7 @@ public final class StartupFailure {
     public static Message alreadyRunning() {
         return new Message("Butterfly Atlas is already running",
                 "Butterfly Atlas is already running. Only one copy can run at a time.",
-                "Use the window of the running copy. If you cannot find it, quit Butterfly Atlas from your computer's task"
+                "Use the window of the running copy. If you cannot find it, quit Butterfly Atlas from your device's task"
                         + " manager or activity monitor, then open it again.");
     }
 
@@ -107,7 +107,7 @@ public final class StartupFailure {
         return new Message("Butterfly Atlas is already running",
                 "Butterfly Atlas is already running. Only one copy can run at a time, and the running copy is not answering.",
                 "Wait a moment and open Butterfly Atlas again. If it still does not open, quit the running copy from your"
-                        + " computer's task manager or activity monitor, then open it again.");
+                        + " device's task manager or activity monitor, then open it again.");
     }
 
     /** The page's HTML: self-contained, the words escaped. */

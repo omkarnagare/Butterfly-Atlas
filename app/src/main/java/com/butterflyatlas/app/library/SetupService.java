@@ -91,7 +91,7 @@ public final class SetupService {
     private final Function<Path, InstanceLock.Result> locks;
     /** The lock of the open library, held for the life of the process. */
     private InstanceLock held;
-    /** The saved look ({@code light}, {@code dark}, or null to follow the computer): kept in memory, and in every save. */
+    /** The saved look ({@code light}, {@code dark}, or null to match the device): kept in memory, and in every save. */
     private volatile String theme;
     private volatile String problem;
     private volatile boolean inUse;
@@ -133,9 +133,9 @@ public final class SetupService {
         this.theme = config.read().map(AppConfig::theme).orElse(null);
     }
 
-    /** The saved look: {@code light}, {@code dark}, or null to follow the computer. */
+    /** The saved look: {@code light} or {@code dark}, else {@code device} (match the device). */
     public String theme() {
-        return theme;
+        return theme == null ? AppConfig.DEVICE : theme;
     }
 
     /**
@@ -455,21 +455,23 @@ public final class SetupService {
     }
 
     /**
-     * Saves the Light or Dark choice with the library folder (Meadow UI contract §3) and keeps it in memory once saved.
-     * Invalid unless {@code light} or {@code dark}; 409 {@code not_set_up} while no library is chosen; a failed write is
+     * Saves the Match device, Light or Dark choice with the library folder (Meadow UI contract §3, match-device design §3)
+     * and keeps it in memory once saved; {@code device} drops the saved look. Invalid unless {@code device}, {@code light}
+     * or {@code dark}; 409 {@code not_set_up} while no library is chosen; a failed write is
      * an {@link UncheckedIOException}, and the choice in memory stays as it was.
      */
     public synchronized String setTheme(String requested) {
-        if (!AppConfig.isTheme(requested)) {
-            throw new AtlasException(AtlasException.Kind.INVALID, INVALID_THEME, "Choose Light or Dark.");
+        if (!AppConfig.isChoice(requested)) {
+            throw new AtlasException(AtlasException.Kind.INVALID, INVALID_THEME, "Choose Match device, Light or Dark.");
         }
         if (holder.current().isEmpty()) {
             throw new AtlasException(AtlasException.Kind.CONFLICT, NOT_SET_UP,
                     "Choose where to keep your photos first.");
         }
         // what else the settings hold (the library folder, a library change's fields) is kept as it is
-        config.save(config.read().map(saved -> saved.withTheme(requested)).orElse(new AppConfig(null, requested)));
-        theme = requested;
+        String look = AppConfig.isTheme(requested) ? requested : null;
+        config.save(config.read().map(saved -> saved.withTheme(look)).orElse(new AppConfig(null, look)));
+        theme = look;
         return requested;
     }
 

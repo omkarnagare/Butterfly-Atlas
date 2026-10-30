@@ -134,7 +134,7 @@
       <h3>File</h3>
       <p class="fp">{item.path}</p>
       {#each fileLines(item) as line (line)}<p class="muted">{line}</p>{/each}
-      {#if standIn}<p class="muted">HEIC half: this computer can't show it yet.</p>{/if}
+      {#if standIn}<p class="muted">HEIC half: this device can't show it yet.</p>{/if}
       <p class="muted keys">← → photos · + − zoom · 0 fit · Esc close</p>
     </aside>
   {/if}

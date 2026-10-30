@@ -245,8 +245,8 @@
         </div>
         {#if heicMissing(status.heic) && summary.recent.some((item) => isHeic(item.photo))}
           <p class="muted">{status.heic.system === 'other'
-            ? 'Some photos are HEIC, and this computer has no HEIC decoder Butterfly Atlas can use. See Settings → About.'
-            : "Some photos are HEIC, which this computer can't show yet. See Settings → About."}</p>
+            ? 'Some photos are HEIC, and this device has no HEIC decoder Butterfly Atlas can use. See Settings → About.'
+            : "Some photos are HEIC, which this device can't show yet. See Settings → About."}</p>
         {/if}
       </section>
     {/if}

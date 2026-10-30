@@ -87,7 +87,7 @@ class ConfigStoreTest {
     @Test
     void readsAnUnknownThemeAsNoChoiceAndStillUsesTheDataFolder() throws Exception {
         ConfigStore store = new ConfigStore(dir);
-        for (String unknown : new String[] {"blue", "", "Dark"}) {
+        for (String unknown : new String[] {"blue", "", "Dark", "device"}) {
             Files.writeString(store.file(), "{\"dataFolder\": \"/a\", \"theme\": \"" + unknown + "\"}");
 
             assertThat(store.load()).as("theme '%s'", unknown).contains(new AppConfig("/a", null));

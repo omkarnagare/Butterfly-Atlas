@@ -360,9 +360,9 @@ export const usePreviousLibrary = () => request('setup/previous', { method: 'POS
 
 /* ---------- appearance (Meadow) ---------- */
 
-/** `{ theme }`: 'light' | 'dark', or null while none is saved (the page follows the computer; Meadow contract §2). */
+/** `{ theme }`: 'device' | 'light' | 'dark' (Match device follows the device's setting; match-device design §3). */
 export const getAppearance = () => request('appearance');
-/** Saves Light or Dark: `{ theme }` as saved (400 `invalid`, 409 `not_set_up`, 500 `save_failed` with the reason). */
+/** Saves Match device, Light or Dark: `{ theme }` as saved (400 `invalid`, 409 `not_set_up`, 500 `save_failed` with the reason). */
 export const setAppearance = (theme) => request('appearance', { method: 'PUT', body: { theme } });
 
 /* ---------- the filter (Phase 4a) ---------- */

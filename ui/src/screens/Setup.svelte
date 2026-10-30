@@ -173,7 +173,7 @@
       {#if previous && movedCopy}<p class="kept-folder">{movedCopyLine(movedCopy)}</p>{/if}
       <p class="retried" role="status">{retryNote}</p>
     {/if}
-    <p class="muted">Your library is an ordinary folder on this computer, with a folder for each species you photograph.</p>
+    <p class="muted">Your library is an ordinary folder on this device, with a folder for each species you photograph.</p>
     <div class="choice" aria-busy={busy}>
       <span class="path mono">{status.suggestedFolder}</span>
       {#if suggestedNote}<p class="hint">{suggestedNote}</p>{/if}

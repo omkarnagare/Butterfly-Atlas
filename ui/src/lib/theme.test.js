@@ -5,20 +5,20 @@ import { refreshStatus, resetStatus } from './status.svelte.js';
 
 vi.mock('./api.js', () => ({ getAppearance: vi.fn(), setAppearance: vi.fn(), getStatus: vi.fn() }));
 
-// The computer's setting, which a test can change (and say it changed) while the page is open.
-let computerDark = false;
+// The device's setting, which a test can change (and say it changed) while the page is open.
+let deviceDark = false;
 let listeners = [];
-function computer(dark) {
-  computerDark = dark;
+function device(dark) {
+  deviceDark = dark;
   window.matchMedia = (query) => ({
-    get matches() { return query.includes('dark') ? computerDark : query.includes('reduce'); },
+    get matches() { return query.includes('dark') ? deviceDark : query.includes('reduce'); },
     media: query,
     addEventListener: (type, fn) => listeners.push(fn),
     removeEventListener: (type, fn) => { listeners = listeners.filter((l) => l !== fn); },
   });
 }
-function computerTurns(dark) {
-  computerDark = dark;
+function deviceTurns(dark) {
+  deviceDark = dark;
   for (const fn of listeners) fn();
 }
 const shown = () => document.documentElement.dataset.theme;
@@ -26,10 +26,10 @@ const shown = () => document.documentElement.dataset.theme;
 beforeEach(() => {
   vi.resetAllMocks();
   listeners = [];
-  computer(false);
+  device(false);
   resetTheme();
   resetStatus();
-  getAppearance.mockResolvedValue({ theme: null });
+  getAppearance.mockResolvedValue({ theme: 'device' });
 });
 afterEach(() => {
   resetTheme();
@@ -48,25 +48,56 @@ test('the theme this window showed last is put on the page at once, and the serv
   expect(localStorage.getItem(THEME_KEY)).toBe('light');
 });
 
-test('with no saved choice the page follows the computer, also when the computer changes', async () => {
-  computer(true);
+test('Match device follows the device, also when the device changes', async () => {
+  device(true);
   startTheme();
   expect(shown()).toBe('dark');
   await vi.waitFor(() => expect(getAppearance).toHaveBeenCalledOnce());
-  expect(theme.saved).toBeNull();
+  expect(theme.saved).toBe('device');
+  expect(localStorage.getItem(THEME_KEY)).toBe('device');
 
-  computerTurns(false);
+  deviceTurns(false);
   expect(shown()).toBe('light');
-  expect(localStorage.getItem(THEME_KEY)).toBe('light');
+  expect(localStorage.getItem(THEME_KEY)).toBe('device');
 });
 
-test('a saved choice stays whatever the computer says', async () => {
+test("a window that last had Match device paints the device's setting at once, so a launch never shows the old look", () => {
+  localStorage.setItem(THEME_KEY, 'device');
+  device(true);
+
+  startTheme();
+
+  expect(shown()).toBe('dark');
+});
+
+test("an older window's cached look shows once, then the server's Match device follows the device", async () => {
+  localStorage.setItem(THEME_KEY, 'light');
+  device(true);
+
+  startTheme();
+  expect(shown()).toBe('light');
+
+  await vi.waitFor(() => expect(shown()).toBe('dark'));
+  expect(theme.saved).toBe('device');
+  expect(localStorage.getItem(THEME_KEY)).toBe('device');
+});
+
+test("an unknown cached value is the device's setting", () => {
+  localStorage.setItem(THEME_KEY, 'blue');
+  device(true);
+
+  startTheme();
+
+  expect(shown()).toBe('dark');
+});
+
+test('a saved choice stays whatever the device says', async () => {
   getAppearance.mockResolvedValue({ theme: 'dark' });
   startTheme();
   await vi.waitFor(() => expect(shown()).toBe('dark'));
 
-  computerTurns(true);
-  computerTurns(false);
+  deviceTurns(true);
+  deviceTurns(false);
   expect(shown()).toBe('dark');
 });
 
@@ -80,14 +111,19 @@ test('storage that cannot be read or written is ignored', async () => {
   await vi.waitFor(() => expect(shown()).toBe('dark'));
 });
 
-test('an appearance that cannot be read leaves the page following the computer, and an unknown value is no choice', async () => {
+test('an appearance that cannot be read leaves the page following the device, and an unknown value is Match device', async () => {
   getAppearance.mockRejectedValue(new Error('offline'));
-  computer(true);
+  device(true);
   startTheme();
   expect(shown()).toBe('dark');
 
+  serverTheme('dark');
   serverTheme('blue');
-  expect(theme.saved).toBeNull();
+  expect(theme.saved).toBe('device');
+  expect(shown()).toBe('dark');
+  serverTheme('light');
+  serverTheme(null);
+  expect(theme.saved).toBe('device');
   expect(shown()).toBe('dark');
 });
 
@@ -101,6 +137,22 @@ test('choosing saves the choice and shows it', async () => {
   expect(theme.saved).toBe('dark');
   expect(shown()).toBe('dark');
   expect(localStorage.getItem(THEME_KEY)).toBe('dark');
+});
+
+test('choosing Match device after Dark follows the device again', async () => {
+  getAppearance.mockResolvedValue({ theme: 'dark' });
+  startTheme();
+  await vi.waitFor(() => expect(theme.saved).toBe('dark'));
+  setAppearance.mockResolvedValue({ theme: 'device' });
+
+  await chooseTheme('device');
+
+  expect(setAppearance).toHaveBeenCalledWith('device');
+  expect(theme.saved).toBe('device');
+  expect(shown()).toBe('light');
+  expect(localStorage.getItem(THEME_KEY)).toBe('device');
+  deviceTurns(true);
+  expect(shown()).toBe('dark');
 });
 
 test('a choice that cannot be saved keeps the saved one, and says why', async () => {
@@ -135,7 +187,7 @@ test('a poll answered while a choice is being saved does not undo it', async () 
   setAppearance.mockReturnValue(new Promise((resolve) => { answer = resolve; }));
   const saving = chooseTheme('dark');
 
-  serverTheme(null);
+  serverTheme('device');
   answer({ theme: 'dark' });
   await saving;
   expect(shown()).toBe('dark');

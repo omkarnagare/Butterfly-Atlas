@@ -49,7 +49,7 @@ final class RequestGuards {
         int p = port.getAsInt();
         String host = ctx.header("Host");
         if (host == null || !Set.of("127.0.0.1:" + p, "localhost:" + p).contains(host.toLowerCase(Locale.ROOT))) {
-            throw new ApiException(403, "forbidden_host", "Butterfly Atlas only answers requests addressed to this computer.");
+            throw new ApiException(403, "forbidden_host", "Butterfly Atlas only answers requests addressed to this device.");
         }
         if (ctx.method() == HandlerType.POST && ctx.path().equals(SessionKeys.NEW_LAUNCH_PATH)) {
             return; // only the launcher of a second copy asks (with the pointer file's key): no Origin, no body

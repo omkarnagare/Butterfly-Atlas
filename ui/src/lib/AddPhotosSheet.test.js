@@ -274,7 +274,7 @@ test('HEIC photos added on a computer without a decoder are said, with what to d
   await choose(heicFile('IMG_1.HEIC'), heicFile('IMG_22.HEIC'), heicFile('IMG_333.HEIC'), jpeg('a.jpg'));
   await fireEvent.click(screen.getByRole('button', { name: 'Add 4 photos' }));
 
-  expect(await screen.findByText("3 HEIC photos were added, but this computer can't show them yet. Install Windows' HEVC decoder, then choose Check again in Settings → About.")).toBeTruthy();
+  expect(await screen.findByText("3 HEIC photos were added, but this device can't show them yet. Install Windows' HEVC decoder, then choose Check again in Settings → About.")).toBeTruthy();
   expect(onClose).not.toHaveBeenCalled();
   await fireEvent.click(screen.getByRole('button', { name: 'Done' }));
   expect(onClose).toHaveBeenCalledOnce();
@@ -306,7 +306,7 @@ test('HEIC photos added while the decoder is still being checked: the sheet says
   expect(await screen.findByText('Checking for a HEIC decoder…')).toBeTruthy();
   expect(onClose).not.toHaveBeenCalled();
   status.heic = { state: 'missing', decoder: null, system: 'linux', reason: 'absent' };
-  expect(await screen.findByText(/^1 HEIC photo was added, but this computer can't show it yet\./)).toBeTruthy();
+  expect(await screen.findByText(/^1 HEIC photo was added, but this device can't show it yet\./)).toBeTruthy();
   expect(onClose).not.toHaveBeenCalled();
 });
 

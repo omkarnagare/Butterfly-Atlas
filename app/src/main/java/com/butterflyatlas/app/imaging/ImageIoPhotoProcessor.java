@@ -231,7 +231,7 @@ public final class ImageIoPhotoProcessor implements PhotoProcessor {
      */
     private void heicThumbnail(Path source, HeifInfo info, int longSide, Path target, Use use) throws IOException {
         if (heic == null) {
-            throw new HeicDecodeException(HeicDecodeException.Kind.UNAVAILABLE, "No HEIC decoder on this computer");
+            throw new HeicDecodeException(HeicDecodeException.Kind.UNAVAILABLE, "No HEIC decoder on this device");
         }
         HeicDecoders.Decoded decoded = heic.decode(source, Math.min(2 * longSide, 2560), info, use);
         BufferedImage img = decoded.image();

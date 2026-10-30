@@ -115,7 +115,7 @@ test('with both kinds: "RAW + JPEG or RAW + HEIC pairs" and "JPEG or HEIC only"'
 
 test('without a HEIC decoder the bar says HEIC only would file photos that can\'t be seen here yet (audit 15)', async () => {
   const { rerender } = render(ImportPairs, { pairs: pairs({ kinds: ['heic'] }), heicMissing: true, onChoose: vi.fn() });
-  const line = "This computer can't show HEIC photos yet. HEIC only would file photos you can't see here until it can.";
+  const line = "This device can't show HEIC photos yet. HEIC only would file photos you can't see here until it can.";
   expect(screen.getByText(line)).toBeTruthy();
   await rerender({ pairs: pairs({ kinds: ['jpeg'] }), heicMissing: true, onChoose: vi.fn() });
   expect(screen.queryByText(line)).toBeNull();
@@ -123,12 +123,12 @@ test('without a HEIC decoder the bar says HEIC only would file photos that can\'
 
 test('the extra line names the choice as the bar says it (7b review fix U6)', () => {
   render(ImportPairs, { pairs: pairs({ kinds: ['jpeg', 'heic'] }), heicMissing: true, onChoose: vi.fn() });
-  expect(screen.getByText("This computer can't show HEIC photos yet. JPEG or HEIC only would file HEIC photos you can't see here until it can.")).toBeTruthy();
+  expect(screen.getByText("This device can't show HEIC photos yet. JPEG or HEIC only would file HEIC photos you can't see here until it can.")).toBeTruthy();
 });
 
 test('on another system the pair bar\'s line says it has no decoder Butterfly Atlas can use (7b review fix U11)', () => {
   status.heic = { state: 'missing', decoder: null, system: 'other', reason: 'absent' };
   render(ImportPairs, { pairs: pairs({ kinds: ['heic'] }), heicMissing: true, onChoose: vi.fn() });
-  expect(screen.getByText("This computer has no HEIC decoder Butterfly Atlas can use. HEIC only would file photos you can't see here.")).toBeTruthy();
+  expect(screen.getByText("This device has no HEIC decoder Butterfly Atlas can use. HEIC only would file photos you can't see here.")).toBeTruthy();
   resetStatus();
 });
