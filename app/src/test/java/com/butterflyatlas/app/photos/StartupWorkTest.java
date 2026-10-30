@@ -152,4 +152,35 @@ class StartupWorkTest {
             assertThat(settled[0]).isTrue();
         }
     }
+
+    @Test
+    void itSaysItIsRunningFromItsFirstStepUntilItsLast() throws Exception {
+        Library library = TestBundles.fixtureLibrary(dir);
+        ImageIoPhotoProcessor processor = new ImageIoPhotoProcessor();
+        try (Thumbnails thumbnails = new Thumbnails(() -> library, processor)) {
+            PhotoStore store = new PhotoStore(() -> library, processor, new TestClock(), id -> { });
+            Rescan rescan = new Rescan(() -> library, processor, new TestClock(), thumbnails::request);
+            ConsumerRunner processing = new ConsumerRunner(() -> library, new PhotoIngest(processor), List.of(), thumbnails,
+                    new TestClock());
+            java.util.concurrent.CountDownLatch inside = new java.util.concurrent.CountDownLatch(1);
+            java.util.concurrent.CountDownLatch go = new java.util.concurrent.CountDownLatch(1);
+            StartupWork work = new StartupWork(rescan, store, processing, thumbnails, () -> {
+                inside.countDown();
+                try {
+                    go.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }, () -> { });
+            assertThat(work.running()).isFalse();
+
+            Thread thread = work.start();
+            inside.await();
+            assertThat(work.running()).isTrue();
+            go.countDown();
+            thread.join(10_000);
+
+            assertThat(work.running()).isFalse();
+        }
+    }
 }

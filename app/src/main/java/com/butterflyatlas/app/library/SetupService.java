@@ -86,6 +86,8 @@ public final class SetupService {
     private volatile boolean retry = true;
     /** Whether the library's drive could not take the lock file (the app started anyway: Settings and the footer say so). */
     private volatile boolean lockWarning;
+    /** Whether this copy was started on a fixed folder ({@code -Datlas.dataDir}): its library folder can't be changed. */
+    private volatile boolean fixed;
 
     public SetupService(ConfigStore config, LibraryHolder holder, TaxonomyBundles bundles, PlaceBundles places, Path home,
                         Clock clock) {
@@ -121,6 +123,7 @@ public final class SetupService {
      */
     public void startup(Optional<Path> override) {
         if (override.isPresent()) {
+            fixed = true;
             holder.set(openLocked(override.get().toAbsolutePath().normalize()));
             return;
         }
@@ -284,6 +287,11 @@ public final class SetupService {
         return Character.toLowerCase(sentence.charAt(0)) + sentence.substring(1);
     }
 
+    /** Whether this copy was started on a fixed folder ({@code -Datlas.dataDir}), so its library folder can't change. */
+    public boolean fixed() {
+        return fixed;
+    }
+
     /** True when the open library's drive cannot prevent a second copy from opening it (design §15, D2). */
     public boolean lockWarning() {
         return lockWarning;
@@ -373,7 +381,7 @@ public final class SetupService {
         return new Place(inside, writable(inside) ? CREATE : NOT_WRITABLE);
     }
 
-    private static boolean hasLibrary(Path folder) {
+    static boolean hasLibrary(Path folder) {
         return Files.isRegularFile(folder.resolve(Database.FILE_NAME));
     }
 
@@ -395,19 +403,25 @@ public final class SetupService {
         return setup(rawPath, true);
     }
 
+    /** Why a chosen folder can't hold the library, in the setup screen's words; null when it can. */
+    static String refusal(Place place) {
+        return switch (place.kind()) {
+            case NOT_A_FOLDER -> "That is a file, not a folder. Choose a folder.";
+            case NOT_FOUND -> "That folder can't be found. Choose another folder.";
+            case TAKEN -> place.folder() + " already exists and isn't a Butterfly Atlas library. Choose another folder.";
+            default -> null;
+        };
+    }
+
     /** Creates or opens the library of a chosen folder ({@code exact} as in {@link #inspect(String, boolean)}). */
     public synchronized Status setup(String rawPath, boolean exact) {
         if (holder.current().isPresent()) {
             throw new AtlasException(AtlasException.Kind.ALREADY_CONFIGURED, "Your library is already set up.");
         }
         Place place = place(resolve(rawPath), exact);
-        switch (place.kind()) {
-            case NOT_A_FOLDER -> throw AtlasException.invalid("That is a file, not a folder. Choose a folder.");
-            case NOT_FOUND -> throw AtlasException.invalid("That folder can't be found. Choose another folder.");
-            case TAKEN -> throw AtlasException.invalid(place.folder()
-                    + " already exists and isn't a Butterfly Atlas library. Choose another folder.");
-            default -> {
-            }
+        String refused = refusal(place);
+        if (refused != null) {
+            throw AtlasException.invalid(refused);
         }
         Path folder = place.folder();
         boolean existing = EXISTING.equals(place.kind());
@@ -508,7 +522,8 @@ public final class SetupService {
         }
     }
 
-    private Path resolve(String rawPath) {
+    /** A typed or chosen path as a full path, or 400 in plain words. */
+    Path resolve(String rawPath) {
         if (rawPath == null || rawPath.isBlank()) {
             throw AtlasException.invalid("Choose a folder for your library.");
         }
