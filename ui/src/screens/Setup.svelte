@@ -2,8 +2,9 @@
   import { onMount, tick } from 'svelte';
   import FolderBrowser from '../lib/FolderBrowser.svelte';
   import Oakblue from '../lib/Oakblue.svelte';
-  import { inspectFolder, retrySetup, setUpLibrary } from '../lib/api.js';
-  import { USE_THIS_FOLDER } from '../lib/messages.js';
+  import { inspectFolder, retrySetup, setUpLibrary, usePreviousLibrary } from '../lib/api.js';
+  import { OPENING_OLD_LIBRARY, USE_THIS_FOLDER, movedCopyLine, usePreviousLabel } from '../lib/messages.js';
+  import { LINK_MS, showToast } from '../lib/toast.svelte.js';
   import { meadow } from '../lib/meadow.js';
   import { setupHere } from '../lib/setupView.js';
 
@@ -12,7 +13,12 @@
    * Try again under the problem opens it again; when it opens the app starts as usual (`onDone`), and when it fails
    * again its new problem replaces the old one. Under a failure, where the photos still are and that another folder starts
    * a new, empty library; no Try again when it can't help (`retry` false: a library from a newer version).
-   * @type {{ status: { suggestedFolder: string, problem?: string | null, retry?: boolean }, onDone: () => void }}
+   * Change the library folder (design §6): when the new library won't open on its first open, `previousFolder` offers
+   * "Use the old library at … instead" beside Try again (POST /api/setup/previous: the old library opens as it was), and
+   * after a move `movedCopy` says under it that the moved copy was not deleted (said once more when the old one opens,
+   * as the app starts). A refusal, or the old library failing to open too, says why in the problem's place.
+   * @type {{ status: { suggestedFolder: string, problem?: string | null, retry?: boolean, previousFolder?: string | null,
+   *   movedCopy?: string | null }, onDone: () => void }}
    */
   let { status, onDone } = $props();
 
@@ -32,6 +38,33 @@
   // `dataFolder` with `configured: false` only then (a fresh setup has none).
   let folder = $derived((retried ?? status).dataFolder ?? null);
   let canRetry = $derived(Boolean((retried ?? status).retry) || Boolean(retryError));
+  // The library in use before a change of library folder, offered while the new one won't open; and the moved copy.
+  let previous = $derived((retried ?? status).previousFolder ?? null);
+  let movedCopy = $derived((retried ?? status).movedCopy ?? null);
+  let goingBack = $state(false);
+
+  async function usePrevious() {
+    if (goingBack || retrying) return;
+    goingBack = true;
+    const moved = movedCopy;
+    try {
+      const next = await usePreviousLibrary();
+      retryError = '';
+      retryNote = '';
+      if (next?.configured) {
+        retried = null;
+        if (moved) showToast(movedCopyLine(moved), { ms: LINK_MS });
+        onDone();
+      } else {
+        retried = next;
+      }
+    } catch (e) {
+      retryError = e?.message ?? String(e);
+      retryNote = '';
+    } finally {
+      goingBack = false;
+    }
+  }
 
   // "Choose a different folder": the folder browser in setup mode (setup design §2) is open.
   let choosing = $state(false);
@@ -130,10 +163,14 @@
     <h1>Where should Butterfly Atlas keep your photos?</h1>
     {#if problem}<p class="problem" role="alert">{problem}</p>{/if}
     {#if folder}<p class="kept-folder">Your photos are still in <span class="mono">{folder}</span>; choosing another folder starts a new, empty library.</p>{/if}
-    {#if canRetry}
+    {#if canRetry || previous}
       <div class="actions">
-        <button class="btn" type="button" aria-disabled={retrying} onclick={retry}>{retrying ? 'Trying again…' : 'Try again'}</button>
+        {#if canRetry}<button class="btn" type="button" aria-disabled={retrying || goingBack} onclick={retry}>{retrying ? 'Trying again…' : 'Try again'}</button>{/if}
+        {#if previous}
+          <button class="btn ghost" type="button" aria-disabled={retrying || goingBack} onclick={usePrevious}>{goingBack ? OPENING_OLD_LIBRARY : usePreviousLabel(previous)}</button>
+        {/if}
       </div>
+      {#if previous && movedCopy}<p class="kept-folder">{movedCopyLine(movedCopy)}</p>{/if}
       <p class="retried" role="status">{retryNote}</p>
     {/if}
     <p class="muted">Your library is an ordinary folder on this computer, with a folder for each species you photograph.</p>

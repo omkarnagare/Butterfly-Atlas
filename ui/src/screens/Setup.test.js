@@ -1,13 +1,19 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { beforeEach, expect, test, vi } from 'vitest';
 import Setup from './Setup.svelte';
-import { getFsRoots, inspectFolder, listFolder, retrySetup, setUpLibrary } from '../lib/api.js';
+import { getFsRoots, inspectFolder, listFolder, retrySetup, setUpLibrary, usePreviousLibrary } from '../lib/api.js';
+import { resetStatus } from '../lib/status.svelte.js';
+import { toast } from '../lib/toast.svelte.js';
 
 vi.mock('../lib/api.js', () => ({
-  inspectFolder: vi.fn(), setUpLibrary: vi.fn(), retrySetup: vi.fn(), getFsRoots: vi.fn(), listFolder: vi.fn(),
+  inspectFolder: vi.fn(), setUpLibrary: vi.fn(), retrySetup: vi.fn(), getFsRoots: vi.fn(), listFolder: vi.fn(), usePreviousLibrary: vi.fn(),
+  getStatus: vi.fn(), getExport: vi.fn(), getBackup: vi.fn(), checkHeic: vi.fn(),
 }));
 
-beforeEach(() => vi.resetAllMocks());
+beforeEach(() => {
+  vi.resetAllMocks();
+  resetStatus();
+});
 
 // A fresh setup: no library yet, so no dataFolder (the server sends one with configured false only when an open failed).
 const status = { configured: false, suggestedFolder: '/Users/me/Documents/Butterfly Atlas', dataFolder: null, problem: null, retry: false };
@@ -265,4 +271,53 @@ test('the butterfly on its daisy stands in a drawn meadow with soft light behind
   expect(scene.querySelector('.oak')).not.toBeNull();
   expect(scene.querySelector('svg.meadow')).not.toBeNull();
   expect(screen.getByRole('heading', { level: 1, name: 'Where should Butterfly Atlas keep your photos?' })).toBeTruthy();
+});
+
+// ---- after a change of library folder, the new library won't open (change-library-folder design §6) ----
+
+const notOpening = {
+  ...status, dataFolder: '/Volumes/B/Butterfly_Atlas', retry: true, problem: "The drive with your library can't be found.",
+  previousFolder: '/Users/me/Atlas', movedCopy: '/Volumes/B/Butterfly_Atlas',
+};
+
+test('the new library that won\'t open offers the old one beside Try again, and says the moved copy stays', () => {
+  render(Setup, { status: notOpening, onDone: vi.fn() });
+  const again = screen.getByRole('button', { name: 'Try again' });
+  const old = screen.getByRole('button', { name: 'Use the old library at /Users/me/Atlas instead' });
+  expect(again.parentElement).toBe(old.parentElement);
+  expect(screen.getByText('The moved copy at /Volumes/B/Butterfly_Atlas was not deleted.')).toBeTruthy();
+});
+
+test('after a switch (no moved copy) the old library is offered without the moved-copy line; with no offer there is no button', () => {
+  const { unmount } = render(Setup, { status: { ...notOpening, movedCopy: null }, onDone: vi.fn() });
+  expect(screen.getByRole('button', { name: 'Use the old library at /Users/me/Atlas instead' })).toBeTruthy();
+  expect(screen.queryByText(/The moved copy/)).toBeNull();
+  unmount();
+  render(Setup, { status: { ...notOpening, previousFolder: null, movedCopy: null }, onDone: vi.fn() });
+  expect(screen.queryByRole('button', { name: /Use the old library/ })).toBeNull();
+});
+
+test('choosing the old library opens it, the app starts, and where the moved copy is is said once more', async () => {
+  usePreviousLibrary.mockResolvedValue({ configured: true, suggestedFolder: status.suggestedFolder, dataFolder: '/Users/me/Atlas', problem: null });
+  const onDone = vi.fn();
+  render(Setup, { status: notOpening, onDone });
+  await fireEvent.click(screen.getByRole('button', { name: 'Use the old library at /Users/me/Atlas instead' }));
+  expect(usePreviousLibrary).toHaveBeenCalledOnce();
+  await vi.waitFor(() => expect(onDone).toHaveBeenCalledOnce());
+  expect(toast.message).toBe('The moved copy at /Volumes/B/Butterfly_Atlas was not deleted.');
+});
+
+test('the old library refused or failing to open says why; the screen stays', async () => {
+  usePreviousLibrary.mockRejectedValueOnce(Object.assign(new Error('The old library is no longer offered.'), { code: 'no_previous' }));
+  const onDone = vi.fn();
+  render(Setup, { status: notOpening, onDone });
+  const old = screen.getByRole('button', { name: 'Use the old library at /Users/me/Atlas instead' });
+  await fireEvent.click(old);
+  expect((await screen.findByRole('alert')).textContent).toBe('The old library is no longer offered.');
+
+  usePreviousLibrary.mockResolvedValue({ ...notOpening, dataFolder: '/Users/me/Atlas', problem: "Butterfly Atlas can't open the library at /Users/me/Atlas.", previousFolder: null });
+  await fireEvent.click(old);
+  expect((await screen.findByRole('alert')).textContent).toBe("Butterfly Atlas can't open the library at /Users/me/Atlas.");
+  expect(onDone).not.toHaveBeenCalled();
+  expect(screen.queryByRole('button', { name: /Use the old library/ })).toBeNull();
 });
