@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import {
-  NO_SESSION_WORDS, LIBRARY_IN_USE_WORDS, closedLine, copyLeftLine, deleteOldCopyAsk, lastBackupLine, libraryMovedLine, movedCopyLine,
-  movingToLine, oldCopyLeftLine, oldCopyLine, otherFilesLeftLine, reopenedLine, tooLittleSpaceLine, usePreviousLabel,
+  NO_SESSION_WORDS, LIBRARY_IN_USE_WORDS, copyLeftLine, deleteOldCopyAsk, lastBackupLine, libraryMovedLine, movedCopyLine,
+  movingToLine, oldCopyLeftLine, oldCopyLine, otherFilesLeftLine, tooLittleSpaceLine, usePreviousLabel,
 } from './messages.js';
 
 // The server says the same words (app SessionGuard.MESSAGE, pinned in SessionApiTest); the two must not drift apart.
@@ -19,8 +19,6 @@ test('the library folder\'s sentences', () => {
   expect(copyLeftLine('/Volumes/B/Butterfly_Atlas', 3))
     .toBe("Some of the copy at /Volumes/B/Butterfly_Atlas couldn't be removed (3 files). You can delete it yourself.");
   expect(copyLeftLine('/V/A', 1)).toBe("Some of the copy at /V/A couldn't be removed (1 file). You can delete it yourself.");
-  expect(reopenedLine('/V/A')).toBe('Butterfly Atlas reopened with your library at /V/A. You can close this window.');
-  expect(closedLine('/V/A')).toBe('Your library is now at /V/A. Butterfly Atlas has closed; open it again to continue.');
   expect(oldCopyLine('/Users/me/Atlas', '12.4 GB')).toBe('The old copy of your library is still at /Users/me/Atlas (12.4 GB).');
   expect(deleteOldCopyAsk('/Users/me/Atlas', '/V/A')).toBe('Delete the old copy at /Users/me/Atlas? Your library at /V/A is the one in use.');
   expect(lastBackupLine('Everything', '27 October')).toBe('Your last backup (Everything) was on 27 October.');

@@ -101,24 +101,38 @@ test('a failed switch has its own heading', () => {
   expect(screen.getByRole('heading', { level: 1, name: "The library couldn't be changed" })).toBeTruthy();
 });
 
-test('reopening by restart: the window says the app reopened and can be closed', () => {
-  render(ChangeScreen, { changing: change({ step: 'reopening', canCancel: false, reopen: { how: 'restart', folder: '/Volumes/B/Butterfly_Atlas', why: null } }) });
-  expect(screen.getByRole('heading', { level: 1 }).textContent)
-    .toBe('Butterfly Atlas reopened with your library at /Volumes/B/Butterfly_Atlas. You can close this window.');
+const LONG = '/Volumes/A very long drive name/Some/Deeply/Nested/Folder/Of/Photographs/Butterfly_Atlas';
+const lines = (main) => [...main.querySelectorAll('h1, p')].map((el) => el.textContent.replace(/\s+/g, ' ').trim());
+// The folder is on its own line, wrapping anywhere (a long path must not run off the window), not in the heading.
+const folderLine = (folder) => {
+  const path = screen.getByText(folder);
+  expect(path.classList.contains('cs-to')).toBe(true);
+  expect(path.classList.contains('mono')).toBe(true);
+  expect(screen.getByRole('heading', { level: 1 }).textContent).not.toContain(folder);
+  return path;
+};
+
+test('reopening by restart: the app is reopening in a new window; the folder on its own line; this window can be closed', () => {
+  render(ChangeScreen, { changing: change({ step: 'reopening', canCancel: false, reopen: { how: 'restart', folder: LONG, why: null } }) });
+  expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Reopening Butterfly Atlas');
+  folderLine(LONG);
+  expect(lines(screen.getByRole('main'))).toEqual([
+    'Reopening Butterfly Atlas', `Your library is now at ${LONG}`, 'It opens in a new window. You can close this one.',
+  ]);
   expect(screen.queryByRole('button')).toBeNull();
 });
 
-test('reopening by quitting: the window says where the library is and to open the app again, first why it couldn\'t reopen itself', async () => {
-  const quit = (why) => change({ step: 'reopening', canCancel: false, reopen: { how: 'quit', folder: '/Volumes/B/Butterfly_Atlas', why } });
+test('reopening by quitting: the app has closed, the folder on its own line, open it again; first why it couldn\'t reopen itself', async () => {
+  const quit = (why) => change({ step: 'reopening', canCancel: false, reopen: { how: 'quit', folder: LONG, why } });
   const { rerender } = render(ChangeScreen, { changing: quit(null) });
-  expect(screen.getByRole('heading', { level: 1 }).textContent)
-    .toBe('Your library is now at /Volumes/B/Butterfly_Atlas. Butterfly Atlas has closed; open it again to continue.');
-  expect(screen.queryByText("Butterfly Atlas couldn't reopen itself.")).toBeNull();
+  expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Butterfly Atlas has closed');
+  folderLine(LONG);
+  expect(lines(screen.getByRole('main'))).toEqual([
+    'Butterfly Atlas has closed', `Your library is now at ${LONG}`, 'Open Butterfly Atlas again to continue.',
+  ]);
   await rerender({ changing: quit('This copy was started from a development build.') });
-  const first = screen.getByText("Butterfly Atlas couldn't reopen itself.");
-  const why = screen.getByText('This copy was started from a development build.');
-  const heading = screen.getByRole('heading', { level: 1 });
-  // the reason comes first, then the sentence
-  expect(first.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(why).toBeTruthy();
+  expect(lines(screen.getByRole('main'))).toEqual([
+    "Butterfly Atlas couldn't reopen itself.", 'This copy was started from a development build.',
+    'Butterfly Atlas has closed', `Your library is now at ${LONG}`, 'Open Butterfly Atlas again to continue.',
+  ]);
 });

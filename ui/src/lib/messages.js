@@ -133,9 +133,13 @@ export const LIBRARY_UNCHANGED = 'Your library is where it was, and nothing in i
 export const copyLeftLine = (folder, files) => `Some of the copy at ${folder} couldn't be removed (${fileCount(files)}). You can delete it yourself.`;
 export const BACK_TO_SETTINGS = 'Back to Settings';
 export const GOING_BACK = 'Going back…';
-export const reopenedLine = (folder) => `Butterfly Atlas reopened with your library at ${folder}. You can close this window.`;
+// The last page (§6): the folder goes on its own line after LIBRARY_NOW_AT, so a long path wraps.
+export const REOPENING_TITLE = 'Reopening Butterfly Atlas';
+export const CLOSED_TITLE = 'Butterfly Atlas has closed';
+export const LIBRARY_NOW_AT = 'Your library is now at';
+export const OPENS_IN_NEW_WINDOW = 'It opens in a new window. You can close this one.';
+export const OPEN_AGAIN = 'Open Butterfly Atlas again to continue.';
 export const COULD_NOT_REOPEN = "Butterfly Atlas couldn't reopen itself.";
-export const closedLine = (folder) => `Your library is now at ${folder}. Butterfly Atlas has closed; open it again to continue.`;
 // Settings → the old copy after a move (§9).
 export const oldCopyLine = (folder, size) => `The old copy of your library is still at ${folder} (${size}).`;
 export const DELETE_OLD_COPY = 'Delete old copy';

@@ -583,8 +583,9 @@ test('after the app quits to reopen, the window keeps its last page: nothing mor
   });
   vi.stubGlobal('fetch', fetchMock);
   render(App);
-  const line = 'Butterfly Atlas reopened with your library at /Volumes/B/Butterfly_Atlas. You can close this window.';
+  const line = 'Reopening Butterfly Atlas';
   expect((await screen.findByRole('heading', { level: 1 })).textContent).toBe(line);
+  expect(screen.getByText('It opens in a new window. You can close this one.')).toBeTruthy();
 
   gone = true;
   const asked = fetchMock.mock.calls.length;
