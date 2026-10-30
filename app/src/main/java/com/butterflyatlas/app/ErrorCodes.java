@@ -50,6 +50,11 @@ public final class ErrorCodes {
     /** The pairs choice can no longer change. */
     public static final String PAIR_CHOICE_LOCKED = "pair_choice_locked";
 
+    /** Refused while the library folder is being changed (change-library-folder contract §4). */
+    public static final String LIBRARY_CHANGING = "library_changing";
+    /** A library change can no longer be cancelled, or none runs. */
+    public static final String CANNOT_CANCEL = "cannot_cancel";
+
     private ErrorCodes() {
     }
 }

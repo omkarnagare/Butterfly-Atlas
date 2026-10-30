@@ -35,5 +35,7 @@ class ErrorCodesTest {
         assertThat(ErrorCodes.NOTHING_TO_FILE).isEqualTo("nothing_to_file");
         assertThat(ErrorCodes.PAIR_CHOICE_NEEDED).isEqualTo("pair_choice_needed");
         assertThat(ErrorCodes.PAIR_CHOICE_LOCKED).isEqualTo("pair_choice_locked");
+        assertThat(ErrorCodes.LIBRARY_CHANGING).isEqualTo("library_changing");
+        assertThat(ErrorCodes.CANNOT_CANCEL).isEqualTo("cannot_cancel");
     }
 }
