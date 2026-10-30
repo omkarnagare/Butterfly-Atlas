@@ -5,6 +5,7 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
@@ -18,7 +19,9 @@ import java.util.function.Supplier;
 
 /**
  * Opens the app window (design §2): the browser found, started with {@code --app=<address>}, its own profile folder in
- * the config folder, {@code --no-first-run} and {@code --no-default-browser-check}. No browser, a browser that cannot be
+ * the config folder, {@code --no-first-run}, {@code --no-default-browser-check} and a maximized window (match-device
+ * design §8: {@code --start-maximized}, which macOS ignores, so there a window size the browser shrinks to the screen;
+ * never both, since a size opens Windows and Linux unmaximized). No browser, a browser that cannot be
  * started, or one that exits with an error within {@link #EARLY} (audit 2) means the default browser opens a tab instead
  * (once: {@link #fallBack}); {@link #mode()} then says {@code tab}. Every address has a fresh one-time launch key, which
  * is never in a program's arguments, the log or the console: the browser (and the default browser) is opened on an owner-only
@@ -48,6 +51,7 @@ public final class WindowLauncher {
     static final long EARLY_NANOS = 5_000_000_000L;
 
     private final Optional<Path> browser;
+    private final boolean mac;
     private final Path profile;
     private final Supplier<URI> launchUri;
     private final LaunchFiles files;
@@ -64,14 +68,15 @@ public final class WindowLauncher {
     private final CompletableFuture<Void> settled = new CompletableFuture<>();
 
     /**
-     * With the browser found, its profile folder, a supplier of a fresh launch address, the redirect files, how to start a
+     * With the browser found, the system it runs on ({@code os.name}), its profile folder, a supplier of a fresh launch address, the redirect files, how to start a
      * program, how to open the default browser, where the console's lines go, the log, a clock and where a problem that
      * stops any window from opening is told.
      */
-    public WindowLauncher(Optional<Path> browser, Path profile, Supplier<URI> launchUri, LaunchFiles files, Starter starter,
+    public WindowLauncher(Optional<Path> browser, String osName, Path profile, Supplier<URI> launchUri, LaunchFiles files, Starter starter,
                           DefaultBrowser defaultBrowser, Consumer<String> console, AtlasLog log, LongSupplier nanos,
                           Consumer<StartupFailure.Message> problem) {
         this.browser = browser;
+        this.mac = osName != null && osName.toLowerCase(Locale.ROOT).startsWith("mac");
         this.profile = profile;
         this.launchUri = launchUri;
         this.files = files;
@@ -95,7 +100,7 @@ public final class WindowLauncher {
             settled.complete(null);
             return;
         }
-        List<String> command = command(browser.get(), profile, page.toUri());
+        List<String> command = command(browser.get(), profile, page.toUri(), mac);
         long began = nanos.getAsLong();
         try {
             Files.createDirectories(profile);
@@ -206,8 +211,8 @@ public final class WindowLauncher {
     }
 
     /** {@code page} is the redirect file's address ({@code file:} URI), never the launch address with its key. */
-    static List<String> command(Path browser, Path profile, URI page) {
+    static List<String> command(Path browser, Path profile, URI page, boolean mac) {
         return List.of(browser.toString(), "--app=" + page, "--user-data-dir=" + profile, "--no-first-run",
-                "--no-default-browser-check");
+                "--no-default-browser-check", mac ? "--window-size=10000,10000" : "--start-maximized");
     }
 }

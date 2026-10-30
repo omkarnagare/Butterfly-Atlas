@@ -423,8 +423,9 @@ final class AppStart {
         if (found.note() != null) {
             log.warn(found.note(), null);
         }
-        return new WindowLauncher(found.browser(), options.configDir().resolve("browser_profile"), address, files, world.starter(),
-                world.defaultBrowser()::test, world.console(), log, System::nanoTime, problem);
+        return new WindowLauncher(found.browser(), System.getProperty("os.name"),
+                options.configDir().resolve("browser_profile"), address, files, world.starter(), world.defaultBrowser()::test,
+                world.console(), log, System::nanoTime, problem);
     }
 
     /** Opens the library and the services; what stops that is told in plain words (never the raw error). */
