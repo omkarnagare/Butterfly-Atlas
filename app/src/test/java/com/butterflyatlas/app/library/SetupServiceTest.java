@@ -98,6 +98,30 @@ class SetupServiceTest {
     }
 
     @Test
+    void theLookIsDeviceUntilOneIsSaved() {
+        SetupService setup = service(holder);
+        assertThat(setup.theme()).isEqualTo("device");
+
+        setup.setup(home.resolve("Atlas").toString());
+
+        assertThat(setup.theme()).isEqualTo("device");
+    }
+
+    @Test
+    void matchDeviceDropsTheSavedLookAndKeepsWhatALibraryChangeLeft() {
+        Path folder = home.resolve("Atlas");
+        SetupService setup = service(holder);
+        setup.setup(folder.toString());
+        config().save(new AppConfig(folder.toString(), "dark", home.resolve("Old").toString(), null, true));
+
+        assertThat(setup.setTheme("device")).isEqualTo("device");
+
+        assertThat(setup.theme()).isEqualTo("device");
+        assertThat(config().load()).contains(new AppConfig(folder.toString(), null, home.resolve("Old").toString(),
+                null, true));
+    }
+
+    @Test
     void startupReopensTheRememberedLibraryWithoutReloadingIt() {
         Path folder = home.resolve("Atlas");
         service(new LibraryHolder()).setup(folder.toString());

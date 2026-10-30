@@ -10,8 +10,8 @@ import java.io.UncheckedIOException;
 import java.nio.file.FileSystemException;
 
 /**
- * {@code GET} and {@code PUT /api/appearance} (Meadow UI contract §2, §3): the saved Light or Dark choice, or null to
- * follow the computer. A choice can be saved once a library folder is chosen (409 {@code not_set_up} before); a failed
+ * {@code GET} and {@code PUT /api/appearance} (Meadow UI contract §2, §3; match-device design §3): the saved Light or Dark
+ * choice, or {@code device} to match the device. A choice can be saved once a library folder is chosen (409 {@code not_set_up} before); a failed
  * write is 500 {@code save_failed} with its reason, and the choice in memory stays as it was.
  */
 final class AppearanceRoutes {

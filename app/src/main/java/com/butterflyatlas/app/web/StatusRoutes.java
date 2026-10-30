@@ -36,7 +36,7 @@ import java.util.function.Supplier;
  * and the files the last rescan did not add, by reason ({@code rescanLeft}, audit D2; empty when none or put away with
  * {@code POST /api/rescan-left/dismiss}); the library's version ({@code libraryVersion}, multi-window contract §10 A8: up
  * with every write that changes photos, so another window reloads them); and the saved look ({@code theme}, Meadow UI
- * contract §4: {@code light}, {@code dark} or null, from memory, so another window follows a change); and the change of
+ * contract §4: {@code device}, {@code light} or {@code dark}, from memory, so another window follows a change); and the change of
  * library folder running or waiting to be dismissed ({@code changing}, change-library-folder contract §2, null when
  * none) and, on the first run after a move, where the library is now ({@code libraryMoved}, until dismissed). A poll runs no SQL (design D9).
  */
