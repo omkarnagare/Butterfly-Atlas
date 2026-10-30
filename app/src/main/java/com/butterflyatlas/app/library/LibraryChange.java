@@ -391,6 +391,13 @@ public final class LibraryChange {
         return String.format(Locale.ROOT, "%,.1f GB", bytes / 1e9);
     }
 
+    /** Whether a change runs (not one that failed and waits to be dismissed): every window is told every second. */
+    public boolean running() {
+        synchronized (lock) {
+            return current != null && !FAILED.equals(current.step());
+        }
+    }
+
     /** Whether the app is blocked: a change runs, or a failed one waits to be dismissed (contract §4). */
     public boolean blocks() {
         synchronized (lock) {

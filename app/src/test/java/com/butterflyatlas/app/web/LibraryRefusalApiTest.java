@@ -34,7 +34,8 @@ class LibraryRefusalApiTest {
         AtlasServices services = new AtlasServices(setup, base.taxa(), base.searchWords(), base.search(), base.photos(),
                 base.photoQueries(), base.tags(), base.thumbnails(), base.rescan(), base.processing(), base.folders(),
                 base.imports(), base.placeSearch(), base.places(), base.photoPlaces(), base.filters(), base.exports(),
-                base.custom(), base.updates(), base.splits(), base.drive(), base.placeNotes(), base.backups(), base.heic());
+                base.custom(), base.updates(), base.splits(), base.drive(), base.placeNotes(), base.backups(), base.heic(),
+                base.change());
         try (AtlasServer server = AtlasServer.start(0, services)) {
             String origin = "http://127.0.0.1:" + server.port();
             RawHttp.Response response = RawHttp.send(server.port(), "POST", "/api/setup",

@@ -44,6 +44,7 @@ public final class Api {
         if (session != null) {
             app.before(new SessionGuard(session.keys(), app::port, session.mode())::check);
         }
+        app.before(new ChangeGate(services.change()::blocks)::check); // while the library folder changes (its contract §4)
         ErrorHandling.install(app, services.drive());
         // Whatever the answer, no other site may embed or sniff it.
         app.after("/api/*", ctx -> {
@@ -71,11 +72,12 @@ public final class Api {
         new HeicRoutes(services.heic()).register(app);
         StatusRoutes status = new StatusRoutes(services.rescan(), services.thumbnails(), services.photos(),
                 services.processing(), services.imports(), services.exports(), services.updates(), services.drive(),
-                services.placeNotes(), services.backups(), services.setup()::theme);
+                services.placeNotes(), services.backups(), services.setup()::theme,
+                () -> services.change().changing().orElse(null));
         status.register(app);
         JavalinJackson json = new JavalinJackson();
         SessionRoutes sessions = session == null ? null : new SessionRoutes(session, services.setup(),
-                () -> json.toJsonString(status.status(), StatusRoutes.Status.class));
+                () -> json.toJsonString(status.status(), StatusRoutes.Status.class), services.change()::running);
         if (sessions != null) {
             sessions.register(app);
         }

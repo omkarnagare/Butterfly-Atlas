@@ -1,7 +1,11 @@
 package com.butterflyatlas.app.web;
 
 import com.butterflyatlas.app.JobStates;
+import com.butterflyatlas.app.backup.Backups;
+import com.butterflyatlas.app.exports.Exports;
+import com.butterflyatlas.app.imports.Imports;
 import com.butterflyatlas.app.photos.ConsumerRunner;
+import com.butterflyatlas.app.updates.Updates;
 
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
@@ -29,13 +33,20 @@ public final class RunningWork {
 
     /** What runs, from the services that hold it; {@code startup}: whether the startup work is still going. */
     public static Supplier<Optional<String>> of(AtlasServices services, BooleanSupplier startup) {
-        return of(() -> services.exports().current().map(e -> JobStates.RUNNING.equals(e.state())).orElse(false),
-                () -> services.backups().current().map(b -> JobStates.RUNNING.equals(b.state())).orElse(false),
-                () -> services.imports().filing(),
-                () -> services.updates().status().map(u -> JobStates.RUNNING.equals(u.state())
+        return of(services.exports(), services.backups(), services.imports(), services.updates(), services.processing(),
+                startup);
+    }
+
+    /** As {@link #of(AtlasServices, BooleanSupplier)}, from the services themselves (before they are gathered). */
+    public static Supplier<Optional<String>> of(Exports exports, Backups backups, Imports imports, Updates updates,
+                                                ConsumerRunner processing, BooleanSupplier startup) {
+        return of(() -> exports.current().map(e -> JobStates.RUNNING.equals(e.state())).orElse(false),
+                () -> backups.current().map(b -> JobStates.RUNNING.equals(b.state())).orElse(false),
+                imports::filing,
+                () -> updates.status().map(u -> JobStates.RUNNING.equals(u.state())
                         || JobStates.WAITING.equals(u.state())).orElse(false),
                 () -> {
-                    ConsumerRunner.Progress progress = services.processing().progress();
+                    ConsumerRunner.Progress progress = processing.progress();
                     return progress == null ? null : progress.step();
                 }, startup);
     }

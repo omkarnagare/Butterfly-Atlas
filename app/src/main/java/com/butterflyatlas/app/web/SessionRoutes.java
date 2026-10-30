@@ -60,9 +60,14 @@ final class SessionRoutes {
 
     /** {@code status}: what {@code GET /api/status} would answer, as JSON (built from memory). */
     SessionRoutes(Session session, SetupService setup, Supplier<String> status) {
+        this(session, setup, status, () -> false);
+    }
+
+    /** As above; while {@code changing} holds (a library change runs) every stream is told every second. */
+    SessionRoutes(Session session, SetupService setup, Supplier<String> status, java.util.function.BooleanSupplier changing) {
         this.session = session;
         this.setup = setup;
-        this.events = new StatusEvents(status);
+        this.events = new StatusEvents(status, changing);
         // on the pings' one thread, so a stream's ping and its status events are never written at once
         pings.scheduleAtFixedRate(() -> {
             try {

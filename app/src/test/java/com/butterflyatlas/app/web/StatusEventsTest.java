@@ -116,4 +116,20 @@ class StatusEventsTest {
 
         assertThat(other.told).as("told once at the open, the failed reads send nothing more").isEqualTo(1);
     }
+
+    @Test
+    void whileALibraryChangeRunsEveryStreamIsToldEverySecondEvenWhenNothingDiffers() {
+        java.util.concurrent.atomic.AtomicBoolean changing = new java.util.concurrent.atomic.AtomicBoolean(true);
+        StatusEvents always = new StatusEvents(status::get, changing::get);
+        Window window = new Window();
+        always.opened(window);
+
+        always.check();
+        always.check();
+        assertThat(window.told).isEqualTo(3);
+
+        changing.set(false);
+        always.check();
+        assertThat(window.told).as("only when it differs again").isEqualTo(3);
+    }
 }

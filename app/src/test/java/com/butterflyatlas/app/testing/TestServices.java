@@ -12,7 +12,9 @@ import com.butterflyatlas.app.imports.ImportPlaceChoices;
 import com.butterflyatlas.app.imports.Imports;
 import com.butterflyatlas.app.imports.TestImports;
 import com.butterflyatlas.app.imaging.heif.TestDecoders;
+import com.butterflyatlas.app.library.ChangeSteps;
 import com.butterflyatlas.app.library.Library;
+import com.butterflyatlas.app.library.LibraryChange;
 import com.butterflyatlas.app.library.LibraryDrive;
 import com.butterflyatlas.app.library.LibraryHolder;
 import com.butterflyatlas.app.library.SetupService;
@@ -41,6 +43,7 @@ import com.butterflyatlas.app.updates.SplitSorter;
 import com.butterflyatlas.app.updates.Updates;
 import com.butterflyatlas.app.web.Api;
 import com.butterflyatlas.app.web.AtlasServices;
+import com.butterflyatlas.app.web.RunningWork;
 
 import java.nio.file.Path;
 import java.time.Duration;
@@ -127,6 +130,10 @@ public final class TestServices {
         custom.onChange(updates::libraryChanged);
         custom.onChange(photos::changedElsewhere); // a rename or delete moves photos: the library's version
         updates.whenFinished(photos::changedElsewhere); // as do an update's moves
+        LibraryChange change = new LibraryChange(holder::library, setup, ChangeSteps.REAL, usableSpace,
+                LibraryChange.Background.NONE, (kind, from, to) -> {
+                    throw new IllegalStateException("No switch in these tests");
+                }, RunningWork.of(exports, backups, imports, updates, processing, () -> false));
         return new AtlasServices(setup, taxa, new SearchWordService(holder, TestBundles.CLOCK), search,
                 photos, photoQueries, new TagService(holder::library), thumbnails,
                 new Rescan(holder::library, processor, TestBundles.CLOCK, thumbnails::request, facts),
@@ -138,7 +145,15 @@ public final class TestServices {
                 new SplitSorter(holder::library, photos, photoQueries, updates::libraryChanged),
                 new LibraryDrive(() -> holder.current().map(Library::folder), usableSpace, System::nanoTime), placeNotes,
                 backups, TestDecoders.none("mac", () -> holder.current().map(l -> l.folder().resolve(Thumbnails.FOLDER)
-                        .resolve(".decode")).orElse(null)));
+                        .resolve(".decode")).orElse(null)), change);
+    }
+
+    /** The same services with {@code change} as their library change (tests of a change's steps). */
+    public static AtlasServices withChange(AtlasServices s, LibraryChange change) {
+        return new AtlasServices(s.setup(), s.taxa(), s.searchWords(), s.search(), s.photos(), s.photoQueries(), s.tags(),
+                s.thumbnails(), s.rescan(), s.processing(), s.folders(), s.imports(), s.placeSearch(), s.places(),
+                s.photoPlaces(), s.filters(), s.exports(), s.custom(), s.updates(), s.splits(), s.drive(), s.placeNotes(),
+                s.backups(), s.heic(), change);
     }
 
     /**
