@@ -199,8 +199,9 @@ class LibraryChangeTest {
         assertThat(to.resolve("images").resolve("Empty_folder")).isDirectory();
         assertThat(Files.readAllBytes(to.resolve("images/Papilionidae/Papilio_2.jpg")))
                 .isEqualTo(Files.readAllBytes(old.resolve("images/Papilionidae/Papilio_2.jpg")));
-        assertThat(Files.getLastModifiedTime(to.resolve("images/Papilionidae/Papilio_1.jpg")))
-                .isEqualTo(Files.getLastModifiedTime(old.resolve("images/Papilionidae/Papilio_1.jpg")));
+        // kept to the millisecond, as the library records it (Linux keeps nanoseconds, a copy only microseconds)
+        assertThat(Files.getLastModifiedTime(to.resolve("images/Papilionidae/Papilio_1.jpg")).toMillis())
+                .isEqualTo(Files.getLastModifiedTime(old.resolve("images/Papilionidae/Papilio_1.jpg")).toMillis());
         assertThat(UnfinishedWorkTest.rows(Database.open(to.resolve("atlas.db")), "SELECT rel_path FROM image ORDER BY id"))
                 .containsExactly("images/Papilionidae/Papilio_1.jpg", "images/Papilionidae/Papilio_2.jpg",
                         "images/Papilionidae/Papilio_3.jpg");
