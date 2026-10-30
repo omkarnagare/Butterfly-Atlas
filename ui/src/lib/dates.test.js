@@ -1,5 +1,12 @@
 import { expect, test } from 'vitest';
-import { ago, shortDate } from './dates.js';
+import { ago, longDate, shortDate } from './dates.js';
+
+test('names a day in full, with the year only when it is another year', () => {
+  const now = new Date(2026, 9, 30, 9, 0);
+  expect(longDate(new Date(2026, 9, 27, 8, 0).toISOString(), { now, locale: 'en-GB' })).toBe('27 October');
+  expect(longDate(new Date(2025, 2, 3, 8, 0).toISOString(), { now, locale: 'en-GB' })).toBe('3 March 2025');
+  expect(longDate('not a date', { now })).toBe('');
+});
 
 test('says how long ago a photo was added, in calendar days', () => {
   const now = new Date(2026, 9, 11, 9, 0);

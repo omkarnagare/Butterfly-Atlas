@@ -1,9 +1,9 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { beforeEach, expect, test, vi } from 'vitest';
 import FolderBrowser from './FolderBrowser.svelte';
-import { getFsRoots, inspectFolder, listFolder } from './api.js';
+import { getFsRoots, inspectChange, inspectFolder, listFolder } from './api.js';
 
-vi.mock('./api.js', () => ({ getFsRoots: vi.fn(), listFolder: vi.fn(), inspectFolder: vi.fn() }));
+vi.mock('./api.js', () => ({ getFsRoots: vi.fn(), listFolder: vi.fn(), inspectFolder: vi.fn(), inspectChange: vi.fn() }));
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -460,4 +460,85 @@ test('for setup a folder whose check fails says why and cannot be chosen', async
 
   expect((await screen.findByRole('alert')).textContent).toBe('Butterfly Atlas is not responding.');
   expect(screen.getByRole('button', { name: 'Use this folder' }).getAttribute('aria-disabled')).toBe('true');
+});
+
+// ---- changing the library folder from Settings (change-library-folder design §3) ----
+
+const GB = 1024 ** 3;
+
+function setUpForChange(checks) {
+  setUpForSetup({});
+  inspectChange.mockImplementation(async (path) => checks[path]);
+}
+
+test('Move library: titled for the move, opens at Documents, checks the folder for a move, and says where and how big', async () => {
+  setUpForChange({ '/Users/you/Documents': inspected('/Users/you/Documents', 'create', { refusal: null, free: 80.1 * GB, needed: 13.2 * GB }) });
+  const onChoose = vi.fn();
+  render(FolderBrowser, { change: 'move', librarySize: 12.4 * GB, onChoose, onClose: vi.fn() });
+
+  expect(screen.getByRole('dialog', { name: 'Choose where to move your library' })).toBeTruthy();
+  const here = await screen.findByText('Your library will be moved to /Users/you/Documents/Butterfly_Atlas. It is 12.4 GB; that drive has 80.1 GB free.');
+  expect(inspectChange).toHaveBeenCalledWith('/Users/you/Documents', 'move');
+  expect(inspectFolder).not.toHaveBeenCalled();
+  // no photo counts, as for setup
+  expect(screen.queryByText(/photos/)).toBeNull();
+  const button = screen.getByRole('button', { name: 'Move here' });
+  expect(button.getAttribute('aria-describedby')).toBe(here.id);
+  await fireEvent.click(button);
+  expect(onChoose).toHaveBeenCalledWith(expect.objectContaining({ path: '/Users/you/Documents' }));
+});
+
+test('Move library: a refused folder says why and Move here does nothing', async () => {
+  setUpForChange({ '/Users/you/Documents': inspected('/Users/you/Documents', 'create', { refusal: 'not_enough_space', free: 3.2 * GB, needed: 13.2 * GB }) });
+  const onChoose = vi.fn();
+  render(FolderBrowser, { change: 'move', librarySize: 12.4 * GB, onChoose, onClose: vi.fn() });
+
+  await screen.findByText('That drive has 3.2 GB free; moving your library needs about 13.2 GB.');
+  const button = screen.getByRole('button', { name: 'Move here' });
+  expect(button.getAttribute('aria-disabled')).toBe('true');
+  await fireEvent.click(button);
+  expect(onChoose).not.toHaveBeenCalled();
+});
+
+test('Use a different library: setup\'s lines and buttons, and the library in use is refused', async () => {
+  setUpForChange({
+    '/Users/you/Documents': inspected('/Users/you/Documents', 'existing', { libraryFolder: '/Users/you/Documents', refusal: 'current_library' }),
+    '/Users/you/Documents/Old': inspected('/Users/you/Documents/Old', 'existing', {
+      libraryFolder: '/Users/you/Documents/Old', refusal: null, unfinished: { imports: 0, exports: 1, backups: 0 },
+    }),
+  });
+  const onChoose = vi.fn();
+  render(FolderBrowser, { change: 'switch', onChoose, onClose: vi.fn() });
+
+  expect(screen.getByRole('dialog', { name: 'Choose a library to use' })).toBeTruthy();
+  await screen.findByText('That is the library you are using.');
+  expect(inspectChange).toHaveBeenCalledWith('/Users/you/Documents', 'switch');
+  expect(screen.getByRole('button', { name: 'Open this existing library' }).getAttribute('aria-disabled')).toBe('true');
+
+  await fireEvent.click(await screen.findByRole('button', { name: /^Old/ }));
+  expect(await screen.findByText(/^This folder already has a Butterfly Atlas library\. It will open as it is, except for work left unfinished where it was used before: 1 paused export\./))
+    .toBeTruthy();
+  const open = screen.getByRole('button', { name: 'Open this existing library' });
+  expect(open.getAttribute('aria-disabled')).toBe('false');
+  await fireEvent.click(open);
+  expect(onChoose).toHaveBeenCalledWith(expect.objectContaining({ path: '/Users/you/Documents/Old' }));
+});
+
+test('a change the server refuses when it is started says why beside the button, and the browser stays open', async () => {
+  setUpForChange({ '/Users/you/Documents': inspected('/Users/you/Documents', 'create', { refusal: null, free: 80 * GB, needed: 13 * GB }) });
+  let refuse;
+  const onChoose = vi.fn(() => new Promise((_, reject) => { refuse = reject; }));
+  const onClose = vi.fn();
+  render(FolderBrowser, { change: 'move', librarySize: 12 * GB, onChoose, onClose });
+
+  await screen.findByText(/^Your library will be moved to/);
+  await fireEvent.click(screen.getByRole('button', { name: 'Move here' }));
+  // while it starts, the button says so and the browser can't be closed
+  expect(screen.getByRole('button', { name: 'Starting…' })).toBeTruthy();
+  await fireEvent.keyDown(window, { key: 'Escape' });
+  expect(onClose).not.toHaveBeenCalled();
+  refuse(Object.assign(new Error('An export is running. Pause it or wait for it to finish, then try again.'), { code: 'work_running' }));
+  expect((await screen.findByRole('alert')).textContent).toBe('An export is running. Pause it or wait for it to finish, then try again.');
+  expect(screen.getByRole('button', { name: 'Move here' })).toBeTruthy();
+  expect(screen.getByRole('dialog', { name: 'Choose where to move your library' })).toBeTruthy();
 });

@@ -13,6 +13,7 @@ import {
   dismissPlaceUpdate, getPlaceUpdate, retrySetup, getSession, resetSessionLost, checkHeic, dismissRescanLeft, openWindow,
   cancelBackup, checkBackup, clearBackups, deleteBackup, getBackup, getBackups, pauseBackup, resumeBackup, setBackupPreference, startBackup,
   getAppearance, setAppearance,
+  cancelChange, deleteOldCopy, dismissChange, dismissMovedNote, getLibraryChange, inspectChange, moveLibrary, switchLibrary, usePreviousLibrary,
 } from './api.js';
 
 afterEach(() => {
@@ -711,4 +712,48 @@ test("an appearance that cannot be saved fails with the server's reason", async 
   const message = "Couldn't save the appearance: Permission denied";
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 500, json: async () => ({ error: { code: 'save_failed', message } }) })));
   await expect(setAppearance('light')).rejects.toMatchObject({ code: 'save_failed', status: 500, message });
+});
+
+// Change the library folder (contract §3): every route, its method, address and body.
+test('the library folder\'s routes', async () => {
+  const fetchMock = vi.fn(async (url, init) => (init.method === 'POST' && /dismiss$/.test(url)
+    ? { ok: true, status: 204, json: async () => null }
+    : { ok: true, status: /move|switch/.test(url) ? 202 : 200, json: async () => ({ answer: url }) }));
+  vi.stubGlobal('fetch', fetchMock);
+
+  await expect(getLibraryChange()).resolves.toEqual({ answer: './api/library/change' });
+  await inspectChange('/Volumes/B 2/Atlas', 'move');
+  await inspectChange('/Volumes/B', 'switch');
+  await moveLibrary('/Volumes/B');
+  await switchLibrary('/Volumes/C');
+  await cancelChange();
+  await expect(dismissChange()).resolves.toBeNull();
+  await deleteOldCopy();
+  await expect(dismissMovedNote()).resolves.toBeNull();
+  await usePreviousLibrary();
+
+  expect(fetchMock.mock.calls.map(([url, init]) => [init.method, url.replace('./api/', ''), init.body ?? null])).toEqual([
+    ['GET', 'library/change', null],
+    ['GET', 'library/change/inspect?path=%2FVolumes%2FB%202%2FAtlas&for=move', null],
+    ['GET', 'library/change/inspect?path=%2FVolumes%2FB&for=switch', null],
+    ['POST', 'library/change/move', '{"path":"/Volumes/B"}'],
+    ['POST', 'library/change/switch', '{"path":"/Volumes/C"}'],
+    ['POST', 'library/change/cancel', '{}'],
+    ['POST', 'library/change/dismiss', '{}'],
+    ['DELETE', 'library/old-copy', null],
+    ['POST', 'library/moved-note/dismiss', '{}'],
+    ['POST', 'setup/previous', '{}'],
+  ]);
+});
+
+test('a request refused because the library folder is changing tells the page, so the change screen shows at once', async () => {
+  const heard = vi.fn();
+  window.addEventListener('atlas:library-problem', heard);
+  vi.stubGlobal('fetch', vi.fn(async () => ({
+    ok: false, status: 409, json: async () => ({ error: { code: 'library_changing', message: 'Butterfly Atlas is changing your library folder.' } }),
+  })));
+  await expect(getUpdate()).rejects.toMatchObject({ code: 'library_changing', status: 409 });
+  expect(heard).toHaveBeenCalledTimes(1);
+  expect(heard.mock.calls[0][0].detail.code).toBe('library_changing');
+  window.removeEventListener('atlas:library-problem', heard);
 });

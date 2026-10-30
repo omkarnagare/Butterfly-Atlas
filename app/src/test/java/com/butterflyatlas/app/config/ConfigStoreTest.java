@@ -102,4 +102,40 @@ class ConfigStoreTest {
         assertThat(store.load()).isEmpty();
         assertThat(store.read()).contains(new AppConfig(null, "light"));
     }
+
+    @Test
+    void savesAndLoadsWhatALibraryChangeLeavesAndWritesNoneOfItWhenUnset() throws Exception {
+        ConfigStore store = new ConfigStore(dir);
+
+        store.save(new AppConfig("/new", "dark", "/old", true, true));
+
+        assertThat(store.load()).contains(new AppConfig("/new", "dark", "/old", true, true));
+        assertThat(store.file()).content().contains("\"previousDataFolder\" : \"/old\"", "\"changePending\" : true",
+                "\"oldCopy\" : true");
+
+        store.save(new AppConfig("/new", "dark"));
+
+        assertThat(Files.readString(store.file())).doesNotContain("previousDataFolder", "changePending", "oldCopy");
+    }
+
+    @Test
+    void anOlderFileHasNoChangeWaitingAndNoOldCopy() throws Exception {
+        ConfigStore store = new ConfigStore(dir);
+        Files.writeString(store.file(), "{\"dataFolder\": \"/a\", \"theme\": \"dark\"}");
+
+        AppConfig config = store.load().orElseThrow();
+
+        assertThat(config.previousDataFolder()).isNull();
+        assertThat(config.pending()).isFalse();
+        assertThat(config.hasOldCopy()).isFalse();
+    }
+
+    @Test
+    void anUnknownThemeKeepsWhatALibraryChangeLeft() throws Exception {
+        ConfigStore store = new ConfigStore(dir);
+        Files.writeString(store.file(), "{\"dataFolder\": \"/a\", \"theme\": \"blue\", \"previousDataFolder\": \"/b\","
+                + " \"changePending\": true, \"oldCopy\": true}");
+
+        assertThat(store.load()).contains(new AppConfig("/a", null, "/b", true, true));
+    }
 }

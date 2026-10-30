@@ -12,7 +12,9 @@ import com.butterflyatlas.app.imaging.heif.HeicDecoders;
 import com.butterflyatlas.app.imports.FolderBrowser;
 import com.butterflyatlas.app.imports.ImportPlaceChoices;
 import com.butterflyatlas.app.imports.Imports;
+import com.butterflyatlas.app.library.ChangeSteps;
 import com.butterflyatlas.app.library.Library;
+import com.butterflyatlas.app.library.LibraryChange;
 import com.butterflyatlas.app.library.LibraryDrive;
 import com.butterflyatlas.app.library.LibraryHolder;
 import com.butterflyatlas.app.library.SetupService;
@@ -42,6 +44,7 @@ import com.butterflyatlas.app.updates.SplitSorter;
 import com.butterflyatlas.app.updates.Updates;
 import com.butterflyatlas.app.web.Api;
 import com.butterflyatlas.app.web.AtlasServices;
+import com.butterflyatlas.app.web.RunningWork;
 import com.butterflyatlas.app.window.AtlasLog;
 import com.butterflyatlas.app.window.InstanceLock;
 import com.butterflyatlas.app.window.StartupFailure;
@@ -242,12 +245,19 @@ public final class Main {
         custom.onChange(updates::libraryChanged);
         custom.onChange(photos::changedElsewhere); // a rename or delete moves photos: the library's version
         updates.whenFinished(photos::changedElsewhere); // as do an update's moves
+        // Changing the library folder (change-library-folder spec): refused while work runs that must finish first.
+        // While a move copies the library, thumbnails (and their HEIC decodes) and photo details wait; the switch saves
+        // the settings, and the app then reopens itself (AppStart sets how).
+        LibraryChange change = new LibraryChange(holder::library, setup, ChangeSteps.REAL, LibraryDrive::usableSpace,
+                LibraryChange.Background.of(holder::library), setup::rememberChange,
+                RunningWork.of(exports, backups, imports, updates, processing, startupWork::running));
         return new AtlasServices(setup, taxa, new SearchWordService(holder, clock),
                 search, photos, photoQueries, new TagService(holder::library),
                 thumbnails, rescan, processing, new FolderBrowser(holder::current, imports.store(), home), imports,
                 placeSearch, new UserPlaces(() -> holder.library().database(), clock, placeSearch,
                         new ImportPlaceChoices(holder::library)),
-                photoPlaces, filters, exports, custom, updates, splits, new LibraryDrive(holder), placeNotes, backups, heic);
+                photoPlaces, filters, exports, custom, updates, splits, new LibraryDrive(holder), placeNotes, backups, heic,
+                change);
     }
 
     /**

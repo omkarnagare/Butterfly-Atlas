@@ -167,6 +167,20 @@ public final class ConsumerRunner {
         }
     }
 
+    /**
+     * Waits before a batch while a change of library folder holds the background work (it copies the library); false when
+     * the wait was cut short by the app closing (the batches stop).
+     */
+    private static boolean free(Library lib) {
+        try {
+            lib.workHold().awaitFree();
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
     private void details(Library lib) {
         Database db = lib.database();
         int total = db.read(ImageMeta::countMissing);
@@ -177,7 +191,7 @@ public final class ConsumerRunner {
         int done = 0;
         int failures = 0;
         long after = 0;
-        while (true) {
+        while (free(lib)) {
             long cursor = after;
             List<Long> ids = db.read(c -> ImageMeta.missing(c, cursor, batch));
             if (ids.isEmpty()) {
@@ -307,7 +321,7 @@ public final class ConsumerRunner {
             // One consumer's trouble (its ledger rows, its snapshots) must not hold back the next one.
             try {
                 long after = 0;
-                while (true) {
+                while (free(lib)) {
                     long cursor = after;
                     List<Long> ids = db.read(c -> ledger.pending(c, consumer.key(), consumer.version(), cursor, batch));
                     if (ids.isEmpty()) {

@@ -6,6 +6,7 @@ import com.butterflyatlas.app.testing.RawHttp;
 import com.butterflyatlas.app.window.AtlasLog;
 import com.butterflyatlas.app.window.BrowserFinder;
 import com.butterflyatlas.app.window.InstanceLock;
+import com.butterflyatlas.app.window.Relaunch;
 import com.butterflyatlas.app.window.InstancePointer;
 import com.butterflyatlas.app.window.SecondLaunch;
 import com.butterflyatlas.app.window.StartupFailure;
@@ -56,6 +57,9 @@ class AppStartTest {
     private int defaultPort = freePort();
     private Duration lockWait = Duration.ZERO;
     private boolean browserFound = true;
+    /** What the packaged launcher would set as {@code jpackage.app-path} (null: a development run). */
+    private String appPath;
+    private boolean startFails;
 
     @BeforeEach
     void folders() throws Exception {
@@ -84,8 +88,11 @@ class AppStartTest {
         return new AppStart.World(exits::add, hook -> { }, uri -> pages.add(uri), () -> new BrowserFinder.Found(
                 browserFound ? Optional.of(Path.of("/fake/chrome")) : Optional.empty(), null), command -> {
             started.add(command);
+            if (startFails) {
+                throw new java.io.IOException("cannot start " + command);
+            }
             return new FakeProcess();
-        }, SecondLaunch::system, lockWait, defaultPort, console::add);
+        }, SecondLaunch::system, lockWait, defaultPort, console::add, () -> appPath);
     }
 
     private AppStart.Running start(AppOptions options) {
@@ -711,5 +718,59 @@ class AppStartTest {
         Thread.sleep(3000); // three times the one-second grace
 
         assertThat(exits).isEmpty();
+    }
+
+    @Test
+    void reopeningStartsTheInstalledAppAfterTheQuitHasBegunThenExits() throws Exception {
+        Path program = Files.createFile(home.resolve("Butterfly Atlas"));
+        appPath = program.toString();
+        AppStart.Running app = start(options(true, 0, Optional.empty()));
+        Relaunch.Reopener reopener = app.reopener();
+
+        Relaunch.Plan plan = reopener.plan();
+        assertThat(plan.restarts()).isTrue();
+        assertThat(reopener.begin(plan)).isTrue();
+
+        assertThat(started).containsExactly(List.of(program.toString()));
+        assertThat(config.resolve("instance.json")).as("the quit began first: a new copy finds no pointer").doesNotExist();
+        InstanceLock.Result instance = InstanceLock.acquireFile(config.resolve("instance.lock"));
+        assertThat(instance.state()).isEqualTo(InstanceLock.State.ACQUIRED);
+        instance.lock().close();
+        assertThat(exits).isEmpty();
+
+        reopener.exit();
+
+        long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
+        while (exits.isEmpty() && System.nanoTime() < deadline) {
+            Thread.sleep(20);
+        }
+        assertThat(exits).containsExactly(0);
+    }
+
+    @Test
+    void aDevelopmentRunQuitsAndAsksWithoutStartingAnything() throws Exception {
+        appPath = null;
+        AppStart.Running app = start(options(true, 0, Optional.empty()));
+        Relaunch.Reopener reopener = app.reopener();
+
+        Relaunch.Plan plan = reopener.plan();
+        assertThat(plan.restarts()).isFalse();
+        assertThat(plan.why()).isEqualTo(Relaunch.NOT_INSTALLED);
+        assertThat(reopener.begin(plan)).isFalse();
+
+        assertThat(started).isEmpty();
+        assertThat(config.resolve("instance.json")).doesNotExist();
+    }
+
+    @Test
+    void anAppThatCannotBeStartedAgainIsLoggedAndTheQuitAsks() throws Exception {
+        appPath = Files.createFile(home.resolve("Butterfly Atlas")).toString();
+        startFails = true;
+        AppStart.Running app = start(options(true, 0, Optional.empty()));
+        Relaunch.Reopener reopener = app.reopener();
+
+        assertThat(reopener.begin(reopener.plan())).isFalse();
+
+        assertThat(Files.readString(log.file())).contains("Could not start Butterfly Atlas again");
     }
 }

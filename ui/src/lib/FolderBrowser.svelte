@@ -1,10 +1,11 @@
 <script>
   import { onMount, tick } from 'svelte';
-  import { getFsRoots, inspectFolder, listFolder } from './api.js';
+  import { getFsRoots, inspectChange, inspectFolder, listFolder } from './api.js';
   import { isTopModal, modal } from './modal.js';
   import { photoCount } from './importView.js';
-  import { CLOSE, USE_THIS_FOLDER } from './messages.js';
+  import { CHOOSE_MOVE_TITLE, CHOOSE_SWITCH_TITLE, CLOSE, STARTING, USE_THIS_FOLDER } from './messages.js';
   import { setupCanChoose, setupHere, setupLabel } from './setupView.js';
+  import { changeCanChoose, changeHere, changeLabel } from './changeView.js';
 
   /**
    * The in-app folder browser (design §4.1, decision B1): shortcuts and drives, breadcrumbs, the folders
@@ -17,13 +18,22 @@
    * "Choose where to back up", "Back up here", "The backup goes inside …". `setup` is for choosing where the library is
    * kept (setup design §2): titled "Choose where to keep your library", it starts at Documents, shows no photo counts,
    * and says what happens to the folder shown from the server's check (its library opens, or one is made inside it).
-   * Starts at `startPath`, else Pictures (Documents for setup), else the first shortcut.
+   * `change` ('move' or 'switch') is Settings' Move library and Use a different library (change-library-folder design §3):
+   * as setup, but titled "Choose where to move your library" or "Choose a library to use", the folder checked for that
+   * change (GET /api/library/change/inspect), and its lines and button from lib/changeView.js (`librarySize`, bytes, is the
+   * library's size, said for a move); while the change starts the button reads "Starting…".
+   * Starts at `startPath`, else Pictures (Documents for setup and a change), else the first shortcut.
    *
    * Keyboard: the folder list is one Tab stop (Up/Down/Home/End move in it, Enter opens); Backspace or Alt+Up
    * goes up one level (outside the path field). While a choice is being made it can't be closed. Focus goes back
    * to `returnFocus()` when it closes, else to where it was.
    */
-  let { title = undefined, relocating = false, exporting = false, backup = false, setup = false, startPath = null, returnFocus = undefined, onChoose, onClose } = $props();
+  let {
+    title = undefined, relocating = false, exporting = false, backup = false, setup = false, change = null, librarySize = 0, startPath = null,
+    returnFocus = undefined, onChoose, onClose,
+  } = $props();
+  // Where the library is kept (setup, or a change from Settings): the folder is checked, and no photos are counted.
+  let keeping = $derived(setup || change !== null);
 
   const uid = $props.id();
   let root = $state(null);
@@ -44,7 +54,7 @@
   // The shortcut the folder shown is in: the longest one its path starts with (as a whole folder name).
   const inside = (path, base) => path === base || (path.startsWith(base) && (/[\\/]$/.test(base) || /^[\\/]/.test(path.slice(base.length))));
   let place = $derived(listing ? roots.filter((r) => inside(listing.path, r.path)).sort((a, b) => b.path.length - a.path.length)[0] ?? null : null);
-  let cantChoose = $derived(!listing || (setup ? !setupCanChoose(check) : listing.isLibrary));
+  let cantChoose = $derived(!listing || (change ? !changeCanChoose(check, change) : setup ? !setupCanChoose(check) : listing.isLibrary));
   // Some folder inside might hold photos: it has some, has folders of its own, or wasn't counted.
   let more = $derived(Boolean(listing?.folders.some((f) => f.photos || f.folders || f.photos == null)));
   // The path field's example, in this computer's own form.
@@ -55,10 +65,12 @@
   });
   // Where something is written (an export, a backup): a folder outside the library, and nothing said of imports.
   let writing = $derived(exporting || backup);
-  let heading = $derived(title ?? (setup ? 'Choose where to keep your library' : backup ? 'Choose where to back up' : exporting ? 'Choose where to export' : 'Choose a folder to import'));
-  let label = $derived(setup ? setupLabel(check) : backup ? 'Back up here' : exporting ? 'Export here' : relocating ? USE_THIS_FOLDER : listing?.openImport ? 'Continue your import' : 'Import this folder');
+  let heading = $derived(title ?? (change === 'move' ? CHOOSE_MOVE_TITLE : change === 'switch' ? CHOOSE_SWITCH_TITLE
+    : setup ? 'Choose where to keep your library' : backup ? 'Choose where to back up' : exporting ? 'Choose where to export' : 'Choose a folder to import'));
+  let label = $derived(change ? changeLabel(check, change) : setup ? setupLabel(check) : backup ? 'Back up here' : exporting ? 'Export here' : relocating ? USE_THIS_FOLDER : listing?.openImport ? 'Continue your import' : 'Import this folder');
   let here = $derived(
     !listing ? ''
+      : change ? changeHere(check, change, librarySize)
       : setup ? setupHere(check)
       : listing.isLibrary ? (writing ? "That's your library folder. Choose a folder outside the library." : "That's your library folder. Choose the folder your photos are in.")
         : writing ? `The ${backup ? 'backup' : 'export'} goes inside ${listing.name}.`
@@ -75,7 +87,7 @@
       loading = false;
       return;
     }
-    const start = startPath ?? (roots.find((r) => r.kind === (setup ? 'documents' : 'pictures')) ?? roots[0])?.path;
+    const start = startPath ?? (roots.find((r) => r.kind === (keeping ? 'documents' : 'pictures')) ?? roots[0])?.path;
     if (start) await open(start, false);
     else loading = false;
   });
@@ -97,7 +109,7 @@
       if (mine !== seq) return false;
       check = null;
       listing = next;
-      if (setup) checkFolder(next.path, mine);
+      if (keeping) checkFolder(next.path, mine);
       active = 0;
       if (typed) pasted = '';
       if (focusList) {
@@ -113,10 +125,10 @@
     }
   }
 
-  /** Setup: asks the server what happens to the folder shown; a failure says why, and the folder can't be chosen. */
+  /** Setup or a change: asks the server what happens to the folder shown; a failure says why, and the folder can't be chosen. */
   async function checkFolder(path, mine) {
     try {
-      const answer = await inspectFolder(path, false);
+      const answer = await (change ? inspectChange(path, change) : inspectFolder(path, false));
       if (mine === seq) check = answer;
     } catch (e) {
       if (mine === seq) error = e.message;
@@ -144,7 +156,7 @@
   function counts(folder) {
     const parts = [];
     if (folder.folders) parts.push(folder.folders === 1 ? '1 folder' : `${folder.folders.toLocaleString()} folders`);
-    if (setup) return parts.join(' · ');
+    if (keeping) return parts.join(' · ');
     if (folder.photos) parts.push(photoCount(folder.photos));
     if (folder.folders === 0 && folder.photos === 0) parts.push('Empty');
     return parts.join(' · ');
@@ -252,7 +264,7 @@
       {#if error}<p class="problem" id="{uid}-here" role="alert">{error}</p>{:else}<p class="muted" id="{uid}-here">{here}</p>{/if}
       <button class="btn ghost" type="button" onclick={close}>Cancel</button>
       <button class="btn" type="button" bind:this={chooseButton} aria-disabled={busy || loading || cantChoose}
-              aria-describedby="{uid}-here" onclick={choose}>{busy && setup ? 'Setting up…' : busy && !writing ? 'Opening…' : label}</button>
+              aria-describedby="{uid}-here" onclick={choose}>{busy && change ? STARTING : busy && setup ? 'Setting up…' : busy && !writing ? 'Opening…' : label}</button>
     </div>
   </div>
 </div>

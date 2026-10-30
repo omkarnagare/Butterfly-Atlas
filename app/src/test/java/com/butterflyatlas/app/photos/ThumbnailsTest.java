@@ -70,6 +70,20 @@ class ThumbnailsTest {
     }
 
     @Test
+    void whileALibraryChangeHoldsTheBackgroundWorkNoThumbnailIsMadeUntilItLetsGo() throws Exception {
+        library.workHold().hold();
+        Photo photo = add(TestImages.jpeg(240, 160));
+
+        assertThat(thumbnails.await(photo.id(), Duration.ofMillis(300))).as("held").isEmpty();
+        assertThat(thumbnails.progress().pending()).isEqualTo(1);
+
+        library.workHold().release();
+
+        assertThat(thumbnails.await(photo.id(), WAIT)).isPresent();
+        assertThat(thumbnails.progress().pending()).isZero();
+    }
+
+    @Test
     void addingAPhotoQueuesItsThumbnail() throws Exception {
         Photo photo = add(TestImages.jpeg(2400, 1600));
 
@@ -490,11 +504,14 @@ class ThumbnailsTest {
 
     @Test
     void awaitReturnsOnlyOnceTheWorkerHasBookedTheThumbnail() throws Exception {
-        // The worker's first library lookup is record(), right after the file is moved into place: hold it there.
+        // The worker's first library lookup is the background-work hold (a library change), its second record(), right
+        // after the file is moved into place: hold it there.
         CountDownLatch recording = new CountDownLatch(1);
         CountDownLatch go = new CountDownLatch(1);
+        AtomicInteger lookups = new AtomicInteger();
         Supplier<Library> gatedLibrary = () -> {
-            if (Thread.currentThread().getName().startsWith("atlas-thumbnails-") && go.getCount() > 0) {
+            if (Thread.currentThread().getName().startsWith("atlas-thumbnails-") && go.getCount() > 0
+                    && lookups.incrementAndGet() >= 2) {
                 recording.countDown();
                 try {
                     go.await(10, TimeUnit.SECONDS);

@@ -44,6 +44,23 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+// Change the library folder (contract §2): once the app quits to reopen on the new folder, the window keeps its last page;
+// the stream is closed and never made again, and its events ask nothing.
+test('ending the session after a reopen closes the stream for good', () => {
+  vi.useFakeTimers();
+  startSession();
+  const [first] = FakeSource.made;
+  sessionModule.endSession();
+  expect(first.closed).toBe(true);
+  first.emit('status');
+  first.onerror?.();
+  vi.advanceTimersByTime(30000);
+  expect(FakeSource.made).toHaveLength(1);
+  expect(refreshStatus).not.toHaveBeenCalled();
+  startSession();
+  expect(FakeSource.made).toHaveLength(1);
+});
+
 test('opens one session stream at start-up, and starting again never makes a second', () => {
   startSession();
   startSession();

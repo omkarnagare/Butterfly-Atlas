@@ -33,13 +33,15 @@
   import PlaceUpdateNote from '../lib/PlaceUpdateNote.svelte';
   import RescanLeftNote from '../lib/RescanLeftNote.svelte';
   import TagNamesNote from '../lib/TagNamesNote.svelte';
+  import LibraryMovedNote from '../lib/LibraryMovedNote.svelte';
   import { thumbRetry } from '../lib/thumbRetry.js';
   import { PAUSED, PENDING, RUNNING, WAITING } from '../lib/states.js';
   import { IMPORTS_THAT_STOPPED, PAUSED_EXPORT } from '../lib/messages.js';
 
   /**
    * Home (prototype vHome): the tally with "Across N photos", the latest addition, family cards,
-   * Next on your list, Recently added and Full life cycles. Imports cut short by the app closing, and a paused export,
+   * Next on your list, Recently added and Full life cycles. After a move of the library folder, its one-time note comes
+   * first (lib/LibraryMovedNote.svelte). Imports cut short by the app closing, and a paused export,
    * show first, then the backup card (Phase 6: a running, paused or closed-by-the-app backup), then the taxonomy cards (an update ready or paused, splits to sort, custom-species matches), then the
    * place note (Phase 5c), then the files the last rescan did not add (Phase 7b audit D2). The heading takes focus when a
    * card's Dismiss leaves no card after it.
@@ -152,6 +154,7 @@
 {#if error}
   <LoadError message={error} onRetry={load} />
 {:else if summary}
+  <LibraryMovedNote />
   {#if status.stoppedImports.length}
     <section class="stop-card" aria-label={IMPORTS_THAT_STOPPED}><StoppedImports stops={status.stoppedImports} label="" /></section>
   {/if}

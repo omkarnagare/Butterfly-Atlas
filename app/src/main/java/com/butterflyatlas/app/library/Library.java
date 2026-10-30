@@ -37,6 +37,7 @@ public final class Library {
     private final TaxonomyGate gate = new TaxonomyGate();
     private final PhotoHold photoHold = new PhotoHold();
     private final OpenImports openImports = new OpenImports();
+    private final WorkHold workHold = new WorkHold();
 
     private Library(Path folder, Database database, PlaceIndex placeIndex, List<String> placeSteps) {
         this.folder = folder;
@@ -100,6 +101,11 @@ public final class Library {
     /** The photos a backup holds (multi-window contract §4): taken after {@link #gate()}. */
     public PhotoHold photoHold() {
         return photoHold;
+    }
+
+    /** The background work a change of library folder holds while the library is copied. */
+    public WorkHold workHold() {
+        return workHold;
     }
 
     /** The bundled boundaries whose places this library holds (read when it opened). */

@@ -35,5 +35,15 @@ class ErrorCodesTest {
         assertThat(ErrorCodes.NOTHING_TO_FILE).isEqualTo("nothing_to_file");
         assertThat(ErrorCodes.PAIR_CHOICE_NEEDED).isEqualTo("pair_choice_needed");
         assertThat(ErrorCodes.PAIR_CHOICE_LOCKED).isEqualTo("pair_choice_locked");
+        assertThat(ErrorCodes.LIBRARY_CHANGING).isEqualTo("library_changing");
+        assertThat(ErrorCodes.CANNOT_CANCEL).isEqualTo("cannot_cancel");
+        assertThat(ErrorCodes.WORK_RUNNING).isEqualTo("work_running");
+        assertThat(ErrorCodes.NOT_ENOUGH_SPACE).isEqualTo("not_enough_space");
+        assertThat(ErrorCodes.FIXED_FOLDER).isEqualTo("fixed_folder");
+        assertThat(ErrorCodes.NO_PREVIOUS).isEqualTo("no_previous");
+        assertThat(ErrorCodes.NO_OLD_COPY).isEqualTo("no_old_copy");
+        assertThat(ErrorCodes.EXISTING_LIBRARY).isEqualTo("existing_library");
+        assertThat(ErrorCodes.INSIDE_LIBRARY).isEqualTo("inside_library");
+        assertThat(ErrorCodes.CURRENT_LIBRARY).isEqualTo("current_library");
     }
 }

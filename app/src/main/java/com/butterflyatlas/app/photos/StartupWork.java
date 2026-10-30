@@ -22,6 +22,8 @@ public final class StartupWork {
     private final Thumbnails thumbnails;
     private final Runnable awaitUpdate;
     private final Runnable filesSettled;
+    /** From the first step to the last (a change of library folder waits for it: change-library-folder spec §4). */
+    private volatile boolean running;
 
     public StartupWork(Rescan rescan, PhotoStore photos, ConsumerRunner processing, Thumbnails thumbnails) {
         this(rescan, photos, processing, thumbnails, () -> { });
@@ -53,6 +55,20 @@ public final class StartupWork {
     }
 
     public void run() {
+        running = true;
+        try {
+            steps();
+        } finally {
+            running = false;
+        }
+    }
+
+    /** Whether the startup work is going (from its first step to its last). */
+    public boolean running() {
+        return running;
+    }
+
+    private void steps() {
         try {
             step("remove unfinished uploads", photos::cleanIncoming);
             step("finish the taxonomy update", awaitUpdate);
@@ -66,8 +82,9 @@ public final class StartupWork {
         step("remove unused thumbnails", thumbnails::cleanOrphans);
     }
 
-    /** Runs {@link #run()} on a background (daemon) thread. */
+    /** Runs {@link #run()} on a background (daemon) thread; it counts as running from the moment it is started. */
     public Thread start() {
+        running = true;
         Thread thread = new Thread(this::run, "atlas-startup");
         thread.setDaemon(true);
         thread.start();

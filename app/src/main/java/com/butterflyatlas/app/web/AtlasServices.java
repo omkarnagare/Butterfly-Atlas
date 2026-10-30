@@ -7,6 +7,7 @@ import com.butterflyatlas.app.filters.FilterQuery;
 import com.butterflyatlas.app.imaging.heif.HeicDecoders;
 import com.butterflyatlas.app.imports.FolderBrowser;
 import com.butterflyatlas.app.imports.Imports;
+import com.butterflyatlas.app.library.LibraryChange;
 import com.butterflyatlas.app.library.LibraryDrive;
 import com.butterflyatlas.app.library.SetupService;
 import com.butterflyatlas.app.photos.ConsumerRunner;
@@ -32,5 +33,5 @@ public record AtlasServices(SetupService setup, TaxonService taxa, SearchWordSer
                             Imports imports, PlaceSearch placeSearch, UserPlaces places, PhotoPlaces photoPlaces,
                             FilterQuery filters, Exports exports, CustomSpecies custom, Updates updates,
                             SplitSorter splits, LibraryDrive drive, PlaceNotes placeNotes, Backups backups,
-                            HeicDecoders heic) {
+                            HeicDecoders heic, LibraryChange change) {
 }

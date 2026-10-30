@@ -3,7 +3,9 @@ package com.butterflyatlas.app.web;
 import com.butterflyatlas.app.backup.Backups;
 import com.butterflyatlas.app.exports.Exports;
 import com.butterflyatlas.app.imports.Imports;
+import com.butterflyatlas.app.library.LibraryChange;
 import com.butterflyatlas.app.library.LibraryDrive;
+import com.butterflyatlas.app.library.SetupService;
 import com.butterflyatlas.app.photos.ConsumerRunner;
 import com.butterflyatlas.app.photos.HeicStatus;
 import com.butterflyatlas.app.photos.PhotoStore;
@@ -34,7 +36,9 @@ import java.util.function.Supplier;
  * and the files the last rescan did not add, by reason ({@code rescanLeft}, audit D2; empty when none or put away with
  * {@code POST /api/rescan-left/dismiss}); the library's version ({@code libraryVersion}, multi-window contract §10 A8: up
  * with every write that changes photos, so another window reloads them); and the saved look ({@code theme}, Meadow UI
- * contract §4: {@code light}, {@code dark} or null, from memory, so another window follows a change). A poll runs no SQL (design D9).
+ * contract §4: {@code light}, {@code dark} or null, from memory, so another window follows a change); and the change of
+ * library folder running or waiting to be dismissed ({@code changing}, change-library-folder contract §2, null when
+ * none) and, on the first run after a move, where the library is now ({@code libraryMoved}, until dismissed). A poll runs no SQL (design D9).
  */
 final class StatusRoutes {
 
@@ -42,7 +46,8 @@ final class StatusRoutes {
                   ConsumerRunner.Progress processing, @JsonProperty("import") Imports.Working importing,
                   List<Imports.Working> stoppedImports, Exports.Status export, UpdateViews.Status taxonomyUpdate,
                   int splitsToSort, int customMatches, LibraryDrive.Problem library, PlaceNotes.Status placeUpdate,
-                  Backups.Status backup, HeicStatus heic, List<Rescan.Left> rescanLeft, long libraryVersion, String theme) {
+                  Backups.Status backup, HeicStatus heic, List<Rescan.Left> rescanLeft, long libraryVersion, String theme,
+                  LibraryChange.Changing changing, SetupService.Moved libraryMoved) {
     }
 
     private static final Logger LOG = LoggerFactory.getLogger(StatusRoutes.class);
@@ -58,6 +63,8 @@ final class StatusRoutes {
     private final PlaceNotes placeNotes;
     private final Backups backups;
     private final Supplier<String> theme;
+    private final Supplier<LibraryChange.Changing> changing;
+    private final Supplier<SetupService.Moved> libraryMoved;
     /** The last known Recently deleted count, imports and export: answered while what is in memory is being read. */
     private volatile int lastDeleted;
     private volatile Imports.StatusPart lastImports = new Imports.StatusPart(null, List.of());
@@ -82,6 +89,20 @@ final class StatusRoutes {
     StatusRoutes(Rescan rescan, Thumbnails thumbnails, PhotoStore photos, ConsumerRunner processing, Imports imports,
                  Exports exports, Updates updates, LibraryDrive drive, PlaceNotes placeNotes, Backups backups,
                  Supplier<String> theme) {
+        this(rescan, thumbnails, photos, processing, imports, exports, updates, drive, placeNotes, backups, theme, () -> null,
+                () -> null);
+    }
+
+    /**
+     * As above, with the library change running or waiting to be dismissed ({@code changing}: null when none) and the
+     * note after a move ({@code libraryMoved}: null when none).
+     */
+    StatusRoutes(Rescan rescan, Thumbnails thumbnails, PhotoStore photos, ConsumerRunner processing, Imports imports,
+                 Exports exports, Updates updates, LibraryDrive drive, PlaceNotes placeNotes, Backups backups,
+                 Supplier<String> theme, Supplier<LibraryChange.Changing> changing,
+                 Supplier<SetupService.Moved> libraryMoved) {
+        this.changing = changing;
+        this.libraryMoved = libraryMoved;
         this.theme = theme;
         this.backups = backups;
         this.rescan = rescan;
@@ -127,7 +148,7 @@ final class StatusRoutes {
         return new Status(rescan.running(), rescan.progress(), thumbnails.progress(), lastDeleted, processing.progress(),
                 i.working(), i.stopped(), lastExport.export(), updates.status().orElse(null), updates.splitsToSort(),
                 updates.customMatches(), drive.problem(), placeNotes.status(), lastBackup.backup(), HeicStatus.current(),
-                rescan.left(), photos.libraryVersion(), theme.get());
+                rescan.left(), photos.libraryVersion(), theme.get(), changing.get(), libraryMoved.get());
     }
 
     /**

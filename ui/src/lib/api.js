@@ -1,5 +1,5 @@
 import { LIBRARY_CODES, LIBRARY_PROBLEM, NO_SESSION as SESSION_LOST } from './events.js';
-import { BAD_RESPONSE, NO_SESSION, OFFLINE } from './codes.js';
+import { BAD_RESPONSE, LIBRARY_CHANGING, NO_SESSION, OFFLINE } from './codes.js';
 import { NO_SESSION_WORDS } from './messages.js';
 
 /**
@@ -61,7 +61,8 @@ async function request(path, { method = 'GET', body, raw, type, signal } = {}) {
       sessionLost = true;
       window.dispatchEvent(new CustomEvent(SESSION_LOST));
     }
-    if (LIBRARY_CODES.includes(error?.code)) window.dispatchEvent(new CustomEvent(LIBRARY_PROBLEM, { detail: error }));
+    // The library's drive is full or gone, or its folder is being changed: the status is read at once (lib/status.svelte.js).
+    if (LIBRARY_CODES.includes(error?.code) || error?.code === LIBRARY_CHANGING) window.dispatchEvent(new CustomEvent(LIBRARY_PROBLEM, { detail: error }));
     throw new ApiError(
       error?.code ?? `http_${response.status}`,
       error?.message ?? `Butterfly Atlas answered with status ${response.status}.`,
@@ -329,6 +330,33 @@ export const cancelBackup = (backupId, remove) => request(`backup/${id(backupId)
 export const deleteBackup = (backupId) => request(`backup/${id(backupId)}`, { method: 'DELETE' });
 /** Clears the list of past backups (their files stay): how many were removed. */
 export const clearBackups = () => request('backup', { method: 'DELETE' }).then((r) => r.removed);
+
+/* ---------- the library folder (change-library-folder contract §3) ---------- */
+
+/**
+ * Settings' Library folder: `{ folder, size, free, fixed, changing, oldCopy }` (bytes; `fixed` under -Datlas.dataDir;
+ * `oldCopy` null or `{ folder, size, lastBackup: null | { what, finishedAt } }`).
+ */
+export const getLibraryChange = () => request('library/change');
+/**
+ * The folder browser's check of the open folder for a move or a switch (`kind`): setup's FolderCheck, with `refusal`
+ * (null or a code), and for a move `free` and `needed` (bytes).
+ */
+export const inspectChange = (path, kind) => request(`library/change/inspect?path=${q(path)}&for=${q(kind)}`);
+/** Starts moving the library into the folder `path` (202 with the change); refusals carry the server's words. */
+export const moveLibrary = (path) => request('library/change/move', { method: 'POST', body: { path } });
+/** Starts using the library in (or a new one inside) the folder `path`, as move does. */
+export const switchLibrary = (path) => request('library/change/switch', { method: 'POST', body: { path } });
+/** Cancel on the change screen (409 `cannot_cancel` once it can't be). */
+export const cancelChange = () => request('library/change/cancel', { method: 'POST', body: {} });
+/** Back to Settings after a change that failed (or a cancel that left files): 204. */
+export const dismissChange = () => request('library/change/dismiss', { method: 'POST', body: {} });
+/** Deletes the old copy a move left: `{ deleted, left, leftCount }` (409 `no_old_copy`, `library_in_use`). */
+export const deleteOldCopy = () => request('library/old-copy', { method: 'DELETE' });
+/** Hides Home's "Your library was moved to …" note: 204. */
+export const dismissMovedNote = () => request('library/moved-note/dismiss', { method: 'POST', body: {} });
+/** The setup screen's "Use the old library at … instead": Setup's status (409 `no_previous`). */
+export const usePreviousLibrary = () => request('setup/previous', { method: 'POST', body: {} });
 
 /* ---------- appearance (Meadow) ---------- */
 
