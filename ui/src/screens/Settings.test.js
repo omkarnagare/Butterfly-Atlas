@@ -217,49 +217,70 @@ test('a check still running after the wait says it is still checking (audit 11)'
 
 const themes = () => within(screen.getByRole('group', { name: 'Appearance' })).getAllByRole('radio').map((r) => [r.labels[0].textContent.trim(), r.checked]);
 
-test('Appearance: Light and Dark, none chosen until a choice is saved, and the note says the computer is followed', async () => {
+const NOTE = "Match device tries to follow your device's light or dark setting. If it stays light while your device is dark, choose Dark.";
+
+test('Appearance: Match device first and chosen until Light or Dark is saved, with the note', async () => {
   render(Settings);
 
   expect(screen.getByRole('heading', { name: 'Appearance' })).toBeTruthy();
-  expect(themes()).toEqual([['Light', false], ['Dark', false]]);
-  expect(screen.getByText('Until you choose, Butterfly Atlas matches your computer.')).toBeTruthy();
+  expect(themes()).toEqual([['Match device', true], ['Light', false], ['Dark', false]]);
+  expect(screen.getByText(NOTE)).toBeTruthy();
+  expect(screen.getByRole('group', { name: 'Appearance' }).getAttribute('aria-describedby'))
+    .toBe(screen.getByText(NOTE).id);
 });
 
-test('choosing Dark saves it and shows it; the note goes', async () => {
+test('choosing Dark saves it and shows it; the note stays', async () => {
   setAppearance.mockResolvedValue({ theme: 'dark' });
   render(Settings);
 
   await fireEvent.click(screen.getByRole('radio', { name: 'Dark' }));
 
   expect(setAppearance).toHaveBeenCalledWith('dark');
-  await vi.waitFor(() => expect(themes()).toEqual([['Light', false], ['Dark', true]]));
+  await vi.waitFor(() => expect(themes()).toEqual([['Match device', false], ['Light', false], ['Dark', true]]));
   expect(document.documentElement.dataset.theme).toBe('dark');
-  expect(screen.queryByText('Until you choose, Butterfly Atlas matches your computer.')).toBeNull();
+  expect(screen.getByText(NOTE)).toBeTruthy();
+  expect(screen.getByRole('group', { name: 'Appearance' }).getAttribute('aria-describedby'))
+    .toBe(screen.getByText(NOTE).id);
   expect(screen.queryByRole('alert')).toBeNull();
+});
+
+test('choosing Match device after Dark saves it and follows the device again', async () => {
+  serverTheme('dark');
+  setAppearance.mockResolvedValue({ theme: 'device' });
+  render(Settings);
+  expect(themes()).toEqual([['Match device', false], ['Light', false], ['Dark', true]]);
+
+  await fireEvent.click(screen.getByRole('radio', { name: 'Match device' }));
+
+  expect(setAppearance).toHaveBeenCalledWith('device');
+  await vi.waitFor(() => expect(themes()).toEqual([['Match device', true], ['Light', false], ['Dark', false]]));
+  expect(document.documentElement.dataset.theme).toBe('light');
 });
 
 test('an appearance that cannot be saved goes back to the saved choice and says why', async () => {
   serverTheme('light');
   setAppearance.mockRejectedValue(new Error("Couldn't save the appearance: Permission denied"));
   render(Settings);
-  expect(themes()).toEqual([['Light', true], ['Dark', false]]);
+  expect(themes()).toEqual([['Match device', false], ['Light', true], ['Dark', false]]);
 
-  await fireEvent.click(screen.getByRole('radio', { name: 'Dark' }));
+  await fireEvent.click(screen.getByRole('radio', { name: 'Match device' }));
 
   expect((await screen.findByRole('alert')).textContent).toBe("Couldn't save the appearance: Permission denied");
-  expect(themes()).toEqual([['Light', true], ['Dark', false]]);
+  expect(themes()).toEqual([['Match device', false], ['Light', true], ['Dark', false]]);
   expect(document.documentElement.dataset.theme).toBe('light');
   // the next choice clears the message
   setAppearance.mockResolvedValue({ theme: 'dark' });
   await fireEvent.click(screen.getByRole('radio', { name: 'Dark' }));
   await vi.waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
-  expect(themes()[1]).toEqual(['Dark', true]);
+  expect(themes()[2]).toEqual(['Dark', true]);
 });
 
 test('a choice made in another window shows here too', async () => {
   render(Settings);
   serverTheme('dark');
-  await vi.waitFor(() => expect(themes()).toEqual([['Light', false], ['Dark', true]]));
+  await vi.waitFor(() => expect(themes()).toEqual([['Match device', false], ['Light', false], ['Dark', true]]));
+  serverTheme('device');
+  await vi.waitFor(() => expect(themes()).toEqual([['Match device', true], ['Light', false], ['Dark', false]]));
 });
 
 // ---- Library folder (change-library-folder design §2, §3, §9) ----

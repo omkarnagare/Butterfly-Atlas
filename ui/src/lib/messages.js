@@ -70,11 +70,12 @@ export const PLACE_PROMPT = 'Type a district, state or country';
 export const USE_THIS_FOLDER = 'Use this folder';
 export const OPEN_EXISTING_LIBRARY = 'Open this existing library';
 
-// Settings: Appearance (Meadow design §6).
+// Settings: Appearance (Meadow design §6, match-device design §2).
 export const APPEARANCE = 'Appearance';
+export const MATCH_DEVICE = 'Match device';
 export const LIGHT = 'Light';
 export const DARK = 'Dark';
-export const APPEARANCE_NOTE = 'Until you choose, Butterfly Atlas matches your computer.';
+export const APPEARANCE_NOTE = "Match device tries to follow your device's light or dark setting. If it stays light while your device is dark, choose Dark.";
 
 // A page with no session (api.js's refusal and the NoSession page; app SessionGuard.MESSAGE says the same).
 export const NO_SESSION_WORDS = 'To open Butterfly Atlas, use its icon, or New window in a Butterfly Atlas window.';

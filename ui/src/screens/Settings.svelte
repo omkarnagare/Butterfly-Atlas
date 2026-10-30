@@ -11,8 +11,8 @@
   import { BACKUP_CHANGED, backupChanged, status } from '../lib/status.svelte.js';
   import HeicCheck from '../lib/HeicCheck.svelte';
   import { aboutLine } from '../lib/heic.js';
-  import { chooseTheme, theme } from '../lib/theme.svelte.js';
-  import { APPEARANCE, APPEARANCE_NOTE, DARK, LIGHT } from '../lib/messages.js';
+  import { DEVICE, chooseTheme, theme } from '../lib/theme.svelte.js';
+  import { APPEARANCE, APPEARANCE_NOTE, DARK, LIGHT, MATCH_DEVICE } from '../lib/messages.js';
   import LibraryFolder from '../lib/LibraryFolder.svelte';
 
   /**
@@ -28,8 +28,9 @@
    * can't take the library's lock; details that can't be read say so, with Try again.
    * Phase 7b: how HEIC photos are shown, from `/api/status` `heic` (followed as it changes, audit 11): "HEIC photos: shown
    * with macOS's sips.", "HEIC photos: checking for a decoder…", or why they can't be and what to do, with Check again.
-   * Appearance (Meadow design §6): Light or Dark, saved at once (PUT /api/appearance) and shown in every window; none is
-   * chosen until one is saved, and the note says the computer's setting is followed meanwhile. A choice that can't be
+   * Appearance (Meadow design §6, match-device design §2): Match device, Light or Dark, saved at once (PUT /api/appearance)
+   * and shown in every window; Match device until another is saved, and the note says what to do when the device's
+   * setting doesn't come through. A choice that can't be
    * saved goes back to the saved one and the server's reason shows under the choices, as for the reminders.
    */
   const uid = $props.id();
@@ -47,7 +48,7 @@
 
   let busyBackup = $derived(status.backup !== null);
 
-  const THEMES = [{ value: 'light', label: LIGHT }, { value: 'dark', label: DARK }];
+  const THEMES = [{ value: DEVICE, label: MATCH_DEVICE }, { value: 'light', label: LIGHT }, { value: 'dark', label: DARK }];
   let themeSaving = $state(false);
   let themeError = $state('');
 
@@ -184,7 +185,7 @@
 
 <section class="sec set" aria-labelledby="{uid}-appearance">
   <div class="sec-h"><h2 id="{uid}-appearance">{APPEARANCE}</h2></div>
-  <fieldset class="ropt-set set-prefs" aria-labelledby="{uid}-appearance" aria-describedby={theme.saved ? undefined : `${uid}-theme-note`}>
+  <fieldset class="ropt-set set-prefs" aria-labelledby="{uid}-appearance" aria-describedby="{uid}-theme-note">
     {#each THEMES as option (option.value)}
       <label class="ropt">
         <input type="radio" name="{uid}-theme" value={option.value} checked={theme.saved === option.value}
@@ -193,7 +194,7 @@
       </label>
     {/each}
   </fieldset>
-  {#if !theme.saved}<p class="set-note muted" id="{uid}-theme-note">{APPEARANCE_NOTE}</p>{/if}
+  <p class="set-note muted" id="{uid}-theme-note">{APPEARANCE_NOTE}</p>
   {#if themeError}<p class="problem" role="alert">{themeError}</p>{/if}
 </section>
 
