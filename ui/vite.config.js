@@ -1,11 +1,13 @@
 import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { svelteTesting } from '@testing-library/svelte/vite';
+import { fileURLToPath } from 'node:url';
+import { atlasIcons } from './vite-plugins/atlasIcons.js';
 
 // The bundle is written into target/classes/ui so Maven packages it into the ui jar,
 // and the Java server serves it from the classpath.
 export default defineConfig({
-  plugins: [svelte(), svelteTesting()],
+  plugins: [svelte(), svelteTesting(), atlasIcons(fileURLToPath(new URL('../packaging/icons', import.meta.url)))],
   base: './',
   build: {
     outDir: 'target/classes/ui',
@@ -37,7 +39,7 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
-    include: ['src/**/*.test.js'],
+    include: ['src/**/*.test.js', 'vite-plugins/**/*.test.js'],
     setupFiles: ['src/test-setup.js'],
   },
 });
