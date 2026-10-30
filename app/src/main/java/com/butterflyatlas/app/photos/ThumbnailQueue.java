@@ -1,6 +1,7 @@
 package com.butterflyatlas.app.photos;
 
 import com.butterflyatlas.app.library.Library;
+import com.butterflyatlas.app.library.WorkHold;
 import com.butterflyatlas.app.photos.CacheFiles.Source;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -277,8 +278,31 @@ final class ThumbnailQueue {
         return new Enqueued(job.future(), true);
     }
 
-    /** One worker turn: makes the thumbnail at the front of the queue. */
+    /**
+     * One worker turn: makes the thumbnail at the front of the queue, once the library's background work is not held (a
+     * change of library folder copies it meanwhile).
+     */
     private void runNext() {
+        WorkHold hold;
+        try {
+            hold = library.get().workHold();
+            hold.enter();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt(); // closing: the job stays queued
+            return;
+        } catch (RuntimeException e) {
+            hold = null; // no library (closing): the turn below finds out
+        }
+        try {
+            makeNext();
+        } finally {
+            if (hold != null) {
+                hold.exit();
+            }
+        }
+    }
+
+    private void makeNext() {
         Job job;
         synchronized (queue) {
             Map.Entry<Path, Job> first = queue.pollFirstEntry();
