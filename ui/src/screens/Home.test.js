@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import Home from './Home.svelte';
-import { cancelBackup, cancelExport, checkBackup, dismissPlaceUpdate, dismissRescanLeft, getBackups, getFsRoots, listFolder, resumeBackup, setBackupPreference, getPlaceUpdate, getSplits, getStatus, getSummary, getTagNames, getTags, resumeExport } from '../lib/api.js';
+import { cancelBackup, cancelExport, checkBackup, dismissMovedNote, dismissPlaceUpdate, dismissRescanLeft, getBackups, getFsRoots, listFolder, resumeBackup, setBackupPreference, getPlaceUpdate, getSplits, getStatus, getSummary, getTagNames, getTags, resumeExport } from '../lib/api.js';
 import { resetStatus, status } from '../lib/status.svelte.js';
 import { modal } from '../lib/modal.js';
 import { resetAsk } from '../lib/backups.js';
@@ -12,7 +12,7 @@ vi.mock('../lib/api.js', () => ({
   getSplits: vi.fn(), getCustomMatches: vi.fn(), retryUpdate: vi.fn(), mergeCustomMatch: vi.fn(), declineCustomMatch: vi.fn(),
   getPlaceUpdate: vi.fn(), dismissPlaceUpdate: vi.fn(), getBackups: vi.fn(), getBackup: vi.fn(), resumeBackup: vi.fn(), cancelBackup: vi.fn(), pauseBackup: vi.fn(),
   setBackupPreference: vi.fn(), checkBackup: vi.fn(), startBackup: vi.fn(), getFsRoots: vi.fn(), listFolder: vi.fn(),
-  dismissRescanLeft: vi.fn(), checkHeic: vi.fn(), getTagNames: vi.fn(), dismissTagNames: vi.fn(),
+  dismissRescanLeft: vi.fn(), checkHeic: vi.fn(), getTagNames: vi.fn(), dismissTagNames: vi.fn(), dismissMovedNote: vi.fn(),
   photoThumb: (photo) => `./api/photos/${photo.id}/thumb?v=1`,
   thumbUrl: (id, v) => `./api/photos/${id}/thumb?v=${v}`,
 }));
@@ -582,6 +582,39 @@ test('a Dismiss that fails says why and keeps the note', async () => {
   await fireEvent.click(within(note).getByRole('button', { name: 'Dismiss' }));
   expect((await within(note).findByRole('alert')).textContent).toBe('Butterfly Atlas could not reach its service. Close the app and open it again.');
   expect(screen.getByRole('region', { name: 'Files not added' })).toBeTruthy();
+});
+
+/* ---------- change the library folder: the one-time note after a move (design §6) ---------- */
+
+test('after a move Home says once where the library now is, until Dismiss', async () => {
+  getSummary.mockResolvedValue(summary);
+  getStatus.mockResolvedValue({ rescanning: false, previews: { pending: 0, done: 0 }, deletedCount: 0, libraryMoved: null });
+  status.libraryMoved = { to: '/Volumes/B/Butterfly_Atlas' };
+  dismissMovedNote.mockResolvedValue(null);
+  render(Home);
+
+  const note = await screen.findByRole('region', { name: 'Library moved' });
+  expect(within(note).getByText('Your library was moved to /Volumes/B/Butterfly_Atlas.')).toBeTruthy();
+  await fireEvent.click(within(note).getByRole('button', { name: 'Dismiss' }));
+  expect(dismissMovedNote).toHaveBeenCalledOnce();
+  await vi.waitFor(() => expect(screen.queryByRole('region', { name: 'Library moved' })).toBeNull());
+});
+
+test('a Dismiss of the moved note that fails says why and keeps it; no note without a move', async () => {
+  getSummary.mockResolvedValue(summary);
+  getStatus.mockResolvedValue({ rescanning: false, previews: { pending: 0, done: 0 }, deletedCount: 0, libraryMoved: { to: '/V/A' } });
+  status.libraryMoved = { to: '/V/A' };
+  dismissMovedNote.mockRejectedValue(new Error('Butterfly Atlas could not reach its service. Close the app and open it again.'));
+  const { unmount } = render(Home);
+  const note = await screen.findByRole('region', { name: 'Library moved' });
+  await fireEvent.click(within(note).getByRole('button', { name: 'Dismiss' }));
+  expect((await within(note).findByRole('alert')).textContent).toBe('Butterfly Atlas could not reach its service. Close the app and open it again.');
+  expect(screen.getByRole('region', { name: 'Library moved' })).toBeTruthy();
+  unmount();
+  status.libraryMoved = null;
+  render(Home);
+  await screen.findByRole('heading', { name: 'Families' });
+  expect(screen.queryByRole('region', { name: 'Library moved' })).toBeNull();
 });
 
 test('Home\'s recent photos show the HEIC badge and "Can\'t show this photo", with one line under them (7b review fix U8)', async () => {
