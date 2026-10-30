@@ -181,7 +181,7 @@ test('without a decoder About says what to do, and Check again says it found one
   let answer;
   checkHeic.mockReturnValue(new Promise((resolve) => { answer = resolve; }));
   render(Settings);
-  expect(await screen.findByText(`HEIC photos can't be shown on this computer. ${WINDOWS_SENTENCE}`)).toBeTruthy();
+  expect(await screen.findByText(`HEIC photos can't be shown on this device. ${WINDOWS_SENTENCE}`)).toBeTruthy();
 
   const button = screen.getByRole('button', { name: 'Check again' });
   await fireEvent.click(button);

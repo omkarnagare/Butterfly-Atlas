@@ -374,5 +374,5 @@ test('the photos to sort say when their HEIC photos can\'t be shown on this comp
   status.heic = { state: 'missing', decoder: null, system: 'windows', reason: 'absent' };
   getSplit.mockResolvedValue(splitWith([photo(1, { fileType: 'heic', unreadable: true }), photo(2)]));
   render(Split, { id: 'A5' });
-  expect(await screen.findByText("This computer can't show HEIC photos yet.")).toBeTruthy();
+  expect(await screen.findByText("This device can't show HEIC photos yet.")).toBeTruthy();
 });

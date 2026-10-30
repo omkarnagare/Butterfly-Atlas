@@ -32,7 +32,7 @@
     const what = kinds?.includes('jpeg') ? 'HEIC photos' : 'photos';
     // A system with no decoder Butterfly Atlas can use has nothing to wait for (review fix U11).
     if (appStatus.heic?.system === 'other') return `${NO_DECODER} ${label} would file ${what} you can't see here.`;
-    return `This computer can't show HEIC photos yet. ${label} would file ${what} you can't see here until it can.`;
+    return `This device can't show HEIC photos yet. ${label} would file ${what} you can't see here until it can.`;
   });
   let open = $derived(Boolean(pairs && !pairs.locked && (pairs.choice ? changing : pairs.toFile > 0)));
 

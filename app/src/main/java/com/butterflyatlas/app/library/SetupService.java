@@ -91,7 +91,7 @@ public final class SetupService {
     private final Function<Path, InstanceLock.Result> locks;
     /** The lock of the open library, held for the life of the process. */
     private InstanceLock held;
-    /** The saved look ({@code light}, {@code dark}, or null to follow the computer): kept in memory, and in every save. */
+    /** The saved look ({@code light}, {@code dark}, or null to match the device): kept in memory, and in every save. */
     private volatile String theme;
     private volatile String problem;
     private volatile boolean inUse;

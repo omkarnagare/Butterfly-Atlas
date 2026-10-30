@@ -157,7 +157,7 @@ test('a HEIC item whose preview failed says the decode note; one that can be sho
   const list = new Map([[7, heicItem(7, { previewFailed: true })], [8, heicItem(8)]]);
   const { container } = render(ImportViewer, { importId: 3, items: list, taxa, order: [7, 8], itemId: 7, onShow: vi.fn(), onClose: vi.fn() });
   expect(screen.getByRole('status').textContent).toBe(
-    "This HEIC photo can't be shown: the computer's decoder couldn't read it. The file may be damaged, or use a HEIC feature the decoder doesn't support. Save it as JPEG on the device it came from and add that.");
+    "This HEIC photo can't be shown: the device's decoder couldn't read it. The file may be damaged, or use a HEIC feature the decoder doesn't support. Save it as JPEG on the phone or camera it came from and add that.");
   const again = render(ImportViewer, { importId: 3, items: list, taxa, order: [7, 8], itemId: 8, onShow: vi.fn(), onClose: vi.fn() });
   expect(again.container.querySelector('.orig').getAttribute('src')).toBe('./api/imports/3/items/8/display?v=v1');
   expect(container).toBeTruthy();
@@ -171,6 +171,6 @@ test('a RAW + HEIC pair\'s large view shows the RAW\'s preview while the compute
   const { container } = render(ImportViewer, { importId: 3, items: list, taxa, order: [7], itemId: 7, onShow: vi.fn(), onClose: vi.fn() });
   expect(container.querySelector('.orig').getAttribute('src')).toBe('./api/imports/3/items/8/display?v=r1');
   expect(container.querySelector('.ph').getAttribute('src')).toBe('./api/imports/3/items/8/preview?v=r1');
-  expect(screen.getByText("HEIC half: this computer can't show it yet.")).toBeTruthy();
+  expect(screen.getByText("HEIC half: this device can't show it yet.")).toBeTruthy();
   expect(screen.getByText('Sinhagad/IMG_7.HEIC')).toBeTruthy();
 });

@@ -161,12 +161,12 @@ test('a photo the caller knows cannot be shown says the caller\'s note at once, 
 });
 
 test('a HEIC display that fails is asked once more for why, and the server\'s words are said (Phase 7b audit 7)', async () => {
-  const fetchMock = vi.fn(async () => ({ ok: false, status: 415, json: async () => ({ error: { code: 'unsupported', message: 'This HEIC photo can\'t be shown: the computer\'s decoder couldn\'t read it.' } }) }));
+  const fetchMock = vi.fn(async () => ({ ok: false, status: 415, json: async () => ({ error: { code: 'unsupported', message: 'This HEIC photo can\'t be shown: the device\'s decoder couldn\'t read it.' } }) }));
   vi.stubGlobal('fetch', fetchMock);
   const { container } = render(ZoomPan, { ...props, explain: true, failedNote: 'Fallback.' });
 
   await fireEvent.error(container.querySelector('img.orig'));
-  await vi.waitFor(() => expect(screen.getByRole('status').textContent).toBe("This HEIC photo can't be shown: the computer's decoder couldn't read it."));
+  await vi.waitFor(() => expect(screen.getByRole('status').textContent).toBe("This HEIC photo can't be shown: the device's decoder couldn't read it."));
   expect(fetchMock).toHaveBeenCalledOnce();
   expect(fetchMock.mock.calls[0][0]).toBe('./api/photos/12/display');
   expect(container.querySelector('img.orig')).toBeNull();

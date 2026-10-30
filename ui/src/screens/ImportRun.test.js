@@ -1276,7 +1276,7 @@ test('File refused for a missing pair choice, or a change refused once locked, s
 /* ---------- Phase 7b: HEIC photos ---------- */
 
 const heicItem = (id, extra = {}) => item(id, { name: `IMG_${id}.HEIC`, path: `Sinhagad/IMG_${id}.HEIC`, fileType: 'heic', heic: { tenBit: false, auxiliary: false }, ...extra });
-const BAR = "This computer can't show the 2 HEIC photos in this folder. They can still be assigned and filed; they'll appear once heif-convert is installed.";
+const BAR = "This device can't show the 2 HEIC photos in this folder. They can still be assigned and filed; they'll appear once heif-convert is installed.";
 
 test('without a decoder, a bar above the grid says how many HEIC photos can\'t be shown, with How and Check again (contract §1)', async () => {
   status.heic = { state: 'missing', decoder: null, system: 'linux', reason: 'absent' };

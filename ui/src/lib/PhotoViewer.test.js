@@ -369,7 +369,7 @@ test('a HEIC photo on a computer without a decoder says the install note at once
   const { container } = render(PhotoViewer, { taxon, photos: [heicPhoto({ unreadable: true })], photoId: 3, tags, onClose: vi.fn(), onChanged: vi.fn() });
   expect(container.querySelector('img.orig')).toBeNull();
   expect(screen.getByRole('status').textContent).toBe(
-    "This computer can't show HEIC photos yet. Install Windows' HEVC decoder, then choose Check again in Settings → About. Your photo is safely in the library.");
+    "This device can't show HEIC photos yet. Install Windows' HEVC decoder, then choose Check again in Settings → About. Your photo is safely in the library.");
   expect(screen.getByText('HEIC, 3024 × 4032')).toBeTruthy();
   expect(screen.getByText('Shown in standard range (the file keeps its full range).')).toBeTruthy();
 });
@@ -388,7 +388,7 @@ test('a HEIC photo the decoder could not read says the decode note at once', () 
   status.heic = { state: 'available', decoder: 'sips', system: 'mac', reason: null };
   render(PhotoViewer, { taxon, photos: [heicPhoto({ unreadable: true })], photoId: 3, tags, onClose: vi.fn(), onChanged: vi.fn() });
   expect(screen.getByRole('status').textContent).toBe(
-    "This HEIC photo can't be shown: the computer's decoder couldn't read it. The file may be damaged, or use a HEIC feature the decoder doesn't support. Save it as JPEG on the device it came from and add that.");
+    "This HEIC photo can't be shown: the device's decoder couldn't read it. The file may be damaged, or use a HEIC feature the decoder doesn't support. Save it as JPEG on the phone or camera it came from and add that.");
 });
 
 function openedFrom(address) {

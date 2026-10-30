@@ -17,14 +17,14 @@ beforeEach(() => {
 afterEach(() => resetStatus());
 
 const linux = { state: 'missing', decoder: null, system: 'linux', reason: 'absent' };
-const LINUX_NOTE = "This computer can't show HEIC photos yet. Install heif-convert from your distribution's packages, then choose Check again in Settings → About. Your photo is safely in the library.";
+const LINUX_NOTE = "This device can't show HEIC photos yet. Install heif-convert from your distribution's packages, then choose Check again in Settings → About. Your photo is safely in the library.";
 
 test('the bar says its line, How shows the install note, and Check again asks (Phase 7b audit D1)', async () => {
   status.heic = linux;
   checkHeic.mockResolvedValue({ state: 'available', decoder: 'heif-convert', system: 'linux', reason: null });
-  render(HeicBar, { line: "This computer can't show HEIC photos yet." });
+  render(HeicBar, { line: "This device can't show HEIC photos yet." });
 
-  expect(screen.getByText("This computer can't show HEIC photos yet.")).toBeTruthy();
+  expect(screen.getByText("This device can't show HEIC photos yet.")).toBeTruthy();
   const how = screen.getByRole('button', { name: 'How' });
   expect(how.getAttribute('aria-expanded')).toBe('false');
   expect(screen.queryByText(LINUX_NOTE)).toBeNull();
@@ -46,20 +46,20 @@ const photo = (id, fileType) => ({
 test('a species gallery showing HEIC photos says when this computer can\'t show them, and only then', async () => {
   status.heic = linux;
   const { rerender } = render(Gallery, { photos: [photo(1, 'jpeg'), photo(2, 'heic')], tags });
-  expect(screen.getByText("This computer can't show HEIC photos yet.")).toBeTruthy();
+  expect(screen.getByText("This device can't show HEIC photos yet.")).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Check again' })).toBeTruthy();
 
   await rerender({ photos: [photo(1, 'jpeg')], tags });
-  expect(screen.queryByText("This computer can't show HEIC photos yet.")).toBeNull();
+  expect(screen.queryByText("This device can't show HEIC photos yet.")).toBeNull();
   await rerender({ photos: [photo(1, 'jpeg'), photo(2, 'heic')], tags });
   status.heic = { state: 'available', decoder: 'heif-convert', system: 'linux', reason: null };
-  await vi.waitFor(() => expect(screen.queryByText("This computer can't show HEIC photos yet.")).toBeNull());
+  await vi.waitFor(() => expect(screen.queryByText("This device can't show HEIC photos yet.")).toBeNull());
 });
 
 test('the Export results\' photos say it too', () => {
   status.heic = linux;
   render(PhotoResults, { photos: [photo(2, 'heic')], query: 'types=heic', onMore: vi.fn() });
-  expect(screen.getByText("This computer can't show HEIC photos yet.")).toBeTruthy();
+  expect(screen.getByText("This device can't show HEIC photos yet.")).toBeTruthy();
   expect(screen.getByRole('button', { name: 'How' })).toBeTruthy();
 });
 
@@ -78,7 +78,7 @@ test('a gallery bar stays, with its Check again, while the check it started runs
   // A poll meanwhile says the server is checking: the bar does not go.
   getStatus.mockResolvedValue({ ...idle, heic: { ...linux, state: 'checking', reason: null } });
   await refreshStatus();
-  expect(screen.getByText("This computer can't show HEIC photos yet.")).toBeTruthy();
+  expect(screen.getByText("This device can't show HEIC photos yet.")).toBeTruthy();
   expect(screen.getByText('Checking for a HEIC decoder…')).toBeTruthy();
 
   // The check answers that it is still running: said, and kept while polls say the same.
@@ -93,13 +93,13 @@ test('a gallery bar stays, with its Check again, while the check it started runs
   await refreshStatus();
   await vi.waitFor(() => expect(screen.queryByText('HEIC photos: checking for a decoder…')).toBeNull());
   expect(status.heicCheck.result).toBe('');
-  expect(screen.getByText("This computer can't show HEIC photos yet.")).toBeTruthy();
+  expect(screen.getByText("This device can't show HEIC photos yet.")).toBeTruthy();
 });
 
 test('without a check of its own, a bar is not shown while the decoder is being checked', () => {
   status.heic = { ...linux, state: 'checking', reason: null };
   render(Gallery, { photos: [photo(2, 'heic')], tags });
-  expect(screen.queryByText("This computer can't show HEIC photos yet.")).toBeNull();
+  expect(screen.queryByText("This device can't show HEIC photos yet.")).toBeNull();
 });
 
 /* ---------- review fix U11: a system with no decoder Butterfly Atlas can use ---------- */
@@ -107,6 +107,6 @@ test('without a check of its own, a bar is not shown while the decoder is being 
 test('on another system the bars say it has no decoder Butterfly Atlas can use, without "yet" (U11)', () => {
   status.heic = { state: 'missing', decoder: null, system: 'other', reason: 'absent' };
   render(Gallery, { photos: [photo(2, 'heic')], tags });
-  expect(screen.getByText('This computer has no HEIC decoder Butterfly Atlas can use.')).toBeTruthy();
+  expect(screen.getByText('This device has no HEIC decoder Butterfly Atlas can use.')).toBeTruthy();
   expect(screen.queryByText(/can't show HEIC photos yet/)).toBeNull();
 });

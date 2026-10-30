@@ -14,27 +14,27 @@ class HeicStatusTest {
     @Test
     void eachSystemAndReasonHasItsOwnNote() {
         String safe = " Your photo is safely in the library.";
-        assertThat(note("windows", "absent")).isEqualTo("This computer can't show HEIC photos yet. Install Windows' HEVC"
+        assertThat(note("windows", "absent")).isEqualTo("This device can't show HEIC photos yet. Install Windows' HEVC"
                 + " decoder, then choose Check again in Settings → About." + safe);
         assertThat(note("windows", "failed")).isEqualTo("Windows' HEIC decoder didn't work. Reinstall Windows' HEVC decoder,"
                 + " then choose Check again in Settings → About." + safe);
-        assertThat(note("windows", "no_heif")).isEqualTo("This computer can't show HEIC photos yet. Install Windows' HEIF"
+        assertThat(note("windows", "no_heif")).isEqualTo("This device can't show HEIC photos yet. Install Windows' HEIF"
                 + " and HEVC decoders, then choose Check again in Settings → About." + safe);
         assertThat(note("windows", "blocked")).isEqualTo("Windows didn't let Butterfly Atlas run its HEIC decoder"
                 + " (PowerShell). Security software may be blocking it: allow Windows PowerShell for Butterfly Atlas, then"
                 + " choose Check again in Settings → About." + safe);
-        assertThat(note("linux", "absent")).isEqualTo("This computer can't show HEIC photos yet. Install heif-convert"
+        assertThat(note("linux", "absent")).isEqualTo("This device can't show HEIC photos yet. Install heif-convert"
                 + " from your distribution's packages, then choose Check again in Settings → About." + safe);
         assertThat(note("linux", "failed")).isEqualTo("heif-convert is installed but didn't work. Choose Check again in"
                 + " Settings → About; if it keeps failing, reinstall it from your distribution's"
                 + " packages." + safe);
         assertThat(note("mac", "failed")).isEqualTo("This Mac couldn't show HEIC photos: its built-in sips tool didn't"
                 + " work. Choose Check again in Settings → About; if it keeps failing, save the photo as JPEG and add that.");
-        assertThat(note("other", "absent")).isEqualTo("This computer has no HEIC decoder Butterfly Atlas can use. Save the"
+        assertThat(note("other", "absent")).isEqualTo("This device has no HEIC decoder Butterfly Atlas can use. Save the"
                 + " photo as JPEG and add that." + safe);
         for (String system : new String[] {"mac", "windows", "linux", "other"}) {
             assertThat(note(system, "timed_out")).isEqualTo("Butterfly Atlas's check for a HEIC decoder took too long"
-                    + " (the computer may be busy). Choose Check again in Settings → About." + safe);
+                    + " (the device may be busy). Choose Check again in Settings → About." + safe);
             assertThat(note(system, "workspace")).isEqualTo(HeicStatus.WORKSPACE_NOTE);
         }
     }

@@ -35,7 +35,7 @@ public record HeicStatus(String state, String decoder, String system, String rea
     /** {@code /display} while the check runs (contract §1). */
     public static final String CHECKING_NOTE = "Butterfly Atlas is still checking for a HEIC decoder. Try again in a moment.";
     /** The decoder ran but could not read this file (contract §1). */
-    public static final String DECODE_FAILED = "This HEIC photo can't be shown: the computer's decoder couldn't read it."
+    public static final String DECODE_FAILED = "This HEIC photo can't be shown: the device's decoder couldn't read it."
             + " The file may be damaged, or use a HEIC feature the decoder doesn't support. Save it as JPEG on the device it"
             + " came from and add that.";
 
@@ -121,7 +121,7 @@ public record HeicStatus(String state, String decoder, String system, String rea
             return WORKSPACE_NOTE;
         }
         if ("timed_out".equals(reason)) {
-            return "Butterfly Atlas's check for a HEIC decoder took too long (the computer may be busy). Choose Check"
+            return "Butterfly Atlas's check for a HEIC decoder took too long (the device may be busy). Choose Check"
                     + " again in Settings → About." + safe;
         }
         boolean failed = "failed".equals(reason);
@@ -129,21 +129,21 @@ public record HeicStatus(String state, String decoder, String system, String rea
             case "windows" -> switch (reason == null ? "" : reason) {
                 case "blocked" -> "Windows didn't let Butterfly Atlas run its HEIC decoder (PowerShell). Security software"
                         + " may be blocking it: allow Windows PowerShell for Butterfly Atlas, then " + checkAgain + safe;
-                case "no_heif" -> "This computer can't show HEIC photos yet. Install Windows' HEIF and HEVC decoders, then "
+                case "no_heif" -> "This device can't show HEIC photos yet. Install Windows' HEIF and HEVC decoders, then "
                         + checkAgain + safe;
                 case "failed" -> "Windows' HEIC decoder didn't work. Reinstall Windows' HEVC decoder, then "
                         + checkAgain + safe;
-                default -> "This computer can't show HEIC photos yet. Install Windows' HEVC decoder, then "
+                default -> "This device can't show HEIC photos yet. Install Windows' HEVC decoder, then "
                         + checkAgain + safe;
             };
             case "linux" -> failed
                     ? "heif-convert is installed but didn't work. Choose Check again in Settings → About; if it keeps"
                             + " failing, reinstall it from your distribution's packages." + safe
-                    : "This computer can't show HEIC photos yet. Install heif-convert from your"
+                    : "This device can't show HEIC photos yet. Install heif-convert from your"
                             + " distribution's packages, then " + checkAgain + safe;
             case "mac" -> "This Mac couldn't show HEIC photos: its built-in sips tool didn't work. Choose Check again in"
                     + " Settings → About; if it keeps failing, save the photo as JPEG and add that.";
-            default -> "This computer has no HEIC decoder Butterfly Atlas can use. Save the photo as JPEG and add that."
+            default -> "This device has no HEIC decoder Butterfly Atlas can use. Save the photo as JPEG and add that."
                     + safe;
         };
     }

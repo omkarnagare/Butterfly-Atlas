@@ -151,7 +151,7 @@ class HeicPhotoApiTest {
         HttpResponse<byte[]> display = fetch(id, "display");
         assertThat(display.statusCode()).isEqualTo(415);
         assertThat(error(display).get("code").asText()).isEqualTo("heic_decoder_missing");
-        assertThat(error(display).get("message").asText()).isEqualTo("This computer can't show HEIC photos yet. Install"
+        assertThat(error(display).get("message").asText()).isEqualTo("This device can't show HEIC photos yet. Install"
                 + " Windows' HEVC decoder, then choose Check again in Settings → About. Your photo is safely in the"
                 + " library.");
         HttpResponse<byte[]> thumb = fetch(id, "thumb");
@@ -161,7 +161,7 @@ class HeicPhotoApiTest {
         assertThat(services.thumbnails().await(id, Duration.ofMillis(200))).isEmpty();
 
         HeicStatus.publish(HeicStatus.missing("linux", "absent"));
-        assertThat(error(fetch(id, "display")).get("message").asText()).startsWith("This computer can't show HEIC photos"
+        assertThat(error(fetch(id, "display")).get("message").asText()).startsWith("This device can't show HEIC photos"
                 + " yet. Install heif-convert");
     }
 

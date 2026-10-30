@@ -120,7 +120,7 @@ test('Recently deleted says when its HEIC photos can\'t be shown on this compute
   status.heic = { state: 'missing', decoder: null, system: 'linux', reason: 'absent' };
   getDeleted.mockResolvedValue([{ ...gone(1, 29, plainTiger), fileName: 'Danaus_chrysippus_01.heic', fileType: 'heic', unreadable: true }]);
   render(Deleted);
-  expect(await screen.findByText("This computer can't show HEIC photos yet.")).toBeTruthy();
+  expect(await screen.findByText("This device can't show HEIC photos yet.")).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Check again' })).toBeTruthy();
   resetStatus();
 });

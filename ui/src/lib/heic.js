@@ -14,14 +14,14 @@ export const isHeic = (photo) => photo?.fileType === 'heic';
 export const HEIC_CHECKING = 'Checking for a HEIC decoder…';
 
 /** The viewer's note for a HEIC photo the decoder couldn't read. */
-export const HEIC_DECODE_FAILED = "This HEIC photo can't be shown: the computer's decoder couldn't read it. The file may be damaged, "
-  + "or use a HEIC feature the decoder doesn't support. Save it as JPEG on the device it came from and add that.";
+export const HEIC_DECODE_FAILED = "This HEIC photo can't be shown: the device's decoder couldn't read it. The file may be damaged, "
+  + "or use a HEIC feature the decoder doesn't support. Save it as JPEG on the phone or camera it came from and add that.";
 
 const SAFE = 'Your photo is safely in the library.';
-const NOT_YET = "This computer can't show HEIC photos yet.";
+const NOT_YET = "This device can't show HEIC photos yet.";
 const NO_HEIF = "Install Windows' HEIF and HEVC decoders, then choose Check again in Settings → About.";
 // Review fix U2: the reasons' own words (J10, shared with the server's notes).
-const TIMED_OUT = "Butterfly Atlas's check for a HEIC decoder took too long (the computer may be busy). Choose Check again in Settings → About.";
+const TIMED_OUT = "Butterfly Atlas's check for a HEIC decoder took too long (the device may be busy). Choose Check again in Settings → About.";
 const BLOCKED = "Windows didn't let Butterfly Atlas run its HEIC decoder (PowerShell). Security software may be blocking it: "
   + 'allow Windows PowerShell for Butterfly Atlas, then choose Check again in Settings → About.';
 const LINUX_FAILED = "heif-convert is installed but didn't work. Choose Check again in Settings → About; if it keeps failing, reinstall it "
@@ -62,12 +62,12 @@ export function installNote(heic) {
     case 'mac':
       return "This Mac couldn't show HEIC photos: its built-in sips tool didn't work. Choose Check again in Settings → About; if it keeps failing, save the photo as JPEG and add that.";
     default:
-      return `This computer has no HEIC decoder Butterfly Atlas can use. Save the photo as JPEG and add that. ${SAFE}`;
+      return `This device has no HEIC decoder Butterfly Atlas can use. Save the photo as JPEG and add that. ${SAFE}`;
   }
 }
 
 /**
- * What to do, in one sentence (audit 20, 21, review fix U2): after "HEIC photos can't be shown on this computer.", "Still
+ * What to do, in one sentence (audit 20, 21, review fix U2): after "HEIC photos can't be shown on this device.", "Still
  * not available." and the Add photos report.
  */
 export function installSentence(heic) {
@@ -99,8 +99,8 @@ const CHECKING_LINE = 'HEIC photos: checking for a decoder…';
 export function aboutLine(heic) {
   if (!heic) return '';
   if (heic.state === DECODER_CHECKING) return CHECKING_LINE;
-  if (heic.state === DECODER_MISSING) return `HEIC photos can't be shown on this computer. ${installSentence(heic)}`;
-  const shown = DECODERS[heic.decoder] ?? "HEIC photos: shown with this computer's decoder.";
+  if (heic.state === DECODER_MISSING) return `HEIC photos can't be shown on this device. ${installSentence(heic)}`;
+  const shown = DECODERS[heic.decoder] ?? "HEIC photos: shown with this device's decoder.";
   // The working folder can fail with the decoder there (J3): said beside it.
   return heic.reason === 'workspace' ? `${shown} ${WORKSPACE}` : shown;
 }
@@ -153,11 +153,11 @@ function barEnding(heic) {
     default:
   }
   return heic?.system === 'windows' ? "once Windows' HEVC decoder is installed"
-    : heic?.system === 'linux' ? 'once heif-convert is installed' : 'once a HEIC decoder works on this computer';
+    : heic?.system === 'linux' ? 'once heif-convert is installed' : 'once a HEIC decoder works on this device';
 }
 
 /**
- * The import grid's bar while the decoder is missing (contract §1): "This computer can't show the 214 HEIC photos in this
+ * The import grid's bar while the decoder is missing (contract §1): "This device can't show the 214 HEIC photos in this
  * folder. They can still be assigned and filed; they'll appear once Windows' HEVC decoder is installed." (one photo:
  * "the 1 HEIC photo … It can still be … it'll appear …").
  */
@@ -165,23 +165,23 @@ export function importBarLine(count, heic) {
   const once = barEnding(heic);
   const photos = things(count, 'the 1 HEIC photo', `the ${count.toLocaleString()} HEIC photos`);
   const still = things(count, "It can still be assigned and filed; it'll appear", "They can still be assigned and filed; they'll appear");
-  return `This computer can't show ${photos} in this folder. ${still} ${once}.`;
+  return `This device can't show ${photos} in this folder. ${still} ${once}.`;
 }
 
 /** The gallery's, species page's and Explore's bar while the decoder is missing and HEIC photos are shown (audit D1). */
-export const GALLERY_BAR = "This computer can't show HEIC photos yet.";
+export const GALLERY_BAR = "This device can't show HEIC photos yet.";
 /** On a system with no decoder Butterfly Atlas knows (`system: 'other'`): nothing to wait for, so no "yet" (review fix U11). */
-export const NO_DECODER = 'This computer has no HEIC decoder Butterfly Atlas can use.';
+export const NO_DECODER = 'This device has no HEIC decoder Butterfly Atlas can use.';
 /** The bars' first sentence, by system (review fix U11). */
 export const galleryBar = (heic) => (heic?.system === 'other' ? NO_DECODER : GALLERY_BAR);
 
 /**
  * The Add photos report's line for HEIC photos added while the decoder is missing (audit 20): "3 HEIC photos were added,
- * but this computer can't show them yet." and what to do; '' for none.
+ * but this device can't show them yet." and what to do; '' for none.
  */
 export function addedLine(count, heic) {
   if (!count) return '';
-  const added = count === 1 ? "1 HEIC photo was added, but this computer can't show it yet."
-    : `${count.toLocaleString()} HEIC photos were added, but this computer can't show them yet.`;
+  const added = count === 1 ? "1 HEIC photo was added, but this device can't show it yet."
+    : `${count.toLocaleString()} HEIC photos were added, but this device can't show them yet.`;
   return `${added} ${installSentence(heic)}`;
 }
