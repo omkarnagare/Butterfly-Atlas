@@ -87,6 +87,10 @@ export const status = $state({
   library: null,
   // How many answers have been applied in this page load (one that failed, or was overtaken by a newer ask, is not).
   answers: 0,
+  // Change the library folder (contract §2): the change running or waiting to be dismissed, else null; every window
+  // shows its screen in place of the page. `libraryMoved` (`{ to }`): Home's one-time note after a move, else null.
+  changing: null,
+  libraryMoved: null,
 });
 
 let seq = 0;
@@ -144,6 +148,8 @@ export function resetStatus() {
   status.doneDismissed = false;
   status.finished = null;
   status.unreachable = false;
+  status.changing = null;
+  status.libraryMoved = null;
   failedReads = 0;
   retried = null;
   loadedAt = Date.now();
@@ -217,6 +223,8 @@ export async function refreshStatus() {
   status.customMatches = next.customMatches ?? 0;
   status.placeUpdate = next.placeUpdate ?? null;
   if (next.theme !== undefined) serverTheme(next.theme);
+  status.changing = next.changing ?? null;
+  status.libraryMoved = next.libraryMoved ?? null;
   const libraryBefore = status.library;
   status.library = next.library ?? null;
   // The library's drive is back: every screen whose load failed reads again (LIBRARY_CHANGED).
@@ -422,6 +430,16 @@ export function exportStopping(exportId) {
   if (exportId === null && leftWhileStopping !== null) exportFinished(leftWhileStopping);
   leftWhileStopping = null;
   stoppingId = exportId;
+}
+
+/**
+ * This page started a move or a switch of the library folder: the change (the 202 answer, `{ changing }` or the change
+ * itself) shows at once, and the status is asked.
+ */
+export function changeStarted(answer) {
+  const changing = answer && 'changing' in answer ? answer.changing : answer;
+  if (changing) status.changing = changing;
+  refreshStatus();
 }
 
 /** After this page applied, retried or merged (`update`, the Update answered): the status follows the answer at once and asks again. */

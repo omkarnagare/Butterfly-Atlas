@@ -13,9 +13,11 @@
   import { aboutLine } from '../lib/heic.js';
   import { chooseTheme, theme } from '../lib/theme.svelte.js';
   import { APPEARANCE, APPEARANCE_NOTE, DARK, LIGHT } from '../lib/messages.js';
+  import LibraryFolder from '../lib/LibraryFolder.svelte';
 
   /**
-   * Settings (#/settings, Phase 6 contract §3–§4): the Backup section, Appearance and About.
+   * Settings (#/settings, Phase 6 contract §3–§4): the Backup section, Library folder (lib/LibraryFolder.svelte,
+   * change-library-folder design §2), Appearance and About.
    * Backup: the three reminder choices (Remind me / Remind me less often / No backup needed), saved at once
    * (PUT /api/backup/preference); one that can't be saved goes back to the saved choice and says why. Under them the
    * last backup in words ("Last backup: 12 days ago — Everything", "4 photos could not be copied" when the last one left
@@ -38,6 +40,7 @@
   let prefError = $state('');
   let sheetOpen = $state(false);
   let backUpButton = $state(null);
+  let backupHeading = $state(null);
   let aboutTried = $state(false);
   let aboutBusy = $state(false);
   let loads = 0;
@@ -145,7 +148,7 @@
 </div>
 
 <section class="sec set" aria-labelledby="{uid}-backup">
-  <div class="sec-h"><h2 id="{uid}-backup">Backup</h2><span class="muted">Nothing is copied by itself, and where to copy is asked every time</span></div>
+  <div class="sec-h"><h2 id="{uid}-backup" tabindex="-1" bind:this={backupHeading}>Backup</h2><span class="muted">Nothing is copied by itself, and where to copy is asked every time</span></div>
   {#if error}
     <LoadError message={error} onRetry={load} />
   {:else if backups === null}
@@ -176,6 +179,8 @@
     <PastBackups past={backups.past ?? []} onRemoved={load} onCleared={load} fallbackFocus={() => backUpButton} />
   {/if}
 </section>
+
+<LibraryFolder onGoToBackup={() => { backupHeading?.scrollIntoView?.({ block: 'start' }); backupHeading?.focus(); }} />
 
 <section class="sec set" aria-labelledby="{uid}-appearance">
   <div class="sec-h"><h2 id="{uid}-appearance">{APPEARANCE}</h2></div>

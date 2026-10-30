@@ -8,6 +8,15 @@ export function ago(iso, now = new Date()) {
   return days === 1 ? 'yesterday' : `${days} days ago`;
 }
 
+/** "27 October", with the year when it is not this year's ("3 March 2025"); '' for a bad date. `locale` is for tests. */
+export function longDate(iso, { now = new Date(), locale } = {}) {
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return '';
+  const options = { day: 'numeric', month: 'long' };
+  if (then.getFullYear() !== now.getFullYear()) options.year = 'numeric';
+  return new Intl.DateTimeFormat(locale, options).format(then);
+}
+
 /** "12 Oct", with the year when it is not this year's ("3 Mar 2025"); '' for a bad date. `locale` is for tests. */
 export function shortDate(iso, { now = new Date(), locale } = {}) {
   const then = new Date(iso);

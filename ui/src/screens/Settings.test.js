@@ -3,7 +3,9 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import Settings from './Settings.svelte';
 import {
   checkBackup, checkHeic, getBackups, getFsRoots, getSession, getStatus, listFolder, setAppearance, setBackupPreference, startBackup,
+  deleteOldCopy, getLibraryChange, inspectChange, moveLibrary, switchLibrary,
 } from '../lib/api.js';
+import { longDate } from '../lib/dates.js';
 import { BACKUP_CHANGED, backupChanged, resetStatus, status } from '../lib/status.svelte.js';
 import { resetSession, session } from '../lib/session.svelte.js';
 import { resetTheme, serverTheme } from '../lib/theme.svelte.js';
@@ -12,6 +14,7 @@ vi.mock('../lib/api.js', () => ({
   getBackups: vi.fn(), setBackupPreference: vi.fn(), checkBackup: vi.fn(), startBackup: vi.fn(), getFsRoots: vi.fn(), listFolder: vi.fn(),
   getStatus: vi.fn(), getSession: vi.fn(), getBackup: vi.fn(), deleteBackup: vi.fn(), clearBackups: vi.fn(), pauseBackup: vi.fn(),
   resumeBackup: vi.fn(), cancelBackup: vi.fn(), checkHeic: vi.fn(), getAppearance: vi.fn(), setAppearance: vi.fn(),
+  getLibraryChange: vi.fn(), inspectChange: vi.fn(), inspectFolder: vi.fn(), moveLibrary: vi.fn(), switchLibrary: vi.fn(), deleteOldCopy: vi.fn(),
 }));
 
 const backups = (over = {}) => ({
@@ -34,6 +37,12 @@ beforeEach(() => {
   getFsRoots.mockResolvedValue([{ name: 'B', path: '/Volumes/B', kind: 'drive' }]);
   listFolder.mockResolvedValue({ path: '/Volumes/B', name: 'B', parent: '/Volumes', crumbs: [{ name: 'B', path: '/Volumes/B' }], folders: [], photos: 0, isLibrary: false, openImport: null });
   checkBackup.mockResolvedValue({ photos: 5, bytes: 1000, neededBytes: 2000, freeBytes: 1e12, name: 'Butterfly_Atlas_backup_2026-10-21', sameDrive: false, problem: null });
+  getLibraryChange.mockResolvedValue(libraryChange());
+});
+
+const GB = 1024 ** 3;
+const libraryChange = (over = {}) => ({
+  folder: '/Users/me/Atlas', size: 12.4 * GB, free: 80.1 * GB, fixed: false, changing: null, oldCopy: null, ...over,
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -251,4 +260,163 @@ test('a choice made in another window shows here too', async () => {
   render(Settings);
   serverTheme('dark');
   await vi.waitFor(() => expect(themes()).toEqual([['Light', false], ['Dark', true]]));
+});
+
+// ---- Library folder (change-library-folder design §2, §3, §9) ----
+
+const librarySection = async () => {
+  const heading = await screen.findByRole('heading', { level: 2, name: 'Library folder' });
+  return heading.closest('section');
+};
+const moveCheck = { path: '/Volumes/B', absolute: true, libraryFolder: '/Volumes/B/Butterfly_Atlas', kind: 'create', unfinished: null, refusal: null, free: 300 * GB, needed: 13.2 * GB };
+const changing = (kind) => ({
+  kind, to: '/Volumes/B/Butterfly_Atlas', step: kind === 'move' ? 'copying' : 'checking', files: { done: 0, total: 0 }, bytes: { done: 0, total: 0 },
+  canCancel: true, problem: null, left: null, reopen: null,
+});
+
+test('the Library folder section says where the library is, its size and the drive\'s free space, with both buttons', async () => {
+  render(Settings);
+  const section = await librarySection();
+  await within(section).findByText('/Users/me/Atlas');
+  expect(within(section).getByText('12.4 GB')).toBeTruthy();
+  expect(within(section).getByText('80.1 GB')).toBeTruthy();
+  for (const name of ['Move library…', 'Use a different library…']) {
+    expect(within(section).getByRole('button', { name }).getAttribute('aria-disabled')).not.toBe('true');
+  }
+  expect(within(section).queryByText(/fixed folder/)).toBeNull();
+});
+
+test('a copy started on a fixed folder shows the section with both buttons disabled and says why', async () => {
+  getLibraryChange.mockResolvedValue(libraryChange({ fixed: true }));
+  render(Settings);
+  const section = await librarySection();
+  const note = await within(section).findByText('This copy of Butterfly Atlas was started on a fixed folder.');
+  for (const name of ['Move library…', 'Use a different library…']) {
+    const button = within(section).getByRole('button', { name });
+    expect(button.getAttribute('aria-disabled')).toBe('true');
+    expect(button.getAttribute('aria-describedby')).toBe(note.id);
+    await fireEvent.click(button);
+  }
+  expect(screen.queryByRole('dialog')).toBeNull();
+});
+
+test('the section that can\'t be read says why, with Try again', async () => {
+  getLibraryChange.mockRejectedValueOnce(new Error('Butterfly Atlas isn\'t answering.'));
+  render(Settings);
+  const section = await librarySection();
+  expect((await within(section).findByRole('alert')).textContent).toContain('Butterfly Atlas isn\'t answering.');
+  await fireEvent.click(within(section).getByRole('button', { name: 'Try again' }));
+  expect(await within(section).findByText('/Users/me/Atlas')).toBeTruthy();
+});
+
+test('Move library… opens the folder browser for a move; Move here starts it and the change shows', async () => {
+  inspectChange.mockResolvedValue(moveCheck);
+  moveLibrary.mockResolvedValue({ changing: changing('move') });
+  getStatus.mockResolvedValue({ rescanning: false, backup: null, changing: changing('move') });
+  render(Settings);
+  const section = await librarySection();
+  await within(section).findByText('/Users/me/Atlas');
+  await fireEvent.click(within(section).getByRole('button', { name: 'Move library…' }));
+
+  const dialog = screen.getByRole('dialog', { name: 'Choose where to move your library' });
+  await within(dialog).findByText('Your library will be moved to /Volumes/B/Butterfly_Atlas. It is 12.4 GB; that drive has 300.0 GB free.');
+  expect(inspectChange).toHaveBeenCalledWith('/Volumes/B', 'move');
+  await fireEvent.click(within(dialog).getByRole('button', { name: 'Move here' }));
+
+  expect(moveLibrary).toHaveBeenCalledWith('/Volumes/B');
+  await vi.waitFor(() => expect(status.changing?.kind).toBe('move'));
+  await vi.waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+});
+
+test('Use a different library… opens the folder browser for a switch; a refusal from the server shows beside the button', async () => {
+  inspectChange.mockResolvedValue({ ...moveCheck, kind: 'existing', libraryFolder: '/Volumes/B' });
+  switchLibrary.mockRejectedValueOnce(Object.assign(new Error('An import is filing photos. Pause it or wait for it to finish, then try again.'), { code: 'work_running' }));
+  render(Settings);
+  const section = await librarySection();
+  await within(section).findByText('/Users/me/Atlas');
+  await fireEvent.click(within(section).getByRole('button', { name: 'Use a different library…' }));
+
+  const dialog = screen.getByRole('dialog', { name: 'Choose a library to use' });
+  await within(dialog).findByText('This folder already has a Butterfly Atlas library. It will open as it is.');
+  expect(inspectChange).toHaveBeenCalledWith('/Volumes/B', 'switch');
+  await fireEvent.click(within(dialog).getByRole('button', { name: 'Open this existing library' }));
+
+  expect(switchLibrary).toHaveBeenCalledWith('/Volumes/B');
+  expect((await within(dialog).findByRole('alert')).textContent).toBe('An import is filing photos. Pause it or wait for it to finish, then try again.');
+  expect(status.changing).toBeNull();
+});
+
+const oldCopy = (over = {}) => ({ folder: '/Users/me/Old Atlas', size: 12.4 * GB, lastBackup: { what: 'everything', finishedAt: '2026-10-27T10:00:00Z' }, ...over });
+
+test('after a move the old copy is offered for deleting, naming the last backup; deleting it says so', async () => {
+  getLibraryChange.mockResolvedValue(libraryChange({ oldCopy: oldCopy() }));
+  deleteOldCopy.mockResolvedValue({ deleted: true, left: [], leftCount: 0 });
+  render(Settings);
+  const section = await librarySection();
+  expect(await within(section).findByText('The old copy of your library is still at /Users/me/Old Atlas (12.4 GB).')).toBeTruthy();
+  const button = within(section).getByRole('button', { name: 'Delete old copy' });
+  await fireEvent.click(button);
+
+  const dialog = screen.getByRole('dialog', { name: 'Delete the old copy?' });
+  expect(within(dialog).getByText('Delete the old copy at /Users/me/Old Atlas? Your library at /Users/me/Atlas is the one in use.')).toBeTruthy();
+  expect(within(dialog).getByText(`Your last backup (Everything) was on ${longDate('2026-10-27T10:00:00Z')}.`)).toBeTruthy();
+  getLibraryChange.mockResolvedValue(libraryChange());
+  await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete old copy' }));
+
+  expect(deleteOldCopy).toHaveBeenCalledOnce();
+  expect(await within(section).findByText('The old copy was deleted.')).toBeTruthy();
+  expect(screen.queryByRole('dialog')).toBeNull();
+  await vi.waitFor(() => expect(within(section).queryByText(/The old copy of your library is still at/)).toBeNull());
+});
+
+test('with no backup the confirmation says so and leads to Backup; Cancel deletes nothing', async () => {
+  getLibraryChange.mockResolvedValue(libraryChange({ oldCopy: oldCopy({ lastBackup: null }) }));
+  render(Settings);
+  const section = await librarySection();
+  await fireEvent.click(await within(section).findByRole('button', { name: 'Delete old copy' }));
+  const dialog = screen.getByRole('dialog', { name: 'Delete the old copy?' });
+  expect(within(dialog).getByText('You have no backup yet.')).toBeTruthy();
+  await fireEvent.click(within(dialog).getByRole('button', { name: 'Go to Backup' }));
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(document.activeElement).toBe(screen.getByRole('heading', { level: 2, name: 'Backup' }));
+  expect(deleteOldCopy).not.toHaveBeenCalled();
+
+  await fireEvent.click(within(section).getByRole('button', { name: 'Delete old copy' }));
+  await fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' }));
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(deleteOldCopy).not.toHaveBeenCalled();
+});
+
+test('an old copy that couldn\'t all be deleted says how many and where, and Delete can be chosen again', async () => {
+  getLibraryChange.mockResolvedValue(libraryChange({ oldCopy: oldCopy() }));
+  deleteOldCopy.mockResolvedValue({ deleted: false, left: ['/Users/me/Old Atlas/images/a.jpg', '/Users/me/Old Atlas/atlas.db'], leftCount: 12 });
+  render(Settings);
+  const section = await librarySection();
+  await fireEvent.click(await within(section).findByRole('button', { name: 'Delete old copy' }));
+  await fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete old copy' }));
+
+  expect(await within(section).findByText("Some of the old copy at /Users/me/Old Atlas couldn't be deleted (12 files). Choose Delete old copy to try again, or delete them yourself."))
+    .toBeTruthy();
+  expect(within(section).getByText('/Users/me/Old Atlas/images/a.jpg')).toBeTruthy();
+  expect(within(section).getByText('/Users/me/Old Atlas/atlas.db')).toBeTruthy();
+  expect(within(section).getByText('and 10 more')).toBeTruthy();
+  expect(within(section).getByRole('button', { name: 'Delete old copy' })).toBeTruthy();
+});
+
+test('a deleted old copy that left other files names them; a refused delete says why in the confirmation', async () => {
+  getLibraryChange.mockResolvedValue(libraryChange({ oldCopy: oldCopy() }));
+  deleteOldCopy.mockRejectedValueOnce(Object.assign(new Error('Another copy of Butterfly Atlas is using this library.'), { code: 'library_in_use' }));
+  render(Settings);
+  const section = await librarySection();
+  await fireEvent.click(await within(section).findByRole('button', { name: 'Delete old copy' }));
+  const dialog = screen.getByRole('dialog');
+  await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete old copy' }));
+  expect((await within(dialog).findByRole('alert')).textContent).toBe('Another copy of Butterfly Atlas is using this library.');
+
+  deleteOldCopy.mockResolvedValue({ deleted: true, left: ['/Users/me/Old Atlas/notes.txt'], leftCount: 1 });
+  getLibraryChange.mockResolvedValue(libraryChange());
+  await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete old copy' }));
+  expect(await within(section).findByText('The old copy was deleted.')).toBeTruthy();
+  expect(within(section).getByText("1 file that isn't part of a library was left in /Users/me/Old Atlas.")).toBeTruthy();
+  expect(within(section).getByText('/Users/me/Old Atlas/notes.txt')).toBeTruthy();
 });
