@@ -13,6 +13,7 @@ import com.butterflyatlas.app.window.InstanceLock;
 import com.butterflyatlas.app.window.InstancePointer;
 import com.butterflyatlas.app.window.LaunchFiles;
 import com.butterflyatlas.app.window.QuitTimer;
+import com.butterflyatlas.app.window.Relaunch;
 import com.butterflyatlas.app.window.SecondLaunch;
 import com.butterflyatlas.app.window.SessionKeys;
 import com.butterflyatlas.app.window.StartupFailure;
@@ -45,11 +46,24 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 final class AppStart {
 
-    /** The outside world of the start; {@link #system()} is the real one. */
+    /**
+     * The outside world of the start; {@link #system()} is the real one. {@code starter} starts the browser, and the
+     * installed app again when a library change reopens it ({@code appPath}: the program the packaged launcher names in
+     * {@code jpackage.app-path}, null in a development run).
+     */
     record World(IntConsumer exit, Consumer<Thread> shutdownHook, Predicate<URI> defaultBrowser,
                  Supplier<BrowserFinder.Found> browser, WindowLauncher.Starter starter,
                  Function<InstancePointer, SecondLaunch> secondLaunch, Duration lockWait, int defaultPort,
-                 Consumer<String> console) {
+                 Consumer<String> console, Supplier<String> appPath) {
+
+        /** As the canonical one, the installed app's program read from the system property. */
+        World(IntConsumer exit, Consumer<Thread> shutdownHook, Predicate<URI> defaultBrowser,
+              Supplier<BrowserFinder.Found> browser, WindowLauncher.Starter starter,
+              Function<InstancePointer, SecondLaunch> secondLaunch, Duration lockWait, int defaultPort,
+              Consumer<String> console) {
+            this(exit, shutdownHook, defaultBrowser, browser, starter, secondLaunch, lockWait, defaultPort, console,
+                    () -> System.getProperty(Relaunch.APP_PATH));
+        }
 
         static World system() {
             return new World(System::exit, Runtime.getRuntime()::addShutdownHook, AppStart::browse,
@@ -71,10 +85,12 @@ final class AppStart {
         private final LaunchFiles launchFiles;
         private final Timer sweeper;
         private final Runnable releaseInstanceLock;
+        private final Relaunch.Reopener reopener;
 
         private Running(AtlasServer server, AtlasServices services, QuitTimer timer, AtomicBoolean closing,
                         InstancePointer pointer, String instanceKey, LaunchFiles launchFiles, Timer sweeper,
-                        Runnable releaseInstanceLock) {
+                        Runnable releaseInstanceLock, Relaunch.Reopener reopener) {
+            this.reopener = reopener;
             this.server = server;
             this.services = services;
             this.timer = timer;
@@ -92,6 +108,11 @@ final class AppStart {
 
         AtlasServices services() {
             return services;
+        }
+
+        /** What ends this copy of the app after a library change, reopening it when it can (contract §1). */
+        Relaunch.Reopener reopener() {
+            return reopener;
         }
 
         /** The moment a quit starts (audit 4): a second launch is told it is closing, and the pointer is gone. */
@@ -270,7 +291,7 @@ final class AppStart {
             }
         }, 10_000, 10_000);
         Running app = new Running(server, services, timer, closing, pointer, keys.instanceKey(), launchFiles, sweeper,
-                this::releaseInstanceLock);
+                this::releaseInstanceLock, reopener(running));
         running.set(app);
         world.shutdownHook().accept(new Thread(app::close, "atlas-shutdown"));
         log.info("Butterfly Atlas " + AtlasVersion.current() + " is running on port " + server.port());
@@ -303,6 +324,48 @@ final class AppStart {
             world.exit().accept(code);
         }, "atlas-quit");
         quitting.start();
+    }
+
+    /**
+     * Reopening after a library change (contract §1, spec §6): the quit begins (the pointer and the instance lock go, so
+     * the new copy starts as a launch of its own and waits for nothing of this one but the library's lock), then the
+     * installed app's program is started with no arguments and its output discarded; then the exit, on a thread of its
+     * own. The 10-second quit timer is not used. A program that is missing or will not start is a quit that asks.
+     */
+    private Relaunch.Reopener reopener(AtomicReference<Running> running) {
+        return new Relaunch.Reopener() {
+            @Override
+            public Relaunch.Plan plan() {
+                return Relaunch.plan(world.appPath().get());
+            }
+
+            @Override
+            public boolean begin(Relaunch.Plan plan) {
+                Running app = running.get();
+                if (app != null) {
+                    app.beginQuit();
+                }
+                if (!plan.restarts()) {
+                    log.info("The library folder changed; Butterfly Atlas quits and asks to be opened again ("
+                            + plan.why() + ")");
+                    return false;
+                }
+                try {
+                    world.starter().start(plan.command());
+                    log.info("The library folder changed; Butterfly Atlas started again to open it.");
+                    return true;
+                } catch (IOException | RuntimeException e) {
+                    log.error("Could not start Butterfly Atlas again after the library folder changed", e);
+                    return false;
+                }
+            }
+
+            @Override
+            public void exit() {
+                log.info("The library folder changed. Butterfly Atlas is quitting.");
+                new Thread(() -> world.exit().accept(0), "atlas-quit").start();
+            }
+        };
     }
 
     /** A window on the copy that is already running, with a fresh key from it; none when the settings say no browser. */
