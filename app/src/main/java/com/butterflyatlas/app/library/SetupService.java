@@ -37,9 +37,23 @@ public final class SetupService {
 
     /**
      * What the setup screen needs to know. {@code problem} explains why a remembered library did not open; {@code retry}
-     * is true then, when opening it again ({@link #retry}) may work.
+     * is true then, when opening it again ({@link #retry}) may work. When it is the first open after a change of library
+     * folder (change-library-folder spec §6), {@code previousFolder} is the library used before, offered instead
+     * ({@link #usePrevious}), and after a move {@code movedCopy} is the moved copy, which is not deleted; else both null.
      */
-    public record Status(boolean configured, String suggestedFolder, String dataFolder, String problem, boolean retry) {
+    public record Status(boolean configured, String suggestedFolder, String dataFolder, String problem, boolean retry,
+                         String previousFolder, String movedCopy) {
+    }
+
+    /** The one-time note after a move (change-library-folder contract §2): where the library is now. */
+    public record Moved(String to) {
+    }
+
+    /** A switched-to library whose unfinished work couldn't be cleared: it is not opened, and the words say why. */
+    private static final class NotCleared extends RuntimeException {
+        NotCleared(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 
     /**
@@ -89,6 +103,13 @@ public final class SetupService {
     private volatile boolean lockWarning;
     /** Whether this copy was started on a fixed folder ({@code -Datlas.dataDir}): its library folder can't be changed. */
     private volatile boolean fixed;
+    /**
+     * The settings of a change of library folder waiting for the new library's first open ({@code changePending}), read
+     * at start; null once it opened, the old library was chosen instead, or another folder was set up.
+     */
+    private volatile AppConfig change;
+    /** The note after a move, in memory until dismissed; null when none. */
+    private volatile Moved moved;
 
     public SetupService(ConfigStore config, LibraryHolder holder, TaxonomyBundles bundles, PlaceBundles places, Path home,
                         Clock clock) {
@@ -132,6 +153,7 @@ public final class SetupService {
         if (saved.isEmpty()) {
             return;
         }
+        change = saved.get().pending() ? saved.get() : null;
         String raw = saved.get().dataFolder();
         Path folder;
         try {
@@ -171,7 +193,9 @@ public final class SetupService {
     /** Opens the remembered library; when it will not open, the problem says why in plain words and Try again is offered. */
     private void open(Path folder) {
         try {
-            holder.set(openLocked(folder));
+            Library library = openLocked(folder);
+            firstOpen(library, folder);
+            holder.set(library);
             problem = null;
             inUse = false;
             failed = null;
@@ -196,12 +220,109 @@ public final class SetupService {
             failed = folder;
             retry = false; // newer or not, this copy of the app lacks the place data: trying again can't help
             problem = e.getMessage();
+        } catch (NotCleared e) {
+            inUse = false;
+            failed = folder;
+            retry = true;
+            problem = e.getMessage();
         } catch (RuntimeException e) {
             inUse = false;
             failed = folder;
             retry = true;
             problem = problem(folder, e, true);
         }
+    }
+
+    /**
+     * The first open after a change of library folder (spec §6), before the library is handed over: a switched-to
+     * library's unfinished work is cleared (as setup does; when that fails it is not opened, its lock is given back, and
+     * the setup screen says why), the change is no longer pending (a move keeps its old copy and where it is), and a move
+     * is noted for Home. Nothing when no change waits.
+     */
+    private void firstOpen(Library library, Path folder) {
+        AppConfig pending = change;
+        if (pending == null) {
+            return;
+        }
+        if (!pending.hasOldCopy()) {
+            try {
+                UnfinishedWork.clear(library, clock);
+            } catch (RuntimeException e) {
+                release(held);
+                held = null;
+                LOG.warn("Could not clear the unfinished work of the library in {}", folder, e);
+                throw new NotCleared("Butterfly Atlas couldn't clear the work left unfinished in your library at " + folder
+                        + ", so it didn't open it. " + plain(folder, e, LibraryDrive::usableSpace), e);
+            }
+        }
+        try {
+            config.save(pending.hasOldCopy()
+                    ? new AppConfig(folder.toString(), theme, pending.previousDataFolder(), null, true)
+                    : new AppConfig(folder.toString(), theme));
+        } catch (UncheckedIOException e) {
+            LOG.warn("Butterfly Atlas could not record that the library change is done", e);
+        }
+        if (pending.hasOldCopy()) {
+            moved = new Moved(folder.toString());
+            LOG.info("Your library was moved to {}; the old copy is at {}", folder, pending.previousDataFolder());
+        }
+        change = null;
+    }
+
+    /**
+     * "Use the old library instead" (spec §6, contract §3): during the first open after a change, when the new library
+     * won't open, the library used before opens as it was (its unfinished work kept) and is remembered again; the change
+     * and its old copy are forgotten (a moved copy is not deleted). 409 {@code no_previous} when it is not offered.
+     */
+    public synchronized Status usePrevious() {
+        AppConfig pending = change;
+        if (pending == null || pending.previousDataFolder() == null || holder.current().isPresent()) {
+            throw new AtlasException(AtlasException.Kind.CONFLICT, ErrorCodes.NO_PREVIOUS,
+                    "There is no earlier library to go back to.");
+        }
+        Path previous = Path.of(pending.previousDataFolder());
+        if (!hasLibrary(previous)) {
+            throw AtlasException.invalid("Butterfly Atlas could not find your old library at " + previous
+                    + ". If it is on an external drive, connect it and try again.");
+        }
+        Library library;
+        try {
+            library = openLocked(previous);
+        } catch (AtlasException e) {
+            throw e;
+        } catch (LibraryTooNewException e) {
+            throw new AtlasException(AtlasException.Kind.CONFLICT, LIBRARY_TOO_NEW, e.getMessage());
+        } catch (PlaceDataUnavailableException e) {
+            LOG.warn("Could not open the old library at {}", previous, e);
+            throw AtlasException.invalid(e.getMessage());
+        } catch (RuntimeException e) {
+            LOG.warn("Could not open the old library at {}", previous, e);
+            throw AtlasException.invalid("Butterfly Atlas could not open your old library at " + previous + ". "
+                    + plain(previous, e, LibraryDrive::usableSpace));
+        }
+        try {
+            config.save(new AppConfig(previous.toString(), theme));
+        } catch (UncheckedIOException e) {
+            LOG.warn("Butterfly Atlas could not remember the library folder for next time", e);
+        }
+        LOG.info("Went back to the old library at {}; {} was not deleted", previous, pending.dataFolder());
+        change = null;
+        problem = null;
+        failed = null;
+        inUse = false;
+        retry = true;
+        holder.set(library);
+        return status();
+    }
+
+    /** After a move, where the library is now, until the note is dismissed; else null. */
+    public Moved libraryMoved() {
+        return moved;
+    }
+
+    /** Home's note after a move is put away (in memory). */
+    public void dismissMovedNote() {
+        moved = null;
     }
 
     /**
@@ -309,10 +430,12 @@ public final class SetupService {
     /** The setup screen's status; a remembered library that would not open is named as {@code dataFolder}. */
     public Status status() {
         Path folder = failed;
+        AppConfig pending = change;
         return holder.current()
-                .map(library -> new Status(true, suggested.toString(), library.folder().toString(), null, false))
+                .map(library -> new Status(true, suggested.toString(), library.folder().toString(), null, false, null, null))
                 .orElseGet(() -> new Status(false, suggested.toString(), folder == null ? null : folder.toString(), problem,
-                        folder != null && retry));
+                        folder != null && retry, pending == null ? null : pending.previousDataFolder(),
+                        pending != null && pending.hasOldCopy() ? pending.dataFolder() : null));
     }
 
     /**
@@ -506,6 +629,7 @@ public final class SetupService {
         } catch (UncheckedIOException e) {
             LOG.warn("Butterfly Atlas could not remember the library folder for next time", e);
         }
+        change = null; // another folder was chosen: the old library is no longer offered
         holder.set(library);
         problem = null;
         failed = null;

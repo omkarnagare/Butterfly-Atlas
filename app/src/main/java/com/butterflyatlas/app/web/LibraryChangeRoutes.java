@@ -1,13 +1,14 @@
 package com.butterflyatlas.app.web;
 
 import com.butterflyatlas.app.library.LibraryChange;
+import com.butterflyatlas.app.library.SetupService;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.javalin.Javalin;
 
 /**
  * Changing the library folder from Settings (change-library-folder contract §3): the Library folder section's facts, the
  * folder browser's live check, Move and Use a different library (202 once started; the status's {@code changing} follows
- * it), Cancel, and putting a failed change away.
+ * it), Cancel, and putting a failed change away; and Home's one-time note after a move.
  */
 final class LibraryChangeRoutes {
 
@@ -16,9 +17,11 @@ final class LibraryChangeRoutes {
     }
 
     private final LibraryChange change;
+    private final SetupService setup;
 
-    LibraryChangeRoutes(LibraryChange change) {
+    LibraryChangeRoutes(LibraryChange change, SetupService setup) {
         this.change = change;
+        this.setup = setup;
     }
 
     void register(Javalin app) {
@@ -36,6 +39,10 @@ final class LibraryChangeRoutes {
         app.post("/api/library/change/cancel", ctx -> ctx.status(202).json(change.cancel()));
         app.post("/api/library/change/dismiss", ctx -> {
             change.dismiss();
+            ctx.status(204);
+        });
+        app.post("/api/library/moved-note/dismiss", ctx -> {
+            setup.dismissMovedNote();
             ctx.status(204);
         });
     }

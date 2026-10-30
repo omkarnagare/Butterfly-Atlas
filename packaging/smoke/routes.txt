@@ -15,6 +15,7 @@ GET /api/setup | setup
 POST /api/setup | setup
 GET /api/setup/inspect | setup
 POST /api/setup/retry | setup
+POST /api/setup/previous | setup
 
 GET /api/appearance | appearance
 PUT /api/appearance | appearance
@@ -135,3 +136,4 @@ POST /api/library/change/move | library change
 POST /api/library/change/switch | library change
 POST /api/library/change/cancel | library change
 POST /api/library/change/dismiss | library change
+POST /api/library/moved-note/dismiss | library change

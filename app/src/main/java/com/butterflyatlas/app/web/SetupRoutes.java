@@ -4,7 +4,10 @@ import com.butterflyatlas.app.library.SetupService;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.javalin.Javalin;
 
-/** First-run choice of data folder, and Try again for a remembered library that did not open. */
+/**
+ * First-run choice of data folder, Try again for a remembered library that did not open, and the old library instead of
+ * a new one that did not open after a change of library folder.
+ */
 final class SetupRoutes {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -27,5 +30,7 @@ final class SetupRoutes {
             ctx.json(setup.setup(request.dataFolder(), request.exact() == null || request.exact()));
         });
         app.post("/api/setup/retry", ctx -> ctx.json(setup.retry()));
+        // the first open after a change of library folder: the library used before, instead of the new one
+        app.post("/api/setup/previous", ctx -> ctx.json(setup.usePrevious()));
     }
 }

@@ -70,11 +70,11 @@ public final class Api {
         new UpdateRoutes(services.updates(), services.splits()).register(app);
         new PlaceUpdateRoutes(services.placeNotes()).register(app);
         new HeicRoutes(services.heic()).register(app);
-        new LibraryChangeRoutes(services.change()).register(app);
+        new LibraryChangeRoutes(services.change(), services.setup()).register(app);
         StatusRoutes status = new StatusRoutes(services.rescan(), services.thumbnails(), services.photos(),
                 services.processing(), services.imports(), services.exports(), services.updates(), services.drive(),
                 services.placeNotes(), services.backups(), services.setup()::theme,
-                () -> services.change().changing().orElse(null));
+                () -> services.change().changing().orElse(null), services.setup()::libraryMoved);
         status.register(app);
         JavalinJackson json = new JavalinJackson();
         SessionRoutes sessions = session == null ? null : new SessionRoutes(session, services.setup(),
