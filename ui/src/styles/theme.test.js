@@ -31,6 +31,11 @@ const LIGHT = tokens(':root');
 // The dusk block overrides the light one; what it leaves out stays as in light.
 const DUSK = { ...LIGHT, ...tokens(':root[data-theme=dark]') };
 
+// The page column (match-device design §8): wide enough that a maximized window on a large monitor isn't mostly margin.
+test('the page column is at most 1440 px wide', () => {
+  expect(css).toMatch(/\n\.wrap \{[^}]*max-width: 1440px;/);
+});
+
 // The theme store (lib/theme.svelte.js) sets data-theme; the device's setting only colours the page before it runs.
 test('the dusk tokens are keyed on data-theme, not on the device setting', () => {
   const early = tokens('@media (prefers-color-scheme: dark) {\n  :root:not([data-theme])');
