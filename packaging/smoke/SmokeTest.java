@@ -372,6 +372,9 @@ public final class SmokeTest {
             step("the status route answers");
             http.call("GET /api/status", "/api/status", null, 200);
 
+            step("the library folder routes answer, and refuse what this library can't do (nothing is moved)");
+            libraryChange();
+
             step("every route in routes.txt was called");
             coverage();
 
@@ -636,6 +639,38 @@ public final class SmokeTest {
             http.call("GET /api/fs/roots", "/api/fs/roots", null, 200);
             Json listing = Json.parse(http.call("GET /api/fs/list", "/api/fs/list?path=" + enc(importFolder.toString()), null, 200).text());
             expect((long) listing.num("photos") == 4, "the folder browser sees " + listing.num("photos") + " photos in the import folder, not 4");
+        }
+
+        /**
+         * The change-library-folder routes (contract §3): the overview and the folder check answer; a move or switch onto
+         * the library itself is refused; with nothing running, Cancel is refused and dismiss is fine; there is no old
+         * copy and no old library to go back to. Nothing is moved: a real move would restart the app.
+         */
+        void libraryChange() throws Exception {
+            Json overview = Json.parse(http.call("GET /api/library/change", "/api/library/change", null, 200).text());
+            expect(library.toString().equals(overview.str("folder")) && !overview.bool("fixed")
+                    && overview.isNull("changing") && overview.isNull("oldCopy") && overview.num("size") > 0,
+                    "the library folder overview is wrong: " + overview);
+            Path elsewhere = Files.createDirectories(work.resolve("mv"));
+            Json inspect = Json.parse(http.call("GET /api/library/change/inspect", "/api/library/change/inspect?for=move&path="
+                    + enc(elsewhere.toString()), null, 200).text());
+            expect("create".equals(inspect.str("kind"))
+                    && elsewhere.resolve("Butterfly_Atlas").toString().equals(inspect.str("libraryFolder")),
+                    "the move check does not offer " + elsewhere + ": " + inspect);
+            String itself = "{\"path\":" + Json.quote(library.toString()) + "}";
+            Resp move = http.call("POST /api/library/change/move", "/api/library/change/move", itself, 400);
+            expect(move.text().contains("Choose a folder outside your library."), "moving onto itself: " + move.text());
+            Resp use = http.call("POST /api/library/change/switch", "/api/library/change/switch", itself, 400);
+            expect(use.text().contains("That is the library you are using."), "switching to itself: " + use.text());
+            http.call("POST /api/library/change/cancel", "/api/library/change/cancel", "{}", 409);
+            http.call("POST /api/library/change/dismiss", "/api/library/change/dismiss", "{}", 204);
+            http.call("POST /api/library/moved-note/dismiss", "/api/library/moved-note/dismiss", "{}", 204);
+            Resp old = http.call("DELETE /api/library/old-copy", "/api/library/old-copy", null, 409);
+            expect(old.text().contains("no_old_copy"), "Delete old copy without one: " + old.text());
+            Resp previous = http.call("POST /api/setup/previous", "/api/setup/previous", "{}", 409);
+            expect(previous.text().contains("no_previous"), "the old library without a change: " + previous.text());
+            Json status = Json.parse(http.call("GET /api/status", "/api/status", null, 200).text());
+            expect(status.isNull("changing") && status.isNull("libraryMoved"), "the status names a change: " + status);
         }
 
         void export() throws Exception {
