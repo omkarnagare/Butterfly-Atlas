@@ -9,7 +9,18 @@ export const SHORT_MS = 2600;
 export const LINK_MS = 8000;
 export const toast = $state({ message: '', seq: 0, link: null, ms: SHORT_MS });
 
+/**
+ * Change the library folder: while its screen is up in place of the page (or a request was just refused for it,
+ * 409 `library_changing`), no toast is shown; one on screen goes. Set by lib/status.svelte.js.
+ */
+let held = false;
+export function holdToasts(on) {
+  if (on && !held) hideToast();
+  held = on;
+}
+
 export function showToast(message, { link: wanted = null, ms } = {}) {
+  if (held) return;
   // No link to the page already shown (it would lead nowhere).
   const link = wanted && typeof window !== 'undefined' && window.location.hash === wanted.href ? null : wanted;
   ms ??= link ? LINK_MS : SHORT_MS;

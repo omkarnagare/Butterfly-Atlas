@@ -7,7 +7,8 @@ import { refreshStatus } from './status.svelte.js';
  * - one `EventSource('/api/session/stream')`, opened at start-up before the first API call, never closed by the page and
  *   never made twice (the browser reconnects it by itself, and the server quits the app when the last window's stream
  *   has been gone for a few seconds). One the browser has given up on (CLOSED) is replaced after a pause, so a window
- *   that is still open does not let the app quit; not once the session is lost, so nothing retries then;
+ *   that is still open does not let the app quit; not once the session is lost, so nothing retries then. The one
+ *   exception: after a change of library folder has quit the app to reopen it, `endSession` closes it for good;
  * - several-windows contract §3: the stream's `event: status` (what /api/status answers has changed, e.g. in another
  *   window) asks for the status as the footer does on focus; events within 250 ms make one read;
  * - `session.lost`: an API answered `401 no_session` (api.js sent NO_SESSION), so the page shows the full-screen message;
@@ -31,9 +32,11 @@ export const session = $state({
 let stream = null;
 let reopening = null;
 let statusSoon = null;
+// The session ended on purpose (endSession): no stream is made again and its events ask nothing.
+let ended = false;
 
 function statusChanged() {
-  if (statusSoon || session.lost) return;
+  if (statusSoon || session.lost || ended) return;
   statusSoon = setTimeout(() => {
     statusSoon = null;
     if (!session.lost) refreshStatus();
@@ -47,7 +50,7 @@ function open() {
   mine.addEventListener('status', statusChanged);
   // A drop is the browser's to reconnect; only one it has given up on is replaced.
   mine.onerror = () => {
-    if (mine !== stream || mine.readyState !== CLOSED || session.lost || reopening) return;
+    if (mine !== stream || mine.readyState !== CLOSED || session.lost || ended || reopening) return;
     reopening = setTimeout(() => {
       reopening = null;
       if (!session.lost) open();
@@ -67,9 +70,23 @@ function readNotice() {
   window.history.replaceState(window.history.state, '', `${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash}`);
 }
 
+/**
+ * Change the library folder (contract §2): the app has quit to reopen on the new folder, and the window keeps its last
+ * page. The stream is closed and never made again (a new copy of the app must not be held open by this old page, nor
+ * this page show its refusals).
+ */
+export function endSession() {
+  ended = true;
+  clearTimeout(reopening);
+  reopening = null;
+  clearTimeout(statusSoon);
+  statusSoon = null;
+  stream?.close?.();
+}
+
 /** Called once from main.js before the first API call; calling it again does nothing. */
 export function startSession() {
-  if (stream) return;
+  if (stream || ended) return;
   open();
   readNotice();
 }
@@ -96,9 +113,9 @@ const RETRY_MS = [1000, 2000];
  */
 export async function loadSessionWithRetry() {
   for (let i = 0; ; i += 1) {
-    if (await loadSession() || session.lost || i >= RETRY_MS.length) return;
+    if (ended || await loadSession() || session.lost || i >= RETRY_MS.length) return;
     await new Promise((resolve) => setTimeout(resolve, RETRY_MS[i]));
-    if (session.lost) return;
+    if (session.lost || ended) return;
   }
 }
 
@@ -109,6 +126,7 @@ export function resetSession() {
   clearTimeout(statusSoon);
   statusSoon = null;
   stream = null;
+  ended = false;
   session.lost = false;
   session.info = null;
   session.tabNote = '';

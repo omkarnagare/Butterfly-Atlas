@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 import App from './App.svelte';
-import { resetStatus } from './lib/status.svelte.js';
+import { refreshStatus, resetStatus } from './lib/status.svelte.js';
 import { resetSessionLost } from './lib/api.js';
 import { LOCK_NOTE, TAB_NOTE, resetSession, session } from './lib/session.svelte.js';
 
@@ -533,4 +533,67 @@ test('#/settings opens the Settings screen', async () => {
   expect(await screen.findByRole('heading', { level: 1, name: 'Settings' })).toBeTruthy();
   expect(await screen.findByText('Never backed up')).toBeTruthy();
   expect(screen.getByRole('link', { name: 'Settings' }).getAttribute('aria-current')).toBe('page');
+});
+
+// ---- changing the library folder (change-library-folder design §5, §6; contract §2, §4) ----
+
+const changing = (over = {}) => ({
+  kind: 'move', to: '/Volumes/B/Butterfly_Atlas', step: 'copying', files: { done: 10, total: 40 }, bytes: { done: 1024, total: 4096 },
+  canCancel: true, problem: null, left: null, reopen: null, ...over,
+});
+
+test('while the library folder changes the window shows the change screen in place of its page, which comes back after a cancel', async () => {
+  vi.stubGlobal('scrollTo', vi.fn());
+  const routes = { setup: configured, summary, status: { ...idleStatus, changing: changing() } };
+  stubApi(routes);
+  render(App);
+
+  expect(await screen.findByRole('heading', { level: 1, name: 'Moving your library' })).toBeTruthy();
+  expect(screen.queryByRole('heading', { name: 'Families' })).toBeNull();
+  expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull();
+
+  routes.status = idleStatus;
+  window.location.hash = '#/';
+  await refreshStatus();
+  expect(await screen.findByRole('heading', { name: 'Families' })).toBeTruthy();
+  expect(screen.queryByRole('heading', { level: 1, name: 'Moving your library' })).toBeNull();
+});
+
+test('a window opened during a change, whose setup read is refused for it, shows the change screen', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (url) => {
+    if (url.startsWith('./api/status')) return { ok: true, status: 200, json: async () => ({ ...idleStatus, changing: changing({ kind: 'switch', step: 'checking' }) }) };
+    if (url.startsWith('./api/session')) return { ok: true, status: 200, json: async () => ({ mode: 'window', lockWarning: false }) };
+    return { ok: false, status: 409, json: async () => ({ error: { code: 'library_changing', message: 'Butterfly Atlas is changing your library folder.' } }) };
+  }));
+  render(App);
+
+  expect(await screen.findByRole('heading', { level: 1, name: 'Changing to another library' })).toBeTruthy();
+  expect(screen.queryByText('Butterfly Atlas is changing your library folder.')).toBeNull();
+});
+
+test('after the app quits to reopen, the window keeps its last page: nothing more is asked and no error or session message shows', async () => {
+  vi.stubGlobal('scrollTo', vi.fn());
+  const reopening = changing({ step: 'reopening', canCancel: false, reopen: { how: 'restart', folder: '/Volumes/B/Butterfly_Atlas', why: null } });
+  let gone = false;
+  const fetchMock = vi.fn(async (url) => {
+    if (gone) return { ok: false, status: 401, json: async () => ({ error: { code: 'no_session', message: 'To open Butterfly Atlas, use its icon.' } }) };
+    if (url.startsWith('./api/status')) return { ok: true, status: 200, json: async () => ({ ...idleStatus, changing: reopening }) };
+    if (url.startsWith('./api/setup')) return { ok: true, status: 200, json: async () => configured };
+    return { ok: true, status: 200, json: async () => ({}) };
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  render(App);
+  const line = 'Butterfly Atlas reopened with your library at /Volumes/B/Butterfly_Atlas. You can close this window.';
+  expect((await screen.findByRole('heading', { level: 1 })).textContent).toBe(line);
+
+  gone = true;
+  const asked = fetchMock.mock.calls.length;
+  window.location.hash = '#/explore';
+  window.dispatchEvent(new HashChangeEvent('hashchange'));
+  await refreshStatus();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(fetchMock.mock.calls.slice(asked).map((call) => call[0])).toEqual([]);
+  expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(line);
+  expect(screen.queryByRole('alert')).toBeNull();
+  window.location.hash = '#/';
 });

@@ -1,9 +1,10 @@
 import { checkHeic, getBackup, getExport, getStatus } from './api.js';
-import { showToast } from './toast.svelte.js';
+import { holdToasts, showToast } from './toast.svelte.js';
 import { briefOf, pausedNoticeOf } from './updates.js';
 import { finishedLine } from './backups.js';
 import { UPDATE_HREF } from './route.js';
 import { LIBRARY_PROBLEM } from './events.js';
+import { LIBRARY_CHANGING } from './codes.js';
 import { exactExportedLine } from './raw.js';
 import { checkResult } from './heic.js';
 import { CANCELLED, DECODER_CHECKING, DECODER_MISSING, DONE, PAUSED, RUNNING, WAITING } from './states.js';
@@ -150,6 +151,7 @@ export function resetStatus() {
   status.unreachable = false;
   status.changing = null;
   status.libraryMoved = null;
+  holdToasts(false);
   failedReads = 0;
   retried = null;
   loadedAt = Date.now();
@@ -169,6 +171,9 @@ export function rescanMessage({ added = 0, removed = 0, updated = 0 } = {}) {
 
 /** Asks the server again; pages call it after deleting, restoring, emptying or adding. Failures leave the footer as it was. */
 export async function refreshStatus() {
+  // The app has quit to reopen on the new library folder (contract §2 `reopening`): the window keeps that page, and
+  // asks nothing more (the service is gone, or is another copy).
+  if (reopening()) return;
   const mine = ++seq;
   let next;
   try {
@@ -225,6 +230,7 @@ export async function refreshStatus() {
   if (next.theme !== undefined) serverTheme(next.theme);
   status.changing = next.changing ?? null;
   status.libraryMoved = next.libraryMoved ?? null;
+  holdToasts(status.changing !== null);
   const libraryBefore = status.library;
   status.library = next.library ?? null;
   // The library's drive is back: every screen whose load failed reads again (LIBRARY_CHANGED).
@@ -432,6 +438,9 @@ export function exportStopping(exportId) {
   stoppingId = exportId;
 }
 
+/** The change of library folder has reached `reopening`: the app is quitting, to reopen or for the user to open again. */
+export const reopening = () => status.changing?.step === 'reopening';
+
 /**
  * This page started a move or a switch of the library folder: the change (the 202 answer, `{ changing }` or the change
  * itself) shows at once, and the status is asked.
@@ -461,5 +470,11 @@ export function retryRefused(message, code) {
   status.retryNote = { at: clock(new Date()), message, code };
 }
 
-// A request refused because the library's drive is full or gone: read the status at once, so the banner shows.
-if (typeof window !== 'undefined') window.addEventListener(LIBRARY_PROBLEM, () => refreshStatus());
+// A request refused because the library's drive is full or gone: read the status at once, so the banner shows. One refused
+// because the library folder is changing holds toasts at once (its refusal is not shown), until the status says otherwise.
+if (typeof window !== 'undefined') {
+  window.addEventListener(LIBRARY_PROBLEM, (event) => {
+    if (event.detail?.code === LIBRARY_CHANGING) holdToasts(true);
+    refreshStatus();
+  });
+}
