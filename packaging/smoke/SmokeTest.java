@@ -24,6 +24,7 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -323,6 +324,16 @@ public final class SmokeTest {
             Resp page = http.get("/", true);
             expect(page.status() == 200 && page.text().toLowerCase(Locale.ROOT).contains("<html"),
                     "GET / gave " + page.status() + ", not the interface page");
+
+            step("the page's icon (the app window's title bar and taskbar) is the app icon");
+            expect(page.text().contains("href=\"./favicon.ico\""), "the interface page does not link favicon.ico");
+            Path icons = script.resolve("../icons");
+            for (String[] icon : List.of(new String[] {"/favicon.ico", "butterfly-atlas.ico"},
+                    new String[] {"/icon.png", "butterfly-atlas.png"})) {
+                Resp served = http.get(icon[0], true);
+                expect(served.status() == 200 && Arrays.equals(served.body(), Files.readAllBytes(icons.resolve(icon[1]))),
+                        "GET " + icon[0] + " gave " + served.status() + ", not packaging/icons/" + icon[1]);
+            }
 
             step("first run: the library folder is set up and the database migrates");
             setup();
