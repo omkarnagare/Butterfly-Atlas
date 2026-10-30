@@ -256,6 +256,33 @@ class LibraryChangeApiTest {
     }
 
     @Test
+    void settingsShowTheOldCopyAMoveLeftAndDeleteRemovesIt() throws Exception {
+        Path old = home.resolve("Old");
+        Library.open(old, TestBundles.fixture(), TestPlaces.bundles(), TestBundles.CLOCK);
+        RawHttp.Response none = RawHttp.send(server.port(), "DELETE", "/api/library/old-copy", Map.of("Origin", origin), null);
+        assertThat(none.status()).isEqualTo(409);
+        assertThat(none.body()).contains("\"code\":\"no_old_copy\"");
+        new ConfigStore(home.resolve("config")).save(new AppConfig(home.resolve("Atlas").toString(), null, old.toString(),
+                null, true));
+
+        JsonNode oldCopy = JSON.readTree(get("/api/library/change").body()).get("oldCopy");
+        assertThat(oldCopy.get("folder").asText()).isEqualTo(old.toString());
+        assertThat(oldCopy.get("size").asLong()).isPositive();
+        assertThat(oldCopy.get("lastBackup").isNull()).isTrue();
+
+        RawHttp.Response deleted = RawHttp.send(server.port(), "DELETE", "/api/library/old-copy", Map.of("Origin", origin),
+                null);
+
+        assertThat(deleted.status()).isEqualTo(200);
+        JsonNode answer = JSON.readTree(deleted.body());
+        assertThat(answer.get("deleted").asBoolean()).isTrue();
+        assertThat(answer.get("left").size()).isZero();
+        assertThat(answer.get("leftCount").asInt()).isZero();
+        assertThat(old).doesNotExist();
+        assertThat(JSON.readTree(get("/api/library/change").body()).get("oldCopy").isNull()).isTrue();
+    }
+
+    @Test
     void theRefusalsAnswerInTheirCodes() throws Exception {
         Path atlas = home.resolve("Atlas");
         Path other = home.resolve("Other");

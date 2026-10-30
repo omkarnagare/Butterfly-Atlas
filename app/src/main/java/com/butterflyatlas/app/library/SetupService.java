@@ -315,6 +315,22 @@ public final class SetupService {
         return status();
     }
 
+    /** The old copy a move left (spec §9), while the settings keep it; else null. */
+    public Path oldCopy() {
+        try {
+            return config.read().filter(AppConfig::hasOldCopy).map(AppConfig::previousDataFolder).map(Path::of)
+                    .orElse(null);
+        } catch (InvalidPathException e) {
+            return null;
+        }
+    }
+
+    /** The old copy is gone: the settings no longer name it (nor the library it was). */
+    public synchronized void forgetOldCopy() {
+        config.read().ifPresent(saved -> config.save(new AppConfig(saved.dataFolder(), saved.theme(), null,
+                saved.changePending(), null)));
+    }
+
     /** After a move, where the library is now, until the note is dismissed; else null. */
     public Moved libraryMoved() {
         return moved;

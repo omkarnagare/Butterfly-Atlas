@@ -137,3 +137,4 @@ POST /api/library/change/switch | library change
 POST /api/library/change/cancel | library change
 POST /api/library/change/dismiss | library change
 POST /api/library/moved-note/dismiss | library change
+DELETE /api/library/old-copy | library change

@@ -155,8 +155,28 @@ public final class LibraryChange {
      * {@code GET /api/library/change} (contract §3): the library folder, its size (every file in it), its drive's usable
      * space, whether it is fixed ({@code -Datlas.dataDir}), and the change running or waiting to be dismissed.
      */
-    public record Overview(String folder, long size, long free, boolean fixed, Changing changing) {
+    public record Overview(String folder, long size, long free, boolean fixed, Changing changing, OldCopy oldCopy) {
     }
+
+    /** The old copy a move left (spec §9): its folder, its size, and the library's last backup (null when none). */
+    public record OldCopy(String folder, long size, LastBackup lastBackup) {
+    }
+
+    /** The newest backup that finished: {@code everything} or {@code database}, and when (an ISO instant). */
+    public record LastBackup(String what, String finishedAt) {
+    }
+
+    /**
+     * {@code DELETE /api/library/old-copy}: whether the old library is gone ({@code deleted}; false while some of it is
+     * left), and up to {@link #NAMED} of what is still in its folder, of {@code leftCount}.
+     */
+    public record Deleted(boolean deleted, List<String> left, int leftCount) {
+    }
+
+    /** What a library is made of: all that Delete old copy removes (spec §9). */
+    private static final List<String> LIBRARY_PARTS = List.of(Database.FILE_NAME, Database.FILE_NAME + "-wal",
+            Database.FILE_NAME + "-shm", Database.FILE_NAME + "-journal", "images", ".thumbs", ".deleted", Library.INCOMING,
+            InstanceLock.FILE);
 
     /**
      * {@code GET /api/library/change/inspect} (contract §3): the setup screen's check of the folder shown, the refusal of
@@ -194,6 +214,8 @@ public final class LibraryChange {
     private final Background background;
     private final Switcher switcher;
     private final Object lock = new Object();
+    /** One Delete old copy at a time. */
+    private final Object deleting = new Object();
     /** Ends this copy of the app after the switch (set once the app runs; until then it quits and asks, doing nothing). */
     private volatile Relaunch.Reopener reopener = new Relaunch.Reopener() {
         @Override
@@ -249,7 +271,144 @@ public final class LibraryChange {
     public Overview overview() {
         Path folder = library.get().folder();
         return new Overview(folder.toString(), size(folder), usableSpace.applyAsLong(folder), setup != null && setup.fixed(),
-                changing().orElse(null));
+                changing().orElse(null), oldCopy());
+    }
+
+    /** The old copy a move left, while the settings keep it (until it is deleted or the user went back to it). */
+    private OldCopy oldCopy() {
+        Path folder = setup == null ? null : setup.oldCopy();
+        if (folder == null) {
+            return null;
+        }
+        return new OldCopy(folder.toString(), Files.isDirectory(folder) ? size(folder) : 0, lastBackup());
+    }
+
+    /** The newest backup of the library in use that finished (spec §9), or null; one that can't be read is none. */
+    private LastBackup lastBackup() {
+        try {
+            return library.get().database().read(c -> {
+                try (PreparedStatement ps = c.prepareStatement("SELECT what, finished_at FROM backup_run WHERE state = 'done'"
+                        + " ORDER BY finished_at DESC, id DESC LIMIT 1"); ResultSet rs = ps.executeQuery()) {
+                    return rs.next() ? new LastBackup(rs.getString(1), rs.getString(2)) : null;
+                }
+            });
+        } catch (RuntimeException e) {
+            LOG.warn("Could not read the last backup", e);
+            return null;
+        }
+    }
+
+    /**
+     * Delete old copy (spec §9): removes only what a library is made of from the old copy's folder, with its lock taken
+     * first and held while deleting (given back before the lock file itself goes); the folder goes only when that leaves
+     * it empty. When all of the library is gone, the settings forget the old copy; when some of it is left, they keep it
+     * and Delete can be chosen again. 409 {@code no_old_copy} when there is none; 409 {@code library_in_use} when it is
+     * the library in use or another copy of the app holds it.
+     */
+    public Deleted deleteOldCopy() {
+        synchronized (deleting) {
+            Path folder = setup == null ? null : setup.oldCopy();
+            if (folder == null) {
+                throw new AtlasException(AtlasException.Kind.CONFLICT, ErrorCodes.NO_OLD_COPY,
+                        "There is no old copy of your library to delete.");
+            }
+            Path current = real(library.get().folder());
+            Path target = real(folder);
+            if (target.equals(current) || current.startsWith(target) || target.startsWith(current)) {
+                throw new AtlasException(AtlasException.Kind.CONFLICT, ErrorCodes.LIBRARY_IN_USE,
+                        "That is the library you are using, so it can't be deleted.");
+            }
+            if (!Files.isDirectory(folder)) {
+                LOG.info("The old copy at {} is gone already", folder);
+                setup.forgetOldCopy();
+                return new Deleted(true, List.of(), 0);
+            }
+            InstanceLock.Result lock = InstanceLock.acquire(folder);
+            if (lock.state() == InstanceLock.State.HELD) {
+                throw new AtlasException(AtlasException.Kind.CONFLICT, ErrorCodes.LIBRARY_IN_USE, IN_USE_WORDS);
+            }
+            if (lock.state() == InstanceLock.State.CANNOT_LOCK) {
+                LOG.warn("The drive of {} cannot lock files ({}); deleting the old copy without its lock", folder,
+                        lock.reason());
+            }
+            try {
+                for (String part : LIBRARY_PARTS) {
+                    if (!part.equals(InstanceLock.FILE)) {
+                        deleteTree(folder.resolve(part));
+                    }
+                }
+            } finally {
+                if (lock.lock() != null) {
+                    try {
+                        lock.lock().close();
+                    } catch (IOException e) {
+                        LOG.debug("Could not give back the lock of {}", folder, e);
+                    }
+                }
+            }
+            deleteTree(folder.resolve(InstanceLock.FILE));
+            List<String> left = new ArrayList<>();
+            for (String part : LIBRARY_PARTS) {
+                left.addAll(filesIn(folder.resolve(part)));
+            }
+            boolean deleted = left.isEmpty();
+            try (Stream<Path> entries = Files.list(folder)) {
+                entries.filter(p -> !LIBRARY_PARTS.contains(p.getFileName().toString())).map(Path::toString).sorted()
+                        .forEach(left::add);
+            } catch (IOException e) {
+                LOG.warn("Could not list what is left in {}", folder, e);
+            }
+            if (left.isEmpty()) {
+                try {
+                    steps.delete(folder);
+                } catch (IOException | RuntimeException e) {
+                    LOG.warn("Could not remove the emptied folder {}", folder, e);
+                    left.add(folder.toString());
+                }
+            }
+            if (deleted) {
+                setup.forgetOldCopy();
+                LOG.info("Deleted the old copy of the library at {}{}", folder, left.isEmpty() ? "" : "; other things in"
+                        + " its folder were left: " + left.size());
+            } else {
+                LOG.warn("{} file(s) of the old copy at {} couldn't be deleted", left.size(), folder);
+            }
+            return new Deleted(deleted, List.copyOf(left.subList(0, Math.min(NAMED, left.size()))), left.size());
+        }
+    }
+
+    /** Deletes a file, or a folder and everything in it, through {@link ChangeSteps#delete}; what fails is logged. */
+    private void deleteTree(Path path) {
+        if (!Files.exists(path, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+            return;
+        }
+        List<Path> paths;
+        try (Stream<Path> walk = Files.walk(path)) {
+            paths = walk.sorted(Comparator.reverseOrder()).toList();
+        } catch (IOException | java.io.UncheckedIOException e) {
+            LOG.warn("Could not list {} to delete it", path, e);
+            return;
+        }
+        for (Path p : paths) {
+            try {
+                steps.delete(p);
+            } catch (IOException | RuntimeException e) {
+                LOG.warn("Could not delete {}", p, e);
+            }
+        }
+    }
+
+    /** The files still at {@code path} (itself, or under it), as full paths, sorted. */
+    private static List<String> filesIn(Path path) {
+        if (!Files.exists(path, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+            return List.of();
+        }
+        try (Stream<Path> walk = Files.walk(path)) {
+            return walk.filter(p -> !Files.isDirectory(p, java.nio.file.LinkOption.NOFOLLOW_LINKS)).map(Path::toString)
+                    .sorted().toList();
+        } catch (IOException | java.io.UncheckedIOException e) {
+            return List.of(path.toString());
+        }
     }
 
     /**

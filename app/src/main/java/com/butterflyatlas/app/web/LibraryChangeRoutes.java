@@ -8,7 +8,7 @@ import io.javalin.Javalin;
 /**
  * Changing the library folder from Settings (change-library-folder contract §3): the Library folder section's facts, the
  * folder browser's live check, Move and Use a different library (202 once started; the status's {@code changing} follows
- * it), Cancel, and putting a failed change away; and Home's one-time note after a move.
+ * it), Cancel, and putting a failed change away; Delete old copy after a move; and Home's one-time note after a move.
  */
 final class LibraryChangeRoutes {
 
@@ -41,6 +41,7 @@ final class LibraryChangeRoutes {
             change.dismiss();
             ctx.status(204);
         });
+        app.delete("/api/library/old-copy", ctx -> ctx.json(change.deleteOldCopy()));
         app.post("/api/library/moved-note/dismiss", ctx -> {
             setup.dismissMovedNote();
             ctx.status(204);
