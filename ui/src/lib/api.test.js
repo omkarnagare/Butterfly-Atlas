@@ -696,10 +696,10 @@ test('Check again asks for a fresh HEIC decoder check, and the rescan note is di
 });
 
 test('the appearance is read and saved (Meadow contract §2–§3)', async () => {
-  const fetchMock = vi.fn(async (url, init) => ({ ok: true, status: 200, json: async () => ({ theme: init.method === 'PUT' ? 'dark' : null }) }));
+  const fetchMock = vi.fn(async (url, init) => ({ ok: true, status: 200, json: async () => ({ theme: init.method === 'PUT' ? 'dark' : 'device' }) }));
   vi.stubGlobal('fetch', fetchMock);
 
-  await expect(getAppearance()).resolves.toEqual({ theme: null });
+  await expect(getAppearance()).resolves.toEqual({ theme: 'device' });
   await expect(setAppearance('dark')).resolves.toEqual({ theme: 'dark' });
 
   expect(fetchMock.mock.calls.map(([url, init]) => [init.method, url.replace('./api/', ''), init.body])).toEqual([

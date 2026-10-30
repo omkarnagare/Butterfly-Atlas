@@ -1,5 +1,5 @@
 /* Butterfly Atlas theme — see docs/PLAN.md §8a and the Meadow design (warm paper; dusk garden). Dusk is keyed on
-   data-theme, which lib/theme.svelte.js sets: the saved Light or Dark, else the OS setting. */
+   data-theme, which lib/theme.svelte.js sets: the saved Light or Dark, else the device's setting. */
 :root {
   --bg: #f6f4ea; --surface: #fffdf6; --surface-2: #eef0e1; --ink: #1c2a20; --muted: #556453; --line: #e0e1cf;
   --accent: #2c7a47; --accent-ink: #ffffff; --glow: #e9a012;
@@ -31,7 +31,7 @@
   --shadow: 0 22px 44px -26px rgba(0, 0, 0, .8);
   color-scheme: dark;
 }
-/* Before the theme store has run (no data-theme yet), a dark computer gets the dusk page, so nothing flashes white. */
+/* Before the theme store has run (no data-theme yet), a dark device gets the dusk page, so nothing flashes white. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) { --bg: #0f1b16; --ink: #e9efe4; color-scheme: dark; }
 }
