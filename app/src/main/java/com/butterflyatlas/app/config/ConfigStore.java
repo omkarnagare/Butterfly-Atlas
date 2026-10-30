@@ -40,8 +40,8 @@ public final class ConfigStore {
     }
 
     /**
-     * The file as saved, with or without a library folder; an unknown theme is logged and read as none. Empty when the
-     * file is missing or damaged.
+     * The file as saved, with or without a library folder; an unknown theme is logged and read as none (the rest is
+     * kept). Empty when the file is missing or damaged.
      */
     public Optional<AppConfig> read() {
         Path file = file();
@@ -55,7 +55,7 @@ public final class ConfigStore {
             }
             if (config.theme() != null && !AppConfig.isTheme(config.theme())) {
                 LOG.warn("Ignoring unknown theme \"{}\" in {}", config.theme(), file);
-                config = new AppConfig(config.dataFolder(), null);
+                config = config.withTheme(null);
             }
             return Optional.of(config);
         } catch (IOException e) {

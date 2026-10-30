@@ -319,8 +319,8 @@ public final class SetupService {
             throw new AtlasException(AtlasException.Kind.CONFLICT, NOT_SET_UP,
                     "Choose where to keep your photos first.");
         }
-        String folder = config.read().map(AppConfig::dataFolder).orElse(null);
-        config.save(new AppConfig(folder, requested));
+        // what else the settings hold (the library folder, a library change's fields) is kept as it is
+        config.save(config.read().map(saved -> saved.withTheme(requested)).orElse(new AppConfig(null, requested)));
         theme = requested;
         return requested;
     }
