@@ -131,9 +131,8 @@ public final class TestServices {
         custom.onChange(photos::changedElsewhere); // a rename or delete moves photos: the library's version
         updates.whenFinished(photos::changedElsewhere); // as do an update's moves
         LibraryChange change = new LibraryChange(holder::library, setup, ChangeSteps.REAL, usableSpace,
-                LibraryChange.Background.NONE, (kind, from, to) -> {
-                    throw new IllegalStateException("No switch in these tests");
-                }, RunningWork.of(exports, backups, imports, updates, processing, () -> false));
+                LibraryChange.Background.of(holder::library), setup::rememberChange,
+                RunningWork.of(exports, backups, imports, updates, processing, () -> false));
         return new AtlasServices(setup, taxa, new SearchWordService(holder, TestBundles.CLOCK), search,
                 photos, photoQueries, new TagService(holder::library), thumbnails,
                 new Rescan(holder::library, processor, TestBundles.CLOCK, thumbnails::request, facts),

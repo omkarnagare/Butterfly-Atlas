@@ -148,6 +148,8 @@ class LibraryChangeChecksTest {
                 refused(AtlasException.Kind.CONFLICT, ErrorCodes.WORK_RUNNING,
                         "An export is running. Pause it or wait for it to finish, then try again."));
         assertThat(drive.resolve("Butterfly_Atlas")).doesNotExist();
+        assertThatThrownBy(() -> change().switchTo(otherLibrary(home.resolve("Other")).toString()))
+                .isInstanceOfSatisfying(AtlasException.class, e -> assertThat(e.code()).isEqualTo(ErrorCodes.WORK_RUNNING));
     }
 
     @Test
@@ -163,10 +165,15 @@ class LibraryChangeChecksTest {
         assertThat(fine.needed()).isNull();
         assertThat(change.inspect(home.resolve("Empty").toString(), LibraryChange.SWITCH).refusal()).isNull();
         assertThat(change.inspect(current.toString(), LibraryChange.SWITCH).refusal()).isEqualTo(LibraryChange.CURRENT_LIBRARY);
+        assertThatThrownBy(() -> change.switchTo(current.toString())).isInstanceOfSatisfying(AtlasException.class,
+                refused(AtlasException.Kind.INVALID, ErrorCodes.INVALID, LibraryChange.CURRENT_WORDS));
 
         InstanceLock.Result held = InstanceLock.acquire(other);
         try {
             assertThat(change.inspect(other.toString(), LibraryChange.SWITCH).refusal()).isEqualTo(ErrorCodes.LIBRARY_IN_USE);
+            assertThatThrownBy(() -> change.switchTo(other.toString())).isInstanceOfSatisfying(AtlasException.class,
+                    refused(AtlasException.Kind.CONFLICT, ErrorCodes.LIBRARY_IN_USE,
+                            "Another copy of Butterfly Atlas is using this library."));
         } finally {
             held.lock().close();
         }
@@ -187,6 +194,8 @@ class LibraryChangeChecksTest {
         assertThat(change.overview().fixed()).isTrue();
         assertThatThrownBy(() -> change.move(drive.toString())).isInstanceOfSatisfying(AtlasException.class,
                 refused(AtlasException.Kind.CONFLICT, ErrorCodes.FIXED_FOLDER, LibraryChange.FIXED_WORDS));
+        assertThatThrownBy(() -> change.switchTo(drive.toString())).isInstanceOfSatisfying(AtlasException.class,
+                e -> assertThat(e.code()).isEqualTo(ErrorCodes.FIXED_FOLDER));
     }
 
     @Test

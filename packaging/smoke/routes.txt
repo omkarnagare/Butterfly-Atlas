@@ -128,3 +128,10 @@ GET /api/status | status
 POST /api/rescan-left/dismiss | status
 
 POST /api/heic/check | heic
+
+GET /api/library/change | library change
+GET /api/library/change/inspect | library change
+POST /api/library/change/move | library change
+POST /api/library/change/switch | library change
+POST /api/library/change/cancel | library change
+POST /api/library/change/dismiss | library change

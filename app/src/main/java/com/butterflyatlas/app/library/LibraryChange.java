@@ -4,6 +4,7 @@ import com.butterflyatlas.app.AtlasException;
 import com.butterflyatlas.app.ErrorCodes;
 import com.butterflyatlas.app.db.Database;
 import com.butterflyatlas.app.window.InstanceLock;
+import com.butterflyatlas.app.window.Relaunch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sqlite.SQLiteConfig;
@@ -105,6 +106,26 @@ public final class LibraryChange {
             public void release() {
             }
         };
+
+        /** The open library's own {@link WorkHold}: thumbnails (and their HEIC decodes) and photo details. */
+        static Background of(Supplier<Library> library) {
+            return new Background() {
+                @Override
+                public void hold() {
+                    try {
+                        library.get().workHold().hold();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException("Interrupted while holding the background work", e);
+                    }
+                }
+
+                @Override
+                public void release() {
+                    library.get().workHold().release();
+                }
+            };
+        }
     }
 
     /** The switch (spec §5 step 4): the settings saved with the new library folder; throws when they can't be. */
@@ -173,6 +194,25 @@ public final class LibraryChange {
     private final Background background;
     private final Switcher switcher;
     private final Object lock = new Object();
+    /** Ends this copy of the app after the switch (set once the app runs; until then it quits and asks, doing nothing). */
+    private volatile Relaunch.Reopener reopener = new Relaunch.Reopener() {
+        @Override
+        public Relaunch.Plan plan() {
+            return Relaunch.plan(null);
+        }
+
+        @Override
+        public boolean begin(Relaunch.Plan plan) {
+            LOG.warn("No app to reopen after the library change");
+            return false;
+        }
+
+        @Override
+        public void exit() {
+        }
+    };
+    /** How long every window has to read {@code reopening} before the quit (contract §2). */
+    private volatile Duration reopenWait = REOPEN_WAIT;
     /** What every window is shown; null when no change runs or waits to be dismissed. */
     private Changing current;
     private boolean cancelRequested;
@@ -425,6 +465,15 @@ public final class LibraryChange {
         }
     }
 
+    /** How long every window is given to read {@code reopening} before the app quits (contract §2). */
+    public static final Duration REOPEN_WAIT = Duration.ofMillis(1500);
+
+    /** What ends this copy of the app after a switch, and how long the windows are given to read how first. */
+    public void reopenWith(Relaunch.Reopener reopener, Duration wait) {
+        this.reopener = reopener;
+        this.reopenWait = wait;
+    }
+
     /** The words of the refusal while a change runs or waits to be dismissed (contract §4). */
     public static final String CHANGING_MESSAGE = "Butterfly Atlas is changing your library folder.";
 
@@ -513,6 +562,7 @@ public final class LibraryChange {
                         + " its settings folder can be written, then try again.", e);
             }
             LOG.info("Your library was copied to {} and checked; Butterfly Atlas switches to it", to);
+            reopen(to);
         } catch (Cancelled c) {
             LOG.info("The move of the library to {} was cancelled", to);
             Left left = created || Files.exists(to) ? removeCopy(from, to) : null;
@@ -527,6 +577,148 @@ public final class LibraryChange {
         } catch (RuntimeException | Error e) {
             LOG.error("The move of the library to {} stopped on an unexpected error", to, e);
             failed(from, to, "Your library couldn't be copied to " + to + ". " + SetupService.UNEXPECTED, held);
+        }
+    }
+
+    /**
+     * Use a different library (spec §5): checks again (fixed folder, a change already running, running work, the folder,
+     * a library another copy holds) and starts the switch. 409 {@code fixed_folder}, {@code library_changing},
+     * {@code work_running} or {@code library_in_use}; 400 {@code invalid} for the folder, in the setup screen's words.
+     */
+    public Changing switchTo(String rawPath) {
+        allowed();
+        SetupService.Place place = place(rawPath);
+        if (SetupService.NOT_WRITABLE.equals(place.kind())) {
+            throw invalid(NOT_WRITABLE_WORDS);
+        }
+        String refusal = refusal(false, setup.resolve(rawPath), place.folder(), place.kind(), null, null);
+        if (refusal != null) {
+            throw refused(false, refusal, 0, 0);
+        }
+        Path from = library.get().folder();
+        Path to = place.folder();
+        boolean existing = SetupService.EXISTING.equals(place.kind());
+        synchronized (lock) {
+            if (current != null) {
+                throw new AtlasException(AtlasException.Kind.CONFLICT, ErrorCodes.LIBRARY_CHANGING, CHANGING_MESSAGE);
+            }
+            cancelRequested = false;
+            current = new Changing(SWITCH, to.toString(), CHECKING, Count.NONE, Count.NONE, true, null, null, null);
+            worker = new Thread(() -> switchLibrary(from, to, existing), "atlas-library-change");
+            worker.setDaemon(true);
+            worker.start();
+            return current;
+        }
+    }
+
+    /**
+     * {@code checking}: an existing library is read to confirm this app can open it (not newer, its place data shipped);
+     * a new one's folder is made and must take files (the next start creates the library in it). Then the switch and the
+     * reopening. Its unfinished work is cleared by the next start, which opens it.
+     */
+    private void switchLibrary(Path from, Path to, boolean existing) {
+        boolean made = false;
+        try {
+            if (existing) {
+                String why = setup.cannotOpen(to);
+                if (why != null) {
+                    throw new Failed("Butterfly Atlas can't open the library at " + to + ". " + why,
+                            new IllegalStateException(why));
+                }
+            } else {
+                made = !Files.exists(to);
+                try {
+                    steps.createFolder(to);
+                } catch (IOException | RuntimeException e) {
+                    throw new Failed("Butterfly Atlas can't make a library at " + to + ". " + reason(from, to, false, e), e);
+                }
+                if (!SetupService.canWrite(to)) {
+                    throw new Failed("Butterfly Atlas can't make a library at " + to + ". " + NOT_WRITABLE_THERE,
+                            new IOException("cannot write in " + to));
+                }
+            }
+            synchronized (lock) {
+                if (cancelRequested) {
+                    throw new Cancelled();
+                }
+                current = with(current, SWITCHING, false);
+            }
+            try {
+                switcher.switchTo(SWITCH, from, to);
+            } catch (Exception e) {
+                throw new Failed("Butterfly Atlas couldn't save which library to use, so it still uses this one. Check"
+                        + " that its settings folder can be written, then try again.", e);
+            }
+            LOG.info("Butterfly Atlas switches to the library at {}", to);
+            reopen(to);
+        } catch (Cancelled c) {
+            LOG.info("The switch to the library at {} was cancelled", to);
+            removeMadeFolder(made, to);
+            synchronized (lock) {
+                current = null;
+            }
+        } catch (Failed f) {
+            LOG.warn("Could not switch to the library at {}: {}", to, f.getMessage(), f.getCause());
+            removeMadeFolder(made, to);
+            synchronized (lock) {
+                current = new Changing(SWITCH, to.toString(), FAILED, Count.NONE, Count.NONE, false, f.getMessage(), null,
+                        null);
+            }
+        } catch (RuntimeException | Error e) {
+            LOG.error("The switch to the library at {} stopped on an unexpected error", to, e);
+            removeMadeFolder(made, to);
+            synchronized (lock) {
+                current = new Changing(SWITCH, to.toString(), FAILED, Count.NONE, Count.NONE, false,
+                        "Butterfly Atlas couldn't switch to the library at " + to + ". " + SetupService.UNEXPECTED, null,
+                        null);
+            }
+        }
+    }
+
+    /** A new library's folder this switch made goes again when the switch does not happen (only while it is empty). */
+    private void removeMadeFolder(boolean made, Path to) {
+        if (made) {
+            try {
+                steps.delete(to);
+            } catch (IOException | RuntimeException e) {
+                LOG.warn("Could not remove the folder {} made for the new library", to, e);
+            }
+        }
+    }
+
+    /**
+     * {@code reopening} (spec §6, contract §2): every window is told how the app reopens on {@code to}, and given
+     * {@link #REOPEN_WAIT} to read it; then the quit begins and the new copy is started. When it can't be, the windows are
+     * told the app quits instead, and why, and given the time again; then the exit.
+     */
+    private void reopen(Path to) {
+        Relaunch.Plan plan = reopener.plan();
+        set(new Reopen(plan.restarts() ? RESTART : QUIT, to.toString(), plan.why()));
+        pause();
+        boolean started = reopener.begin(plan);
+        if (plan.restarts() && !started) {
+            set(new Reopen(QUIT, to.toString(), Relaunch.NOT_STARTED));
+            pause();
+        }
+        reopener.exit();
+    }
+
+    /** How the app reopens: it starts itself again, or quits and asks to be opened again. */
+    public static final String RESTART = "restart";
+    public static final String QUIT = "quit";
+
+    private void set(Reopen reopen) {
+        synchronized (lock) {
+            current = new Changing(current.kind(), current.to(), REOPENING, current.files(), current.bytes(), false, null,
+                    null, reopen);
+        }
+    }
+
+    private void pause() {
+        try {
+            Thread.sleep(reopenWait.toMillis());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 

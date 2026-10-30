@@ -246,10 +246,11 @@ public final class Main {
         custom.onChange(photos::changedElsewhere); // a rename or delete moves photos: the library's version
         updates.whenFinished(photos::changedElsewhere); // as do an update's moves
         // Changing the library folder (change-library-folder spec): refused while work runs that must finish first.
+        // While a move copies the library, thumbnails (and their HEIC decodes) and photo details wait; the switch saves
+        // the settings, and the app then reopens itself (AppStart sets how).
         LibraryChange change = new LibraryChange(holder::library, setup, ChangeSteps.REAL, LibraryDrive::usableSpace,
-                LibraryChange.Background.NONE, (kind, from, to) -> {
-                    throw new IllegalStateException("A library change can't switch yet");
-                }, RunningWork.of(exports, backups, imports, updates, processing, startupWork::running));
+                LibraryChange.Background.of(holder::library), setup::rememberChange,
+                RunningWork.of(exports, backups, imports, updates, processing, startupWork::running));
         return new AtlasServices(setup, taxa, new SearchWordService(holder, clock),
                 search, photos, photoQueries, new TagService(holder::library),
                 thumbnails, rescan, processing, new FolderBrowser(holder::current, imports.store(), home), imports,

@@ -70,6 +70,7 @@ public final class Api {
         new UpdateRoutes(services.updates(), services.splits()).register(app);
         new PlaceUpdateRoutes(services.placeNotes()).register(app);
         new HeicRoutes(services.heic()).register(app);
+        new LibraryChangeRoutes(services.change()).register(app);
         StatusRoutes status = new StatusRoutes(services.rescan(), services.thumbnails(), services.photos(),
                 services.processing(), services.imports(), services.exports(), services.updates(), services.drive(),
                 services.placeNotes(), services.backups(), services.setup()::theme,

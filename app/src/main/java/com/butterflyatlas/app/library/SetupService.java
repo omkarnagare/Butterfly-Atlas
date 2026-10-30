@@ -14,6 +14,7 @@ import com.butterflyatlas.app.taxonomy.TaxonomyBundles;
 import com.butterflyatlas.app.window.InstanceLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.sqlite.SQLiteConfig;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -333,6 +334,49 @@ public final class SetupService {
         return requested;
     }
 
+    /**
+     * Whether this app can open the library at {@code folder}, read without changing it (change-library-folder spec §5,
+     * Use a different library's {@code checking}): not made by a newer app, and on place data this app ships. Null when
+     * it can, else why not in plain words.
+     */
+    String cannotOpen(Path folder) {
+        Path file = folder.resolve(Database.FILE_NAME);
+        SQLiteConfig readOnly = new SQLiteConfig();
+        readOnly.setReadOnly(true);
+        try (java.sql.Connection c = readOnly.createConnection("jdbc:sqlite:" + file.toAbsolutePath())) {
+            int newest = 0;
+            try (java.sql.Statement st = c.createStatement(); java.sql.ResultSet rs = st.executeQuery(
+                    "SELECT MAX(CAST(version AS INTEGER)) FROM flyway_schema_history WHERE success = 1")) {
+                if (rs.next()) {
+                    newest = rs.getInt(1);
+                }
+            }
+            if (newest > Database.knownSchemaVersion()) {
+                return new LibraryTooNewException(newest, Database.knownSchemaVersion()).getMessage();
+            }
+            java.util.List<String> versions = new java.util.ArrayList<>();
+            try (java.sql.Statement st = c.createStatement(); java.sql.ResultSet rs = st.executeQuery(
+                    "SELECT DISTINCT bundle_version FROM place_state ORDER BY 1")) {
+                while (rs.next()) {
+                    versions.add(rs.getString(1));
+                }
+            }
+            return com.butterflyatlas.app.placeupdates.PlaceChain.unavailable(versions, places).orElse(null);
+        } catch (java.sql.SQLException e) {
+            LOG.warn("Could not read the library at {}", folder, e);
+            return "Its atlas.db couldn't be read as a Butterfly Atlas library. " + plain(folder, e, LibraryDrive::usableSpace);
+        }
+    }
+
+    /**
+     * Remembers a change of library folder at its switch (spec §5 step 4, §8): {@code to} is the library folder from now
+     * on, {@code from} the one before it, the change waits for the new library's first open, and after a move the old copy
+     * is kept. The look is kept. A failed write throws and the settings are as they were.
+     */
+    public synchronized void rememberChange(String kind, Path from, Path to) {
+        config.save(new AppConfig(to.toString(), theme, from.toString(), true, LibraryChange.MOVE.equals(kind)));
+    }
+
     /** {@link #inspect(String, boolean)} for the folder as given. */
     public FolderCheck inspect(String rawPath) {
         return inspect(rawPath, true);
@@ -546,7 +590,7 @@ public final class SetupService {
         return path.normalize();
     }
 
-    private static boolean canWrite(Path folder) {
+    static boolean canWrite(Path folder) {
         Path probe;
         try {
             probe = Files.createTempFile(folder, ".atlas-write-check", ".tmp");

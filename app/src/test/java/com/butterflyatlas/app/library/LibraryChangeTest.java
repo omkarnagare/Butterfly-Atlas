@@ -160,6 +160,24 @@ class LibraryChangeTest {
             throws Exception {
         Map<String, String> before = contents();
         LibraryChange change = change(new Steps());
+        List<String> reopened = new CopyOnWriteArrayList<>();
+        change.reopenWith(new com.butterflyatlas.app.window.Relaunch.Reopener() {
+            @Override
+            public com.butterflyatlas.app.window.Relaunch.Plan plan() {
+                return com.butterflyatlas.app.window.Relaunch.plan(null);
+            }
+
+            @Override
+            public boolean begin(com.butterflyatlas.app.window.Relaunch.Plan plan) {
+                reopened.add("begin");
+                return false;
+            }
+
+            @Override
+            public void exit() {
+                reopened.add("exit");
+            }
+        }, Duration.ofMillis(10));
 
         LibraryChange.Changing started = change.copyTo(to);
         assertThat(started.kind()).isEqualTo(LibraryChange.MOVE);
@@ -167,7 +185,10 @@ class LibraryChangeTest {
         assertThat(started.canCancel()).isTrue();
         LibraryChange.Changing end = done(change);
 
-        assertThat(end.step()).isEqualTo(LibraryChange.SWITCHING);
+        assertThat(end.step()).isEqualTo(LibraryChange.REOPENING);
+        assertThat(end.reopen()).isEqualTo(new LibraryChange.Reopen(LibraryChange.QUIT, to.toString(),
+                com.butterflyatlas.app.window.Relaunch.NOT_INSTALLED));
+        assertThat(reopened).containsExactly("begin", "exit");
         assertThat(end.canCancel()).isFalse();
         assertThat(end.problem()).isNull();
         assertThat(end.files()).isEqualTo(new LibraryChange.Count(5, 5));

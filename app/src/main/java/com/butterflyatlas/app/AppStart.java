@@ -2,6 +2,7 @@ package com.butterflyatlas.app;
 
 import com.butterflyatlas.app.config.AppDirs;
 import com.butterflyatlas.app.db.LibraryTooNewException;
+import com.butterflyatlas.app.library.LibraryChange;
 import com.butterflyatlas.app.library.SetupService;
 import com.butterflyatlas.app.places.PlaceBundleException;
 import com.butterflyatlas.app.taxonomy.BundleException;
@@ -293,6 +294,7 @@ final class AppStart {
         Running app = new Running(server, services, timer, closing, pointer, keys.instanceKey(), launchFiles, sweeper,
                 this::releaseInstanceLock, reopener(running));
         running.set(app);
+        services.change().reopenWith(app.reopener(), LibraryChange.REOPEN_WAIT); // a library change ends this copy so
         world.shutdownHook().accept(new Thread(app::close, "atlas-shutdown"));
         log.info("Butterfly Atlas " + AtlasVersion.current() + " is running on port " + server.port());
         world.console().accept("Butterfly Atlas is running at " + server.baseUri());
