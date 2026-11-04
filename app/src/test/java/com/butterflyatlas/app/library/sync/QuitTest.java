@@ -63,7 +63,7 @@ class QuitTest {
 
         assertThat(generation(folderA)).isEqualTo(2);
         assertThat(MarkerFile.read(folderA).marker()).isEqualTo(new Marker(a.sync.device().id(), "Omkar's MacBook Air",
-                Marker.CLOSED, since, clock.instant(), 2));
+                Marker.CLOSED, since, clock.instant(), 2, Checksum.of(folderA.resolve(Database.FILE_NAME))));
         a.write("after");
         clock.advance(Duration.ofMinutes(5));
         a.ticker.runDue();

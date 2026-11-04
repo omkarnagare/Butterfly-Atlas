@@ -19,14 +19,14 @@ import java.time.Instant;
  * <ol>
  *   <li>{@link OnlineCopy#copy} (as a backup's database) into {@code atlas.db.part} in the library</li>
  *   <li>the copy's {@code generation} set to the working copy's plus one and its {@code dirty} to 0, then checked
- *   ({@code quick_check})</li>
+ *   ({@code quick_check}), and its SHA-256 taken</li>
  *   <li>the marker read again: when it names another device, it stops here and the {@code .part} goes</li>
  *   <li>the {@code .part} renamed over {@code atlas.db}, tried again for a moment when it is refused ({@link Replace})
  *   (and the {@code -wal} and {@code -shm} an in-place opening left
  *   deleted)</li>
  *   <li>in the working copy, {@code generation} the new number, {@code published_at} now and {@code dirty} 0, unless a
  *   write happened during steps 1–4, when {@code dirty} stays 1</li>
- *   <li>the marker written with the new {@code generation} and {@code seen}</li>
+ *   <li>the marker written with the new {@code generation}, its SHA-256 and {@code seen}</li>
  * </ol>
  */
 public final class Publish {
@@ -37,8 +37,11 @@ public final class Publish {
     public sealed interface Result permits Published, NotOurs {
     }
 
-    /** It published {@code generation}; {@code dirty}: a write happened meanwhile, so another publish should follow. */
-    public record Published(long generation, boolean dirty) implements Result {
+    /**
+     * It published {@code generation}, whose snapshot's SHA-256 is {@code sha256}; {@code dirty}: a write happened
+     * meanwhile, so another publish should follow.
+     */
+    public record Published(long generation, boolean dirty, String sha256) implements Result {
     }
 
     /** Step 3 found the marker naming another device: nothing was published (§6). */
@@ -73,6 +76,7 @@ public final class Publish {
         long next = generation != null ? generation : state.generation() + 1;
         Path part = library.resolve(PART);
         Files.deleteIfExists(part);
+        String sha256;
         try {
             OnlineCopy.copy(working, part);
             try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + part.toAbsolutePath())) {
@@ -83,6 +87,7 @@ public final class Publish {
                 c.commit();
             }
             WorkingCopy.check(part);
+            sha256 = Checksum.of(part); // the rename keeps it
             afterCopy.run();
             MarkerFile.Read read = MarkerFile.readSettled(library, pause);
             if (read.unreadable()) {
@@ -111,8 +116,8 @@ public final class Publish {
             SyncState.set(c, SyncState.DIRTY, meanwhile ? "1" : "0");
             return meanwhile;
         });
-        MarkerFile.write(library, new Marker(device.id(), device.name(), Marker.OPEN, since, now, next));
+        MarkerFile.write(library, new Marker(device.id(), device.name(), Marker.OPEN, since, now, next, sha256));
         LOG.info("Published generation {} of the library at {}", next, library);
-        return new Published(next, dirty);
+        return new Published(next, dirty, sha256);
     }
 }

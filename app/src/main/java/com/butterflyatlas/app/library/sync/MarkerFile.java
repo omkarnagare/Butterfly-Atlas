@@ -81,7 +81,10 @@ public final class MarkerFile {
                 return Read.unreadable("it isn't a complete marker");
             }
             String name = node.hasNonNull("name") && !node.get("name").asText().isBlank() ? node.get("name").asText() : null;
-            return new Read(new Marker(device, name, state, since, seen, node.get("generation").asLong()), false, null);
+            String sha256 = node.hasNonNull("sha256") && !node.get("sha256").asText().isBlank() ? node.get("sha256").asText()
+                    : null;
+            return new Read(new Marker(device, name, state, since, seen, node.get("generation").asLong(), sha256), false,
+                    null);
         } catch (IOException | DateTimeParseException | NullPointerException e) {
             return Read.unreadable("it isn't a complete marker");
         }
@@ -120,6 +123,9 @@ public final class MarkerFile {
         node.put("since", marker.since().toString());
         node.put("seen", marker.seen().toString());
         node.put("generation", marker.generation());
+        if (marker.sha256() != null) {
+            node.put("sha256", marker.sha256());
+        }
         Path part = library.resolve(PART);
         try {
             Files.writeString(part, JSON.writerWithDefaultPrettyPrinter().writeValueAsString(node) + "\n",

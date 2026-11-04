@@ -58,6 +58,18 @@ public final class LibrarySync {
     /** The library claimed in this run (null until one is). */
     private volatile Claim claimed;
 
+    /** The SHA-256 of the library's snapshot (§5), null when it isn't there. */
+    private static String checksum(Path snapshot) {
+        if (!Files.isRegularFile(snapshot)) {
+            return null;
+        }
+        try {
+            return Checksum.of(snapshot);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Could not read the library's database " + snapshot, e);
+        }
+    }
+
     /** What this run claimed; {@code unsent}: the working copy had unsent changes of the last session (§5 case 2). */
     record Claim(Path folder, Library library, Instant since, boolean unsent) {
     }
@@ -210,6 +222,12 @@ public final class LibrarySync {
             throw new Refusal.OtherDevice(new Refusal.OtherDevice.Info(refused.name(), refused.seen().toString(),
                     refused.openAnywayFrom().toString()));
         }
+        String sha256 = checksum(snapshot);
+        if (marker != null && marker.sha256() != null && !marker.sha256().equals(sha256)) {
+            // The snapshot isn't the one the marker names: the sync app hasn't finished bringing it (§5 case 1)
+            LOG.info("The library's database at {} doesn't match its marker's checksum yet; it isn't opened", snapshot);
+            throw new Refusal.NotSynced(new Refusal.NotSynced.Info(folder.toString()));
+        }
         OptionalInt version = Database.newestSchemaVersion(snapshot);
         if (version.isPresent() && version.getAsInt() > Database.knownSchemaVersion()) {
             throw new LibraryTooNewException(version.getAsInt(), Database.knownSchemaVersion());
@@ -258,7 +276,7 @@ public final class LibrarySync {
         boolean unsent = claim == ClaimRules.Claim.USE_WORKING_COPY && mine.dirty();
         Library opened = opener.open(working.file());
         try {
-            MarkerFile.write(folder, new Marker(me.id(), me.name(), Marker.OPEN, now, now, library.generation()));
+            MarkerFile.write(folder, new Marker(me.id(), me.name(), Marker.OPEN, now, now, library.generation(), sha256));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -553,9 +571,11 @@ public final class LibrarySync {
                 } else {
                     long generation = read.marker() != null ? read.marker().generation()
                             : SyncState.read(c.library().database()).generation();
+                    String sha256 = read.marker() != null ? read.marker().sha256()
+                            : checksum(c.folder().resolve(Database.FILE_NAME));
                     Device me = device();
                     MarkerFile.write(c.folder(), new Marker(me.id(), me.name(), Marker.OPEN, c.since(), clock.instant(),
-                            generation));
+                            generation, sha256));
                 }
             } catch (IOException | RuntimeException e) {
                 LOG.warn("Could not write this device's heartbeat into the library's marker", e);
@@ -699,6 +719,8 @@ public final class LibrarySync {
                 Device me = device();
                 SyncState mine = SyncState.read(c.library().database());
                 long generation = mine.generation();
+                String sha256 = null;
+                boolean published = false;
                 if (mine.dirty()) {
                     Publish.Result result = Publish.run(c.library().database(), c.folder(), me, c.since(), clock.instant(),
                             null, pause, () -> { });
@@ -708,6 +730,8 @@ public final class LibrarySync {
                         return;
                     }
                     generation = ((Publish.Published) result).generation();
+                    sha256 = ((Publish.Published) result).sha256();
+                    published = true;
                 }
                 MarkerFile.Read read = MarkerFile.readSettled(c.folder(), pause);
                 if (read.marker() != null && !read.marker().names(me.id())) {
@@ -715,8 +739,11 @@ public final class LibrarySync {
                             read.marker().name());
                     return;
                 }
+                if (!published) {
+                    sha256 = read.marker() != null ? read.marker().sha256() : checksum(c.folder().resolve(Database.FILE_NAME));
+                }
                 MarkerFile.write(c.folder(), new Marker(me.id(), me.name(), Marker.CLOSED, c.since(), clock.instant(),
-                        generation));
+                        generation, sha256));
                 LOG.info("The library at {} is closed on this device (generation {})", c.folder(), generation);
             } catch (IOException | SQLException | RuntimeException e) {
                 LOG.warn("Could not send the library's last changes or mark it closed at quit; the next start on this"

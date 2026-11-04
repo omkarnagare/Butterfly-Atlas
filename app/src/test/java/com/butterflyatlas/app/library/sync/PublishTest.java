@@ -66,15 +66,20 @@ class PublishTest {
         return Files.list(library).map(p -> p.getFileName().toString()).sorted();
     }
 
+    /** The SHA-256 of the library's snapshot as it is now. */
+    private String sha() throws IOException {
+        return Checksum.of(library.resolve(Database.FILE_NAME));
+    }
+
     @Test
     void theGenerationGoesUpInTheSnapshotTheWorkingCopyAndTheMarker() throws Exception {
         Publish.Result result = publish(() -> { });
 
-        assertThat(result).isEqualTo(new Publish.Published(5, false));
+        assertThat(result).isEqualTo(new Publish.Published(5, false, sha()));
         assertThat(snapshot()).isEqualTo(new SyncState("lib-1", 5, NOW, false));
         assertThat(SyncState.read(working)).isEqualTo(new SyncState("lib-1", 5, NOW, false));
         assertThat(MarkerFile.read(library).marker())
-                .isEqualTo(new Marker("dev-me", "Omkar's MacBook Air", Marker.OPEN, SINCE, NOW, 5));
+                .isEqualTo(new Marker("dev-me", "Omkar's MacBook Air", Marker.OPEN, SINCE, NOW, 5, sha()));
         assertThat(names()).containsExactly(MarkerFile.NAME, Database.FILE_NAME);
     }
 
@@ -112,10 +117,10 @@ class PublishTest {
     void aWriteDuringThePublishKeepsTheWorkingCopyDirty() throws Exception {
         Publish.Result result = publish(() -> write("meanwhile"));
 
-        assertThat(result).isEqualTo(new Publish.Published(5, true));
+        assertThat(result).isEqualTo(new Publish.Published(5, true, sha()));
         assertThat(SyncState.read(working).dirty()).isTrue();
         assertThat(snapshot().dirty()).isFalse();
-        assertThat(publish(() -> { })).isEqualTo(new Publish.Published(6, false));
+        assertThat(publish(() -> { })).isEqualTo(new Publish.Published(6, false, sha()));
     }
 
     @Test
@@ -155,7 +160,7 @@ class PublishTest {
     void aGivenGenerationIsPublishedAsItIs() throws Exception {
         Publish.Result result = Publish.run(working, library, ME, SINCE, NOW, 1L, millis -> { }, () -> { });
 
-        assertThat(result).isEqualTo(new Publish.Published(1, false));
+        assertThat(result).isEqualTo(new Publish.Published(1, false, sha()));
         assertThat(snapshot().generation()).isEqualTo(1);
     }
 

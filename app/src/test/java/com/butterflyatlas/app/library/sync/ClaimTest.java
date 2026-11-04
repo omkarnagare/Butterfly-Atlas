@@ -82,7 +82,7 @@ class ClaimTest {
         assertThat(snap.generation()).isEqualTo(1);
         assertThat(snap.dirty()).isFalse();
         assertThat(marker(folderA)).isEqualTo(new Marker(a.sync.device().id(), MAC, Marker.OPEN, clock.instant(),
-                clock.instant(), 1));
+                clock.instant(), 1, Checksum.of(folderA.resolve(Database.FILE_NAME))));
         assertThat(a.db().file()).isEqualTo(WorkingCopy.of(a.config, snap.libraryId()).file());
         assertThat(SyncState.read(a.db())).isEqualTo(new SyncState(snap.libraryId(), 1, clock.instant(), false));
     }
