@@ -16,6 +16,8 @@ POST /api/setup | setup
 GET /api/setup/inspect | setup
 POST /api/setup/retry | setup
 POST /api/setup/previous | setup
+POST /api/setup/open-anyway | setup
+POST /api/setup/discarded/continue | setup
 
 GET /api/appearance | appearance
 PUT /api/appearance | appearance

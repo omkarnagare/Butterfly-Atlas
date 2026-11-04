@@ -10,6 +10,8 @@ import com.butterflyatlas.app.db.LibraryTooNewException;
 import com.butterflyatlas.app.places.PlaceBundles;
 import com.butterflyatlas.app.placeupdates.PlaceDataUnavailableException;
 import com.butterflyatlas.app.placeupdates.PlaceUpdateException;
+import com.butterflyatlas.app.sync.LibrarySync;
+import com.butterflyatlas.app.sync.Refusal;
 import com.butterflyatlas.app.taxonomy.TaxonomyBundles;
 import com.butterflyatlas.app.window.InstanceLock;
 import org.slf4j.Logger;
@@ -40,9 +42,18 @@ public final class SetupService {
      * is true then, when opening it again ({@link #retry}) may work. When it is the first open after a change of library
      * folder (change-library-folder spec §6), {@code previousFolder} is the library used before, offered instead
      * ({@link #usePrevious}), and after a move {@code movedCopy} is the moved copy, which is not deleted; else both null.
+     * {@code otherDevice}, {@code notSynced} and {@code discarded} say why the library didn't open on this device
+     * (one-device contract §1); when one is set, {@code problem} is null.
      */
     public record Status(boolean configured, String suggestedFolder, String dataFolder, String problem, boolean retry,
-                         String previousFolder, String movedCopy) {
+                         String previousFolder, String movedCopy, Refusal.OtherDevice.Info otherDevice,
+                         Refusal.NotSynced.Info notSynced, Refusal.Discarded.Info discarded) {
+
+        /** A status without any of the one-device refusals. */
+        public Status(boolean configured, String suggestedFolder, String dataFolder, String problem, boolean retry,
+                      String previousFolder, String movedCopy) {
+            this(configured, suggestedFolder, dataFolder, problem, retry, previousFolder, movedCopy, null, null, null);
+        }
     }
 
     /** The one-time note after a move (change-library-folder contract §2): where the library is now. */
@@ -110,6 +121,12 @@ public final class SetupService {
     private volatile AppConfig change;
     /** The note after a move, in memory until dismissed; null when none. */
     private volatile Moved moved;
+    /** One device at a time (one-device design); null: libraries open in place, as before (tests of other features). */
+    private final LibrarySync sync;
+    /** Why the library didn't open on this device: answered by the status until Try again, Open here anyway or Continue. */
+    private volatile Refusal refusal;
+    /** Open here anyway was chosen for the library that failed (kept for Continue on the discarded page). */
+    private volatile boolean anyway;
 
     public SetupService(ConfigStore config, LibraryHolder holder, TaxonomyBundles bundles, PlaceBundles places, Path home,
                         Clock clock) {
@@ -122,6 +139,16 @@ public final class SetupService {
      */
     public SetupService(ConfigStore config, LibraryHolder holder, TaxonomyBundles bundles, PlaceBundles places, Path home,
                         Clock clock, Function<Path, InstanceLock.Result> locks) {
+        this(config, holder, bundles, places, home, clock, locks, null);
+    }
+
+    /**
+     * As above, each library claimed for this device with {@code sync} before it opens (one-device design §4, §5): its live
+     * database is this device's working copy. Null: libraries open in place.
+     */
+    public SetupService(ConfigStore config, LibraryHolder holder, TaxonomyBundles bundles, PlaceBundles places, Path home,
+                        Clock clock, Function<Path, InstanceLock.Result> locks, LibrarySync sync) {
+        this.sync = sync;
         this.locks = locks;
         this.config = config;
         this.holder = holder;
@@ -146,7 +173,12 @@ public final class SetupService {
     public void startup(Optional<Path> override) {
         if (override.isPresent()) {
             fixed = true;
-            holder.set(openLocked(override.get().toAbsolutePath().normalize()));
+            Path folder = override.get().toAbsolutePath().normalize();
+            try {
+                holder.set(openLocked(folder));
+            } catch (Refusal r) {
+                refused(folder, r);
+            }
             return;
         }
         Optional<AppConfig> saved = config.load();
@@ -186,21 +218,38 @@ public final class SetupService {
                     + ". If it is on an external drive, connect it and choose Try again, or choose another folder.";
             return status();
         }
-        open(folder);
+        open(folder, false, false);
         return status();
     }
 
     /** Opens the remembered library; when it will not open, the problem says why in plain words and Try again is offered. */
     private void open(Path folder) {
+        open(folder, false, false);
+    }
+
+    /** As {@link #open(Path)}; {@code anyway}: Open here anyway was chosen; {@code discard}: Continue on the discarded page. */
+    private void open(Path folder, boolean anyway, boolean discard) {
         try {
-            Library library = openLocked(folder);
+            Library library = openLocked(folder, anyway, discard);
             firstOpen(library, folder);
             holder.set(library);
             problem = null;
             inUse = false;
             failed = null;
             retry = true;
+            refusal = null;
+            this.anyway = false;
+        } catch (Refusal.Failed e) {
+            LOG.warn("Could not open the library at {}", folder, e);
+            refusal = null;
+            inUse = false;
+            failed = folder;
+            retry = true;
+            problem = e.getMessage();
+        } catch (Refusal r) {
+            refused(folder, r);
         } catch (LibraryTooNewException e) {
+            refusal = null;
             inUse = false;
             LOG.warn("The library at {} is newer than this app", folder, e);
             failed = folder;
@@ -210,27 +259,80 @@ public final class SetupService {
             if (!LIBRARY_IN_USE.equals(e.code())) {
                 throw e;
             }
+            refusal = null;
             failed = folder;
             retry = true; // once the other copy has closed
             inUse = true;
             problem = e.getMessage();
         } catch (PlaceDataUnavailableException e) {
+            refusal = null;
             inUse = false;
             LOG.warn("Could not open the library at {}", folder, e);
             failed = folder;
             retry = false; // newer or not, this copy of the app lacks the place data: trying again can't help
             problem = e.getMessage();
         } catch (NotCleared e) {
+            refusal = null;
             inUse = false;
             failed = folder;
             retry = true;
             problem = e.getMessage();
         } catch (RuntimeException e) {
+            refusal = null;
             inUse = false;
             failed = folder;
             retry = true;
             problem = problem(folder, e, true);
         }
+    }
+
+    /**
+     * The library in {@code folder} may not open on this device now (one-device contract §1): the setup screen shows why,
+     * and Try again (or Open here anyway, or Continue) opens it again.
+     */
+    private void refused(Path folder, Refusal r) {
+        LOG.info("The library at {} didn't open on this device: {}", folder, r.getMessage());
+        refusal = r;
+        inUse = false;
+        failed = folder;
+        retry = true;
+        problem = null;
+    }
+
+    /**
+     * Open here anyway (one-device contract §1, spec §4 case 3): opens the library as if the other device's marker said
+     * closed. 409 {@code not_on_other_device} unless another device has it open; 409 {@code too_soon} before
+     * {@code openAnywayFrom} by this device's clock.
+     */
+    public synchronized Status openAnyway() {
+        Path folder = failed;
+        if (!(refusal instanceof Refusal.OtherDevice other) || folder == null || holder.current().isPresent()) {
+            throw new AtlasException(AtlasException.Kind.CONFLICT, ErrorCodes.NOT_ON_OTHER_DEVICE,
+                    "No other device has your library open.");
+        }
+        java.time.Instant from = java.time.Instant.parse(other.info().openAnywayFrom());
+        if (clock.instant().isBefore(from)) {
+            throw new AtlasException(AtlasException.Kind.CONFLICT, ErrorCodes.TOO_SOON, "You can open the library here from "
+                    + java.time.format.DateTimeFormatter.ofPattern("HH:mm").withZone(java.time.ZoneId.systemDefault())
+                    .format(from) + ".");
+        }
+        anyway = true;
+        open(folder, true, false);
+        return status();
+    }
+
+    /**
+     * Continue on the discarded page (one-device contract §1, spec §7): this device's working copy is replaced by the
+     * library's database and the library opens. 409 {@code nothing_discarded} when nothing is waiting to be discarded.
+     */
+    public synchronized Status continueDiscarded() {
+        Path folder = failed;
+        if (!(refusal instanceof Refusal.Discarded) || folder == null || holder.current().isPresent()) {
+            throw new AtlasException(AtlasException.Kind.CONFLICT, ErrorCodes.NOTHING_DISCARDED,
+                    "There are no unsent changes waiting to be discarded.");
+        }
+        open(folder, anyway, true);
+        return status();
     }
 
     /**
@@ -288,6 +390,14 @@ public final class SetupService {
         Library library;
         try {
             library = openLocked(previous);
+        } catch (Refusal.Failed e) {
+            throw AtlasException.invalid(e.getMessage());
+        } catch (Refusal r) {
+            // the old library is in use elsewhere (or not synced yet): it is the one remembered, and the screen says why
+            rememberFolder(previous);
+            change = null;
+            refused(previous, r);
+            return status();
         } catch (AtlasException e) {
             throw e;
         } catch (LibraryTooNewException e) {
@@ -447,11 +557,16 @@ public final class SetupService {
     public Status status() {
         Path folder = failed;
         AppConfig pending = change;
+        Refusal why = refusal;
         return holder.current()
                 .map(library -> new Status(true, suggested.toString(), library.folder().toString(), null, false, null, null))
-                .orElseGet(() -> new Status(false, suggested.toString(), folder == null ? null : folder.toString(), problem,
-                        folder != null && retry, pending == null ? null : pending.previousDataFolder(),
-                        pending != null && pending.hasOldCopy() ? pending.dataFolder() : null));
+                .orElseGet(() -> new Status(false, suggested.toString(), folder == null ? null : folder.toString(),
+                        why == null ? problem : null, folder != null && retry,
+                        pending == null ? null : pending.previousDataFolder(),
+                        pending != null && pending.hasOldCopy() ? pending.dataFolder() : null,
+                        why instanceof Refusal.OtherDevice o ? o.info() : null,
+                        why instanceof Refusal.NotSynced n ? n.info() : null,
+                        why instanceof Refusal.Discarded d ? d.info() : null));
     }
 
     /**
@@ -621,6 +736,14 @@ public final class SetupService {
         Library library;
         try {
             library = openLocked(folder);
+        } catch (Refusal.Failed e) {
+            throw AtlasException.invalid(e.getMessage());
+        } catch (Refusal r) {
+            // another device has it (or it hasn't synced): it is remembered, and the setup screen says why
+            rememberFolder(folder);
+            change = null;
+            refused(folder, r);
+            return status();
         } catch (AtlasException e) {
             throw e;
         } catch (LibraryTooNewException e) {
@@ -651,7 +774,17 @@ public final class SetupService {
         holder.set(library);
         problem = null;
         failed = null;
+        refusal = null;
+        anyway = false;
         return status();
+    }
+
+    private void rememberFolder(Path folder) {
+        try {
+            config.save(new AppConfig(folder.toString(), theme));
+        } catch (UncheckedIOException e) {
+            LOG.warn("Butterfly Atlas could not remember the library folder for next time", e);
+        }
     }
 
     /**
@@ -675,6 +808,14 @@ public final class SetupService {
      * {@code library_in_use}; a drive that cannot lock files sets {@link #lockWarning()} and the library opens anyway.
      */
     private Library openLocked(Path folder) {
+        return openLocked(folder, false, false);
+    }
+
+    /**
+     * As {@link #openLocked(Path)}; with one device at a time the library is claimed for this device first (a
+     * {@link Refusal} when it may not open here), {@code anyway} and {@code discard} as in {@link LibrarySync#claim}.
+     */
+    private Library openLocked(Path folder, boolean anyway, boolean discard) {
         InstanceLock lock = null;
         if (locks != null) {
             InstanceLock.Result result = locks.apply(folder);
@@ -689,7 +830,8 @@ public final class SetupService {
             }
         }
         try {
-            Library library = Library.open(folder, bundles, places, clock);
+            Library library = sync == null ? Library.open(folder, bundles, places, clock)
+                    : sync.claim(folder, anyway, discard, file -> Library.open(folder, file, bundles, places, clock));
             held = lock;
             return library;
         } catch (RuntimeException | Error e) {

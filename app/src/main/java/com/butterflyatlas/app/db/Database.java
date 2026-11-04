@@ -39,7 +39,7 @@ public final class Database {
     /** The tracked write transactions begun since it opened, and those of them that have ended (committed or not). */
     private final AtomicLong writes = new AtomicLong();
     private final AtomicLong ended = new AtomicLong();
-    /** Told after each tracked write commits (the publisher's debounce); keep it quick. */
+    /** Told after each tracked write that changed a row commits (the publisher's debounce); keep it quick. */
     private volatile Runnable onWrite = () -> { };
     /** Wraps each connection: as it is in the app; tests make one fail in ways SQLite never does on demand. */
     private volatile UnaryOperator<Connection> connections = UnaryOperator.identity();
@@ -199,8 +199,8 @@ public final class Database {
     }
 
     /**
-     * Runs work in one transaction: committed if it returns, rolled back if it throws. The same transaction marks the
-     * database dirty (one-device design §5: it has changes the library folder hasn't had yet).
+     * Runs work in one transaction: committed if it returns, rolled back if it throws. When it changed a row, the same
+     * transaction marks the database dirty (one-device design §5: it has changes the library folder hasn't had yet).
      */
     public <T> T write(Work<T> work) {
         return write(work, () -> { });
@@ -258,6 +258,7 @@ public final class Database {
 
     private <T> T transaction(Work<T> work, Runnable undo, boolean track) {
         boolean committed = false;
+        boolean changed = false;
         T done;
         boolean undone = false;
         try (Connection connection = connection()) {
@@ -265,8 +266,16 @@ public final class Database {
             try {
                 T result = work.apply(connection);
                 if (track && tracked) {
-                    try (Statement st = connection.createStatement()) {
-                        st.executeUpdate("UPDATE sync_state SET value = '1' WHERE key = 'dirty' AND value IS NOT '1'");
+                    // a transaction that changed no row leaves nothing to publish (opening a library re-syncs its place
+                    // list, which usually changes nothing)
+                    try (Statement st = connection.createStatement();
+                         ResultSet rs = st.executeQuery("SELECT total_changes()")) {
+                        changed = rs.next() && rs.getLong(1) > 0;
+                    }
+                    if (changed) {
+                        try (Statement st = connection.createStatement()) {
+                            st.executeUpdate("UPDATE sync_state SET value = '1' WHERE key = 'dirty' AND value IS NOT '1'");
+                        }
                     }
                 }
                 connection.commit();
@@ -295,7 +304,7 @@ public final class Database {
                 undo.run(); // failed before the work began (no connection): nothing was moved, harmless
             }
         }
-        if (track && tracked) {
+        if (changed) {
             try {
                 onWrite.run();
             } catch (RuntimeException e) {

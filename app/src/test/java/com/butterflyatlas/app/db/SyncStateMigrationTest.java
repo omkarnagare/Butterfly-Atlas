@@ -108,6 +108,23 @@ class SyncStateMigrationTest {
     }
 
     @Test
+    void aWriteThatChangesNoRowLeavesItCleanAndIsNotHeard() {
+        Database db = Database.open(dir.resolve(Database.FILE_NAME));
+        AtomicInteger heard = new AtomicInteger();
+        db.onWrite(heard::incrementAndGet);
+
+        db.write(c -> {
+            try (Statement st = c.createStatement()) {
+                st.executeUpdate("DELETE FROM library_setting WHERE key = 'none such'");
+            }
+            return null;
+        });
+
+        assertThat(dirty(db)).isEqualTo("0");
+        assertThat(heard).hasValue(0);
+    }
+
+    @Test
     void aWriteThatFailsIsNeitherMarkedNorHeard() {
         Database db = Database.open(dir.resolve(Database.FILE_NAME));
         AtomicInteger heard = new AtomicInteger();

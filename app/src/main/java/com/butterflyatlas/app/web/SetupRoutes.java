@@ -32,5 +32,8 @@ final class SetupRoutes {
         app.post("/api/setup/retry", ctx -> ctx.json(setup.retry()));
         // the first open after a change of library folder: the library used before, instead of the new one
         app.post("/api/setup/previous", ctx -> ctx.json(setup.usePrevious()));
+        // one device at a time (its contract §1): Open here anyway, and Continue once unsent changes were discarded
+        app.post("/api/setup/open-anyway", ctx -> ctx.json(setup.openAnyway()));
+        app.post("/api/setup/discarded/continue", ctx -> ctx.json(setup.continueDiscarded()));
     }
 }

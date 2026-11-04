@@ -457,6 +457,10 @@ public final class SmokeTest {
             Resp done = http.call("POST /api/setup", "/api/setup", "{\"dataFolder\":" + Json.quote(library.toString()) + "}", 200);
             expect(Json.parse(done.text()).bool("configured"), "setup did not configure the library: " + done.text());
             http.call("POST /api/setup/retry", "/api/setup/retry", "{}", null);
+            Resp anyway = http.call("POST /api/setup/open-anyway", "/api/setup/open-anyway", "{}", 409);
+            expect(anyway.text().contains("not_on_other_device"), "Open here anyway with no other device: " + anyway.text());
+            Resp discarded = http.call("POST /api/setup/discarded/continue", "/api/setup/discarded/continue", "{}", 409);
+            expect(discarded.text().contains("nothing_discarded"), "Continue with nothing discarded: " + discarded.text());
             Json session = Json.parse(http.call("GET /api/session", "/api/session", null, 200).text());
             expect(version.equals(session.str("version")), "the app says it is version " + session.str("version") + ", not " + version);
             expect("window".equals(session.str("mode")), "the session mode is " + session.str("mode"));

@@ -72,6 +72,25 @@ public final class ErrorCodes {
     /** A library change's refusal: the folder is the library in use. */
     public static final String CURRENT_LIBRARY = "current_library";
 
+    /** One device at a time (one-device contract §4): another device has the library open (setup status only). */
+    public static final String LIBRARY_ON_OTHER_DEVICE = "library_on_other_device";
+    /** The marker came through before the library's database (setup status only). */
+    public static final String LIBRARY_NOT_SYNCED = "library_not_synced";
+    /** This device's unsent changes couldn't be sent and were discarded (setup status only). */
+    public static final String UNSENT_CHANGES_DISCARDED = "unsent_changes_discarded";
+    /** Open here anyway before the other device has been away 15 minutes. */
+    public static final String TOO_SOON = "too_soon";
+    /** Open here anyway while no other device is named. */
+    public static final String NOT_ON_OTHER_DEVICE = "not_on_other_device";
+    /** Continue while nothing was discarded. */
+    public static final String NOTHING_DISCARDED = "nothing_discarded";
+    /** Try again (publishing) while publishing hasn't stopped. */
+    public static final String NOT_STOPPED = "not_stopped";
+    /** Quit (opened elsewhere) while the library wasn't opened elsewhere. */
+    public static final String NOT_OPENED_ELSEWHERE = "not_opened_elsewhere";
+    /** Refused once the library was opened on another device while it was open here. */
+    public static final String LIBRARY_OPENED_ELSEWHERE = "library_opened_elsewhere";
+
     private ErrorCodes() {
     }
 }

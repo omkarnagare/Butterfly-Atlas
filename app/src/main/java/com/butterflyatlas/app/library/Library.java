@@ -58,7 +58,15 @@ public final class Library {
         } catch (IOException e) {
             throw new UncheckedIOException("Could not create " + folder, e);
         }
-        Database database = Database.open(folder.resolve(Database.FILE_NAME));
+        return open(folder, folder.resolve(Database.FILE_NAME), bundles, places, clock);
+    }
+
+    /**
+     * As {@link #open(Path, TaxonomyBundles, PlaceBundles, Clock)}, with the live database at {@code databaseFile}: this
+     * device's working copy of the library (one-device design §5), while the folder keeps the photos and the snapshot.
+     */
+    public static Library open(Path folder, Path databaseFile, TaxonomyBundles bundles, PlaceBundles places, Clock clock) {
+        Database database = Database.open(databaseFile);
         boolean empty = database.read(c -> {
             try (PreparedStatement ps = c.prepareStatement("SELECT COUNT(*) FROM taxonomy_state"); ResultSet rs = ps.executeQuery()) {
                 rs.next();
