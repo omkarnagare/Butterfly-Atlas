@@ -100,3 +100,13 @@ test('a request refused because the library was opened elsewhere holds toasts at
   expect(toast.message).toBeFalsy();
   await vi.waitFor(() => expect(status.openedElsewhere).not.toBeNull());
 });
+
+test('the status carries the publishing bar\'s state; an older server has none', async () => {
+  const publish = { state: 'retrying', reason: 'The drive with your library is full. Free some space, then try again.', tries: 3 };
+  getStatus.mockResolvedValue({ rescanning: false, publish });
+  await refreshStatus();
+  expect(status.publish).toEqual(publish);
+  getStatus.mockResolvedValue({ rescanning: false });
+  await refreshStatus();
+  expect(status.publish).toBeNull();
+});

@@ -48,7 +48,9 @@ import { serverTheme } from './theme.svelte.js';
  *
  * One device at a time (contract §2): `openedElsewhere` (`{ name, at, unsentSince }`, else null), the library was opened
  * on another device while this one ran: every window shows its page in place of the screen, and toasts are held.
- * `closedHere`: Quit on that page was taken, the app is quitting, and this window asks nothing more.
+ * `closedHere`: Quit on that page was taken, the app is quitting, and this window asks nothing more. `publish`
+ * (`{ state: 'retrying' | 'stopped', reason, tries }`, else null): changes couldn't be sent to the library folder; the
+ * bar under the header says so (lib/PublishBar.svelte).
  */
 export const LIBRARY_CHANGED = 'atlas:library-changed';
 /** Sent on window by "Continue import" when that import's grid is already open (its address would not change). */
@@ -98,6 +100,7 @@ export const status = $state({
   libraryMoved: null,
   openedElsewhere: null,
   closedHere: false,
+  publish: null,
 });
 
 let seq = 0;
@@ -159,6 +162,7 @@ export function resetStatus() {
   status.libraryMoved = null;
   status.openedElsewhere = null;
   status.closedHere = false;
+  status.publish = null;
   holdToasts(false);
   failedReads = 0;
   retried = null;
@@ -239,6 +243,7 @@ export async function refreshStatus() {
   status.changing = next.changing ?? null;
   status.libraryMoved = next.libraryMoved ?? null;
   status.openedElsewhere = next.openedElsewhere ?? null;
+  status.publish = next.publish ?? null;
   holdToasts(status.changing !== null || status.openedElsewhere !== null);
   const libraryBefore = status.library;
   status.library = next.library ?? null;

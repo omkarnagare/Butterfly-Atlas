@@ -9,6 +9,7 @@
   import { NOT_ANSWERING, refreshStatus, reopening, status } from './lib/status.svelte.js';
   import ChangeScreen from './lib/ChangeScreen.svelte';
   import OpenedElsewhere from './lib/OpenedElsewhere.svelte';
+  import PublishBar from './lib/PublishBar.svelte';
   import { LIBRARY_CHANGING, LIBRARY_OPENED_ELSEWHERE } from './lib/codes.js';
   import { anyModalOpen } from './lib/modal.js';
   import { getSetup } from './lib/api.js';
@@ -166,13 +167,15 @@
   });
 </script>
 
-<!-- The library's drive is full or gone (/api/status `library`): said at the top of every screen while it holds. -->
+<!-- The library's drive is full or gone (/api/status `library`): said at the top of every screen while it holds; and
+     changes that couldn't be sent to the library folder (`publish`, one device at a time). -->
 {#snippet libraryBanner()}
   {#if status.library}
     <section class="stop-card lib-banner" role="alert" aria-label="Your library">
       <div class="stops"><p><span>{status.library.message}</span></p></div>
     </section>
   {/if}
+  <PublishBar />
 {/snippet}
 
 <!-- Where there is no footer (starting up, a load error, the first-run setup, the launch line) the standing notes of the

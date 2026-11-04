@@ -643,3 +643,13 @@ test('after Quit the window keeps its last page and asks nothing more', async ()
   expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Your library was opened on another device');
   window.location.hash = '#/';
 });
+
+test('while changes can\'t be sent to the library, a bar under the header says so on every screen', async () => {
+  vi.stubGlobal('scrollTo', vi.fn());
+  const publish = { state: 'retrying', reason: 'The drive with your library is full. Free some space, then try again.', tries: 1 };
+  stubApi({ setup: configured, summary, status: { ...idleStatus, publish } });
+  render(App);
+  const bar = await screen.findByRole('region', { name: 'Sending changes to your library' });
+  expect(bar.textContent).toContain('Trying again in a minute.');
+  expect(screen.getByRole('navigation', { name: 'Main' })).toBeTruthy();
+});
