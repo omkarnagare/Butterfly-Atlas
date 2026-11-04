@@ -1,5 +1,5 @@
 import { LIBRARY_CODES, LIBRARY_PROBLEM, NO_SESSION as SESSION_LOST } from './events.js';
-import { BAD_RESPONSE, LIBRARY_CHANGING, NO_SESSION, OFFLINE } from './codes.js';
+import { BAD_RESPONSE, LIBRARY_CHANGING, LIBRARY_OPENED_ELSEWHERE, NO_SESSION, OFFLINE } from './codes.js';
 import { NO_SESSION_WORDS } from './messages.js';
 
 /**
@@ -61,8 +61,9 @@ async function request(path, { method = 'GET', body, raw, type, signal } = {}) {
       sessionLost = true;
       window.dispatchEvent(new CustomEvent(SESSION_LOST));
     }
-    // The library's drive is full or gone, or its folder is being changed: the status is read at once (lib/status.svelte.js).
-    if (LIBRARY_CODES.includes(error?.code) || error?.code === LIBRARY_CHANGING) window.dispatchEvent(new CustomEvent(LIBRARY_PROBLEM, { detail: error }));
+    // The library's drive is full or gone, its folder is being changed, or it was opened on another device: the status is
+    // read at once (lib/status.svelte.js).
+    if (LIBRARY_CODES.includes(error?.code) || error?.code === LIBRARY_CHANGING || error?.code === LIBRARY_OPENED_ELSEWHERE) window.dispatchEvent(new CustomEvent(LIBRARY_PROBLEM, { detail: error }));
     throw new ApiError(
       error?.code ?? `http_${response.status}`,
       error?.message ?? `Butterfly Atlas answered with status ${response.status}.`,
@@ -468,3 +469,19 @@ export const importPreviewUrl = (importId, item) =>
 /** The source photo for the large view. */
 export const importDisplayUrl = (importId, item) =>
   `./api/imports/${id(importId)}/items/${id(item.id)}/display${item.v == null ? '' : `?v=${q(item.v)}`}`;
+
+/* ---------- one device at a time (one-device-library contract §1–§2) ---------- */
+
+/**
+ * The setup page's Open here anyway (after its warning): the Setup status (which may now be `discarded` or `notSynced`);
+ * 409 `too_soon` before `openAnywayFrom` by the server's clock, `not_on_other_device` when no other device has it.
+ */
+export const openHereAnyway = () => request('setup/open-anyway', { method: 'POST', body: {} });
+/** The discarded page's Continue: the Setup status (409 `nothing_discarded`). */
+export const continueDiscarded = () => request('setup/discarded/continue', { method: 'POST', body: {} });
+/** The publishing bar's Try again: one attempt now; 202 `{ publish }` (null when it worked); 409 `not_stopped`. */
+export const publishAgain = () => request('library/publish', { method: 'POST', body: {} });
+/** Dismisses Home's current sync note: 204. */
+export const dismissSyncNote = () => request('library/sync-note/dismiss', { method: 'POST', body: {} });
+/** The opened-elsewhere page's Quit: 202, then the app quits (409 `not_opened_elsewhere`). */
+export const quitOpenedElsewhere = () => request('library/opened-elsewhere/quit', { method: 'POST', body: {} });

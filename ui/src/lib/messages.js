@@ -165,3 +165,77 @@ export const movedCopyLine = (folder) => `The moved copy at ${folder} was not de
 export const libraryMovedLine = (folder) => `Your library was moved to ${folder}.`;
 export const LIBRARY_MOVED = 'Library moved';
 export const DISMISS = 'Dismiss';
+
+// One device at a time (one-device-library design §4–§8, §10). A sentence naming the other device comes as
+// `{ lead, name, rest, bold }`: the name is bold where the spec has it, and "another device" (plain) when it couldn't be read.
+export const ANOTHER_DEVICE = 'another device';
+const THE_OTHER_DEVICE = 'the other device';
+const named = (lead, name, rest) => ({ lead, name: name ?? ANOTHER_DEVICE, rest, bold: Boolean(name) });
+/** "just now", "2 minutes ago", "3 hours ago", "2 days ago". */
+export function agoWords(minutes) {
+  if (minutes <= 0) return 'just now';
+  if (minutes < 60) return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? '1 day ago' : `${days} days ago`;
+}
+// The setup page when another device has the library open (§4).
+export const ON_OTHER_DEVICE_TITLE = 'Your library is open on another device';
+/** `seen` "4 Nov at 11:05", `ago` "2 minutes ago", `from` "11:20"; `late`: 15 minutes or more have passed. */
+export const otherDeviceWords = ({ name, seen, ago, from, late }) => named('This library is open on ', name, ` (last seen ${seen}, ${ago}). `
+  + (late
+    ? 'It may be off or asleep, or it may have closed without quitting properly. Quit Butterfly Atlas there if you can, let your sync app'
+      + ' finish, then choose Try again.'
+    : `Quit Butterfly Atlas there, let your sync app finish, then choose Try again. If that device is off or asleep, you can open the library here from ${from}.`));
+export const TRY_AGAIN = 'Try again';
+export const TRYING_AGAIN = 'Trying again…';
+export const triedAgainLine = (time) => `Tried again at ${time} — still couldn't open.`;
+export const OPEN_HERE_ANYWAY_ASK = 'Open here anyway…';
+export const OPEN_HERE_ANYWAY = 'Open here anyway';
+export const OPENING_HERE = 'Opening…';
+export const OPEN_HERE_TITLE = 'Open the library here?';
+export const openAnywayWarning = (name) => `If ${name ?? THE_OTHER_DEVICE} is still running Butterfly Atlas, or didn't send its last changes,`
+  + ' those changes will be lost.';
+// The setup page when the database hasn't arrived yet (§5 case 1).
+export const NOT_SYNCED_TITLE = "Your library hasn't finished syncing";
+export const NOT_SYNCED_WORDS = "This library's database hasn't finished syncing to this device yet. Let your sync app finish, then choose Try again.";
+// The setup page when unsent changes were discarded (§7). `at` "4 Nov at 14:20", `since` "4 Nov, 14:02".
+export const DISCARDED_TITLE = 'Unsent changes were discarded';
+export const discardedWords = ({ name, at, since }) => named('This library was used on ', name, ` (last on ${at}) after this device last`
+  + ` sent its changes. Changes made here after ${since} couldn't be sent and have been discarded.`);
+export const DISCARDED_PHOTOS_LEAD = "These photos are in your library's folder but no longer in your atlas; import them again to add them back:";
+export const CONTINUE = 'Continue';
+export const CONTINUING = 'Continuing…';
+// Every window, when the library was opened on another device while this one ran (§6). `at` "4 Nov at 14:20".
+export const OPENED_ELSEWHERE_TITLE = 'Your library was opened on another device';
+export const openedElsewhereWords = ({ name, at }) => named('Your library was opened on ', name, ` on ${at} while Butterfly Atlas was still`
+  + ' open here. To keep one version of your library, this device has stopped saving. To use the library here again, quit Butterfly'
+  + ` Atlas on ${name ?? THE_OTHER_DEVICE} and let your sync app finish, then quit and reopen it here.`);
+/** `since` "4 Nov, 14:02". */
+export const unsentLine = (since, name) => `Changes made here since ${since} haven't reached the library yet. They will be sent when you`
+  + ` reopen Butterfly Atlas here, unless changes are saved on ${name ?? THE_OTHER_DEVICE} first.`;
+export const QUIT = 'Quit';
+export const QUITTING = 'Quitting…';
+export const CLOSED_HERE = 'Butterfly Atlas has closed here. You can close this window.';
+// The publishing bar under the header (§10). The reason (SetupService.plain's sentences) goes inside the sentence.
+export const PUBLISH_BAR_LABEL = 'Sending changes to your library';
+const inSentence = (reason) => {
+  const words = (reason ?? '').trim().replace(/\.$/, '');
+  if (!words) return '';
+  return words.startsWith('Butterfly Atlas') ? words : words.charAt(0).toLowerCase() + words.slice(1);
+};
+export function publishLine({ state, reason }) {
+  const why = inSentence(reason);
+  const until = "Don't open your library on another device until this message goes away.";
+  if (state === 'stopped') {
+    return `Your changes are saved on this device but couldn't be sent to your library folder after 5 tries${why ? `: ${why}` : ''}. Fix that`
+      + ` (for example, start your sync app or free some space), then choose Try again. ${until}`;
+  }
+  return `Your changes are saved on this device but couldn't be sent to your library folder${why ? `: ${why}` : ''}. Trying again in a minute. ${until}`;
+}
+// Home's one-time notes (§5 case 2, §8).
+export const SYNC_SENT_TITLE = 'Changes sent';
+export const SYNC_SENT_LINE = 'Changes from your last session on this device were sent to the library.';
+export const SYNC_BEFORE_OTHER_TITLE = 'Before using another device';
+export const SYNC_BEFORE_OTHER_LINE = 'Before you open your library on another device, quit Butterfly Atlas here and let your sync app finish.';
