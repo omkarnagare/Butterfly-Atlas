@@ -598,3 +598,48 @@ test('after the app quits to reopen, the window keeps its last page: nothing mor
   expect(screen.queryByRole('alert')).toBeNull();
   window.location.hash = '#/';
 });
+
+// ---- one device at a time: the library opened on another device while this one ran (design §6; contract §2, §3, §5) ----
+
+const elsewhere = { name: 'DESKTOP-PUNE', at: '2026-11-04T14:20:00Z', unsentSince: null };
+
+test('when the library is opened on another device, the window shows its page in place of the screen, without the header', async () => {
+  stubApi({ setup: configured, summary, status: { ...idleStatus, openedElsewhere: elsewhere } });
+  render(App);
+  expect(await screen.findByRole('heading', { level: 1, name: 'Your library was opened on another device' })).toBeTruthy();
+  expect(screen.queryByRole('heading', { name: 'Families' })).toBeNull();
+  expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull();
+});
+
+test('a window opened after that, whose setup read is refused by the gate, shows the page without the refusal', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (url) => {
+    if (url.startsWith('./api/status')) return { ok: true, status: 200, json: async () => ({ ...idleStatus, openedElsewhere: elsewhere }) };
+    if (url.startsWith('./api/session')) return { ok: true, status: 200, json: async () => ({ mode: 'window', lockWarning: false }) };
+    return { ok: false, status: 409, json: async () => ({ error: { code: 'library_opened_elsewhere', message: 'This device has stopped saving to your library.' } }) };
+  }));
+  render(App);
+  expect(await screen.findByRole('heading', { level: 1, name: 'Your library was opened on another device' })).toBeTruthy();
+  expect(screen.queryByText('This device has stopped saving to your library.')).toBeNull();
+});
+
+test('after Quit the window keeps its last page and asks nothing more', async () => {
+  vi.stubGlobal('scrollTo', vi.fn());
+  const fetchMock = vi.fn(async (url) => {
+    if (url.startsWith('./api/status')) return { ok: true, status: 200, json: async () => ({ ...idleStatus, openedElsewhere: elsewhere }) };
+    if (url.startsWith('./api/setup')) return { ok: true, status: 200, json: async () => configured };
+    if (url.startsWith('./api/library/opened-elsewhere/quit')) return { ok: true, status: 202, json: async () => null };
+    return { ok: true, status: 200, json: async () => ({}) };
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  render(App);
+  await fireEvent.click(await screen.findByRole('button', { name: 'Quit' }));
+  expect(await screen.findByText('Butterfly Atlas has closed here. You can close this window.')).toBeTruthy();
+  const asked = fetchMock.mock.calls.length;
+  window.location.hash = '#/explore';
+  window.dispatchEvent(new HashChangeEvent('hashchange'));
+  await refreshStatus();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(fetchMock.mock.calls.slice(asked).map((call) => call[0])).toEqual([]);
+  expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Your library was opened on another device');
+  window.location.hash = '#/';
+});

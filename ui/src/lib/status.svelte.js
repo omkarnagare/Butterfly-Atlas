@@ -4,7 +4,7 @@ import { briefOf, pausedNoticeOf } from './updates.js';
 import { finishedLine } from './backups.js';
 import { UPDATE_HREF } from './route.js';
 import { LIBRARY_PROBLEM } from './events.js';
-import { LIBRARY_CHANGING } from './codes.js';
+import { LIBRARY_CHANGING, LIBRARY_OPENED_ELSEWHERE } from './codes.js';
 import { exactExportedLine } from './raw.js';
 import { checkResult } from './heic.js';
 import { CANCELLED, DECODER_CHECKING, DECODER_MISSING, DONE, PAUSED, RUNNING, WAITING } from './states.js';
@@ -45,6 +45,10 @@ import { serverTheme } from './theme.svelte.js';
  *
  * Meadow: `theme`, the saved Light or Dark (null: none), goes to lib/theme.svelte.js, so a choice made in another window
  * shows here within a poll; a status without it (an older server) leaves the theme as it is.
+ *
+ * One device at a time (contract §2): `openedElsewhere` (`{ name, at, unsentSince }`, else null), the library was opened
+ * on another device while this one ran: every window shows its page in place of the screen, and toasts are held.
+ * `closedHere`: Quit on that page was taken, the app is quitting, and this window asks nothing more.
  */
 export const LIBRARY_CHANGED = 'atlas:library-changed';
 /** Sent on window by "Continue import" when that import's grid is already open (its address would not change). */
@@ -92,6 +96,8 @@ export const status = $state({
   // shows its screen in place of the page. `libraryMoved` (`{ to }`): Home's one-time note after a move, else null.
   changing: null,
   libraryMoved: null,
+  openedElsewhere: null,
+  closedHere: false,
 });
 
 let seq = 0;
@@ -151,6 +157,8 @@ export function resetStatus() {
   status.unreachable = false;
   status.changing = null;
   status.libraryMoved = null;
+  status.openedElsewhere = null;
+  status.closedHere = false;
   holdToasts(false);
   failedReads = 0;
   retried = null;
@@ -173,7 +181,7 @@ export function rescanMessage({ added = 0, removed = 0, updated = 0 } = {}) {
 export async function refreshStatus() {
   // The app has quit to reopen on the new library folder (contract §2 `reopening`): the window keeps that page, and
   // asks nothing more (the service is gone, or is another copy).
-  if (reopening()) return;
+  if (reopening() || status.closedHere) return;
   const mine = ++seq;
   let next;
   try {
@@ -230,7 +238,8 @@ export async function refreshStatus() {
   if (next.theme !== undefined) serverTheme(next.theme);
   status.changing = next.changing ?? null;
   status.libraryMoved = next.libraryMoved ?? null;
-  holdToasts(status.changing !== null);
+  status.openedElsewhere = next.openedElsewhere ?? null;
+  holdToasts(status.changing !== null || status.openedElsewhere !== null);
   const libraryBefore = status.library;
   status.library = next.library ?? null;
   // The library's drive is back: every screen whose load failed reads again (LIBRARY_CHANGED).
@@ -471,10 +480,11 @@ export function retryRefused(message, code) {
 }
 
 // A request refused because the library's drive is full or gone: read the status at once, so the banner shows. One refused
-// because the library folder is changing holds toasts at once (its refusal is not shown), until the status says otherwise.
+// because the library folder is changing, or because the library was opened on another device, holds toasts at once (its
+// refusal is not shown), until the status says otherwise.
 if (typeof window !== 'undefined') {
   window.addEventListener(LIBRARY_PROBLEM, (event) => {
-    if (event.detail?.code === LIBRARY_CHANGING) holdToasts(true);
+    if (event.detail?.code === LIBRARY_CHANGING || event.detail?.code === LIBRARY_OPENED_ELSEWHERE) holdToasts(true);
     refreshStatus();
   });
 }

@@ -73,3 +73,30 @@ test('a library_changing refusal holds toasts at once, before the status answers
   expect(toast.message).toBe('');
   await vi.waitFor(() => expect(status.changing).not.toBeNull());
 });
+
+// One device at a time (contract §2): the status's `openedElsewhere`; toasts are held while it is set.
+test('the status carries the library opened on another device, and holds toasts meanwhile; an older server has none', async () => {
+  const elsewhere = { name: 'DESKTOP-PUNE', at: '2026-11-04T14:20:00Z', unsentSince: null };
+  getStatus.mockResolvedValue({ rescanning: false, openedElsewhere: elsewhere });
+  await refreshStatus();
+  expect(status.openedElsewhere).toEqual(elsewhere);
+  showToast('Export finished.');
+  expect(toast.message).toBeFalsy();
+  getStatus.mockResolvedValue({ rescanning: false });
+  await refreshStatus();
+  expect(status.openedElsewhere).toBeNull();
+});
+
+test('once Quit was taken here, nothing more is asked', async () => {
+  status.closedHere = true;
+  await refreshStatus();
+  expect(getStatus).not.toHaveBeenCalled();
+});
+
+test('a request refused because the library was opened elsewhere holds toasts at once and reads the status', async () => {
+  getStatus.mockResolvedValue({ rescanning: false, openedElsewhere: { name: null, at: '2026-11-04T14:20:00Z', unsentSince: null } });
+  window.dispatchEvent(new CustomEvent('atlas:library-problem', { detail: { code: 'library_opened_elsewhere' } }));
+  showToast('Saved.');
+  expect(toast.message).toBeFalsy();
+  await vi.waitFor(() => expect(status.openedElsewhere).not.toBeNull());
+});

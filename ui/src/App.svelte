@@ -8,7 +8,8 @@
   import { endSession, loadSessionWithRetry, session } from './lib/session.svelte.js';
   import { NOT_ANSWERING, refreshStatus, reopening, status } from './lib/status.svelte.js';
   import ChangeScreen from './lib/ChangeScreen.svelte';
-  import { LIBRARY_CHANGING } from './lib/codes.js';
+  import OpenedElsewhere from './lib/OpenedElsewhere.svelte';
+  import { LIBRARY_CHANGING, LIBRARY_OPENED_ELSEWHERE } from './lib/codes.js';
   import { anyModalOpen } from './lib/modal.js';
   import { getSetup } from './lib/api.js';
   import { UPDATE_HREF, parseRoute } from './lib/route.js';
@@ -81,7 +82,8 @@
   // Change the library folder (design §5, §6): while one runs or waits to be dismissed, its screen replaces the page in
   // every window. Once it reopens the app, this window keeps that last page: the session ends here, so the app's going
   // (or a new copy's refusals) shows nothing more.
-  let finalPage = $derived(reopening());
+  // One device at a time (contract §5): after Quit on the opened-elsewhere page, likewise.
+  let finalPage = $derived(reopening() || status.closedHere);
   $effect(() => {
     if (finalPage) untrack(endSession);
   });
@@ -111,8 +113,9 @@
       setup = next;
       error = '';
     } catch (e) {
-      // A window opened while the library folder changes: setup is refused for it, and the status shows the change.
-      if (e?.code === LIBRARY_CHANGING) {
+      // A window opened while the library folder changes, or after the library was opened on another device: setup is
+      // refused for it, and the status shows the change (or that page).
+      if (e?.code === LIBRARY_CHANGING || e?.code === LIBRARY_OPENED_ELSEWHERE) {
         loadSessionWithRetry();
         await refreshStatus();
         setup = { configured: true };
@@ -142,7 +145,7 @@
     };
     const onKey = (event) => {
       // Not while the launch line shows: the palette would open over the page much later.
-      if (!setup?.configured || continuing || status.changing || searching || anyModalOpen() || event.isComposing) return;
+      if (!setup?.configured || continuing || status.changing || status.openedElsewhere || searching || anyModalOpen() || event.isComposing) return;
       const tag = event.target?.tagName ?? '';
       const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(tag) || event.target?.isContentEditable;
       if ((event.key === 'k' || event.key === 'K') && (event.metaKey || event.ctrlKey)) {
@@ -179,10 +182,14 @@
   {#if session.tabNote}<p class="muted">{session.tabNote}</p>{/if}
 {/snippet}
 
-{#if finalPage}
+{#if status.closedHere}
+  <OpenedElsewhere />
+{:else if finalPage}
   <ChangeScreen changing={status.changing} />
 {:else if session.lost}
   <NoSession />
+{:else if status.openedElsewhere}
+  <OpenedElsewhere />
 {:else if status.changing}
   <ChangeScreen changing={status.changing} />
 {:else if error}
