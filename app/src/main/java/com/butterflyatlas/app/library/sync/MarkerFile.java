@@ -11,7 +11,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.List;
@@ -109,7 +108,10 @@ public final class MarkerFile {
         return read(library);
     }
 
-    /** Writes the marker as {@code .part} and renames it over the old one; then deletes conflict copies. */
+    /**
+     * Writes the marker as {@code .part} and renames it over the old one (tried again for a moment when it is refused,
+     * {@link Replace}); then deletes conflict copies.
+     */
     public static void write(Path library, Marker marker) throws IOException {
         ObjectNode node = JSON.createObjectNode();
         node.put("device", marker.device());
@@ -122,7 +124,7 @@ public final class MarkerFile {
         try {
             Files.writeString(part, JSON.writerWithDefaultPrettyPrinter().writeValueAsString(node) + "\n",
                     StandardCharsets.UTF_8);
-            Files.move(part, library.resolve(NAME), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            Replace.replace(part, library.resolve(NAME));
         } catch (IOException e) {
             try {
                 Files.deleteIfExists(part);

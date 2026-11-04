@@ -9,7 +9,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -22,7 +21,8 @@ import java.time.Instant;
  *   <li>the copy's {@code generation} set to the working copy's plus one and its {@code dirty} to 0, then checked
  *   ({@code quick_check})</li>
  *   <li>the marker read again: when it names another device, it stops here and the {@code .part} goes</li>
- *   <li>the {@code .part} renamed over {@code atlas.db} (and the {@code -wal} and {@code -shm} an in-place opening left
+ *   <li>the {@code .part} renamed over {@code atlas.db}, tried again for a moment when it is refused ({@link Replace})
+ *   (and the {@code -wal} and {@code -shm} an in-place opening left
  *   deleted)</li>
  *   <li>in the working copy, {@code generation} the new number, {@code published_at} now and {@code dirty} 0, unless a
  *   write happened during steps 1–4, when {@code dirty} stays 1</li>
@@ -93,8 +93,7 @@ public final class Publish {
                         read.marker().name());
                 return new NotOurs(read.marker());
             }
-            Files.move(part, library.resolve(Database.FILE_NAME), StandardCopyOption.REPLACE_EXISTING,
-                    StandardCopyOption.ATOMIC_MOVE);
+            Replace.replace(part, library.resolve(Database.FILE_NAME));
         } finally {
             Files.deleteIfExists(part);
         }
