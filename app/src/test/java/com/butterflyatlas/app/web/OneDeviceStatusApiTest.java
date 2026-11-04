@@ -20,6 +20,7 @@ import java.sql.Statement;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * The status and routes of one device at a time while running (one-device contract §2): {@code publish} is null while
@@ -35,13 +36,15 @@ class OneDeviceStatusApiTest {
 
     @AfterEach
     void writable() throws Exception {
-        if (folder != null && Files.isDirectory(folder)) {
+        if (folder != null && Files.isDirectory(folder) && folder.getFileSystem().supportedFileAttributeViews().contains("posix")) {
             Files.setPosixFilePermissions(folder, PosixFilePermissions.fromString("rwxr-xr-x"));
         }
     }
 
     @Test
     void tryAgainIsRefusedUntilPublishingHasStoppedThenMakesOneAttempt() throws Exception {
+        assumeTrue(home.getFileSystem().supportedFileAttributeViews().contains("posix"),
+                "POSIX permissions make the library folder unwritable");
         TestClock clock = new TestClock();
         ManualTicker ticker = new ManualTicker(clock);
         LibrarySync sync = new LibrarySync(home.resolve("config"), () -> "Mac", clock, millis -> { }, ticker);

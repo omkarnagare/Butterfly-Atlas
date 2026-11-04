@@ -15,6 +15,7 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
@@ -40,7 +41,9 @@ class PublisherTest {
 
     @AfterEach
     void writable() throws Exception {
-        Files.setPosixFilePermissions(folder, PosixFilePermissions.fromString("rwxr-xr-x"));
+        if (folder.getFileSystem().supportedFileAttributeViews().contains("posix")) {
+            Files.setPosixFilePermissions(folder, PosixFilePermissions.fromString("rwxr-xr-x"));
+        }
     }
 
     private long generation() throws Exception {
@@ -100,6 +103,8 @@ class PublisherTest {
 
     @Test
     void aFailingPublishIsTriedOnceAMinute5TimesThenStopsUntilTryAgain() throws Exception {
+        assumeTrue(folder.getFileSystem().supportedFileAttributeViews().contains("posix"),
+                "POSIX permissions make the library folder unwritable");
         Files.setPosixFilePermissions(folder, PosixFilePermissions.fromString("r-xr-xr-x"));
         a.write("unsent");
         after(LibrarySync.PUBLISH_EVERY);
@@ -138,6 +143,8 @@ class PublisherTest {
 
     @Test
     void tryAgainThatWorksClearsTheBar() throws Exception {
+        assumeTrue(folder.getFileSystem().supportedFileAttributeViews().contains("posix"),
+                "POSIX permissions make the library folder unwritable");
         Files.setPosixFilePermissions(folder, PosixFilePermissions.fromString("r-xr-xr-x"));
         a.write("unsent");
         after(LibrarySync.PUBLISH_EVERY);

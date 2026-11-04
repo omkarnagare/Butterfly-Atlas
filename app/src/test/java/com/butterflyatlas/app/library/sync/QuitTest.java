@@ -15,6 +15,7 @@ import java.time.Instant;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Quitting (one-device design §8): what is unsent is published and the marker closed; when that fails the marker stays
@@ -43,7 +44,7 @@ class QuitTest {
 
     @AfterEach
     void writable() throws Exception {
-        if (Files.isDirectory(folderA)) {
+        if (Files.isDirectory(folderA) && folderA.getFileSystem().supportedFileAttributeViews().contains("posix")) {
             Files.setPosixFilePermissions(folderA, PosixFilePermissions.fromString("rwxr-xr-x"));
         }
     }
@@ -82,6 +83,8 @@ class QuitTest {
 
     @Test
     void aQuitThatCantPublishLeavesTheMarkerOpenAndTheNextStartSendsIt() throws Exception {
+        assumeTrue(folderA.getFileSystem().supportedFileAttributeViews().contains("posix"),
+                "POSIX permissions make the library folder unwritable");
         a.setup.setup(folderA.toString());
         a.write("unsent");
         Files.setPosixFilePermissions(folderA, PosixFilePermissions.fromString("r-xr-xr-x"));
