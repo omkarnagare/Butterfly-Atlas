@@ -430,6 +430,24 @@ public final class LibrarySync {
         }
     }
 
+    /**
+     * Publishes now when anything is unsent (a move of the library publishes first, one-device design §9); a failure counts
+     * as a failed try, as any publish's does.
+     */
+    public void publishNow() {
+        Claim c = claimed;
+        if (c == null) {
+            return;
+        }
+        try {
+            if (SyncState.read(c.library().database()).dirty()) {
+                attempt();
+            }
+        } catch (RuntimeException e) {
+            LOG.warn("Could not read whether the library has unsent changes", e);
+        }
+    }
+
     /** Whether this run has a library it may publish to. */
     private boolean running() {
         return claimed != null && !stopped;

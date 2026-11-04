@@ -162,6 +162,9 @@ public final class TestServices {
         LibraryChange change = new LibraryChange(holder::library, setup, ChangeSteps.REAL, usableSpace,
                 LibraryChange.Background.of(holder::library), setup::rememberChange,
                 RunningWork.of(exports, backups, imports, updates, processing, () -> false));
+        if (sync != null) {
+            change.syncWith(sync::publishNow, sync::close);
+        }
         return new AtlasServices(setup, taxa, new SearchWordService(holder, TestBundles.CLOCK), search,
                 photos, photoQueries, new TagService(holder::library), thumbnails,
                 new Rescan(holder::library, processor, TestBundles.CLOCK, thumbnails::request, facts),

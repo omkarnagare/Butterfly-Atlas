@@ -279,6 +279,7 @@ public final class Main {
                 photoPlaces, filters, exports, custom, updates, splits, new LibraryDrive(holder), placeNotes, backups, heic,
                 change, sync);
         sync.stopWorkWith(() -> beginClose(services)); // the library was opened on another device: work stops
+        change.syncWith(sync::publishNow, sync::close); // a move publishes first; a change closes the library here
         return services;
     }
 
