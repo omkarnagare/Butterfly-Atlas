@@ -14,6 +14,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.OptionalInt;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.UnaryOperator;
 
 /**
@@ -33,12 +34,19 @@ public final class Database {
 
     private final Path file;
     private final SQLiteDataSource dataSource;
+    /** Whether the schema has {@code sync_state} (V16): every write transaction then marks the database dirty. */
+    private final boolean tracked;
+    /** The write transactions begun to commit since it opened (counted inside the transaction, before the commit). */
+    private final AtomicLong writes = new AtomicLong();
+    /** Told after each tracked write commits (the publisher's debounce); keep it quick. */
+    private volatile Runnable onWrite = () -> { };
     /** Wraps each connection: as it is in the app; tests make one fail in ways SQLite never does on demand. */
     private volatile UnaryOperator<Connection> connections = UnaryOperator.identity();
 
-    private Database(Path file, SQLiteDataSource dataSource) {
+    private Database(Path file, SQLiteDataSource dataSource, boolean tracked) {
         this.file = file;
         this.dataSource = dataSource;
+        this.tracked = tracked;
     }
 
     /**
@@ -74,7 +82,14 @@ public final class Database {
         } catch (RuntimeException e) {
             throw new DatabaseException("Could not prepare the database " + file, e);
         }
-        return new Database(file, dataSource);
+        boolean tracked;
+        try (Connection c = dataSource.getConnection(); Statement st = c.createStatement();
+             ResultSet rs = st.executeQuery("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sync_state'")) {
+            tracked = rs.next();
+        } catch (SQLException e) {
+            throw new DatabaseException("Could not prepare the database " + file, e);
+        }
+        return new Database(file, dataSource, tracked);
     }
 
     /** The newest schema version this app ships a migration for. */
@@ -182,9 +197,30 @@ public final class Database {
         }
     }
 
-    /** Runs work in one transaction: committed if it returns, rolled back if it throws. */
+    /**
+     * Runs work in one transaction: committed if it returns, rolled back if it throws. The same transaction marks the
+     * database dirty (one-device design §5: it has changes the library folder hasn't had yet).
+     */
     public <T> T write(Work<T> work) {
         return write(work, () -> { });
+    }
+
+    /**
+     * A write of the sync state itself (publishing, claiming): it does not mark the database dirty, is not counted and is
+     * not heard.
+     */
+    public <T> T writeUntracked(Work<T> work) {
+        return write(work, () -> { }, false);
+    }
+
+    /** The write transactions that began to commit since the database opened (a write during a publish shows here). */
+    public long writes() {
+        return writes.get();
+    }
+
+    /** {@code listener} is told after each tracked write commits, on the writing thread; keep it quick. */
+    public void onWrite(Runnable listener) {
+        this.onWrite = listener;
     }
 
     /**
@@ -194,15 +230,28 @@ public final class Database {
      * even if something fails afterwards, so a caller can put back files it moved inside the work.
      */
     public <T> T write(Work<T> work, Runnable undo) {
+        return write(work, undo, true);
+    }
+
+    private <T> T write(Work<T> work, Runnable undo, boolean track) {
         boolean committed = false;
+        T done;
         boolean undone = false;
         try (Connection connection = connection()) {
             connection.setAutoCommit(false);
             try {
                 T result = work.apply(connection);
+                if (track && tracked) {
+                    try (Statement st = connection.createStatement()) {
+                        st.executeUpdate("UPDATE sync_state SET value = '1' WHERE key = 'dirty' AND value IS NOT '1'");
+                    }
+                }
+                if (track) {
+                    writes.incrementAndGet(); // before the commit: a publish that reads the count after it sees this write
+                }
                 connection.commit();
                 committed = true;
-                return result;
+                done = result;
             } catch (SQLException | RuntimeException | Error e) {
                 if (!committed) {
                     undone = true;
@@ -226,5 +275,13 @@ public final class Database {
                 undo.run(); // failed before the work began (no connection): nothing was moved, harmless
             }
         }
+        if (track && tracked) {
+            try {
+                onWrite.run();
+            } catch (RuntimeException e) {
+                org.slf4j.LoggerFactory.getLogger(Database.class).warn("A listener of the database's writes failed", e);
+            }
+        }
+        return done;
     }
 }
