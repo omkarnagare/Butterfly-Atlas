@@ -17,9 +17,9 @@ import java.util.List;
 import java.util.stream.Stream;
 
 /**
- * The marker file {@code .atlas-device.json} in the library folder (one-device design §3). It is always written as
- * {@code .atlas-device.json.part} and renamed over the old one, so a sync service never sees half a marker. Any other file
- * whose name starts with {@code .atlas-device} (a conflict copy such as {@code .atlas-device (1).json}) is ignored, and
+ * The marker file {@code atlas-device.json} in the library folder (one-device design §3). It is always written as
+ * {@code atlas-device.json.part} and renamed over the old one, so a sync service never sees half a marker. Any other file
+ * whose name starts with {@code atlas-device} (a conflict copy such as {@code atlas-device (1).json}) is ignored, and
  * deleted when the marker is next written.
  */
 public final class MarkerFile {
@@ -27,8 +27,8 @@ public final class MarkerFile {
     private static final Logger LOG = LoggerFactory.getLogger(MarkerFile.class);
     private static final ObjectMapper JSON = new ObjectMapper();
 
-    public static final String NAME = ".atlas-device.json";
-    private static final String PREFIX = ".atlas-device";
+    public static final String NAME = "atlas-device.json";
+    private static final String PREFIX = "atlas-device";
     private static final String PART = NAME + ".part";
     /** How long a marker that can't be read is given before it is read again (§6: the service may be mid-update). */
     static final long SETTLE_MILLIS = 2000;

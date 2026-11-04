@@ -14,7 +14,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The marker file {@code .atlas-device.json} (one-device design §3): written as {@code .part} then renamed, read back as
+ * The marker file {@code atlas-device.json} (one-device design §3): written as {@code .part} then renamed, read back as
  * written; conflict copies are ignored when reading and deleted when the marker is next written; one that can't be read is
  * read again 2 seconds later (§6).
  */
@@ -30,6 +30,14 @@ class MarkerFileTest {
         try (Stream<Path> files = Files.list(library)) {
             return files.map(p -> p.getFileName().toString()).sorted().toList();
         }
+    }
+
+    @Test
+    void theMarkerIsAVisibleFileSoEverySyncAppKeepsIt() throws Exception {
+        assertThat(MarkerFile.NAME).isEqualTo("atlas-device.json");
+        Files.createDirectories(library);
+        MarkerFile.write(library, MARKER);
+        assertThat(names()).containsExactly("atlas-device.json"); // no hidden file, no .part left
     }
 
     @Test
@@ -63,8 +71,8 @@ class MarkerFileTest {
     @Test
     void conflictCopiesAreIgnoredThenDeletedAtTheNextWrite() throws IOException {
         MarkerFile.write(library, MARKER);
-        Files.writeString(library.resolve(".atlas-device (1).json"), "{\"device\":\"other\"}");
-        Files.writeString(library.resolve(".atlas-device.json (conflicted copy)"), "x");
+        Files.writeString(library.resolve("atlas-device (1).json"), "{\"device\":\"other\"}");
+        Files.writeString(library.resolve("atlas-device.json (conflicted copy)"), "x");
         Files.writeString(library.resolve("atlas.db"), "kept");
 
         assertThat(MarkerFile.read(library).marker()).isEqualTo(MARKER);

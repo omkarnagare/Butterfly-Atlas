@@ -176,7 +176,7 @@ public final class LibraryChange {
     /** What a library is made of: all that Delete old copy removes (spec §9). */
     private static final List<String> LIBRARY_PARTS = List.of(Database.FILE_NAME, Database.FILE_NAME + "-wal",
             Database.FILE_NAME + "-shm", Database.FILE_NAME + "-journal", "images", ".thumbs", ".deleted", Library.INCOMING,
-            InstanceLock.FILE, ".atlas-device.json");
+            InstanceLock.FILE, "atlas-device.json");
 
     /**
      * {@code GET /api/library/change/inspect} (contract §3): the setup screen's check of the folder shown, the refusal of
@@ -991,7 +991,7 @@ public final class LibraryChange {
             return false;
         }
         // the device marker (and a sync app's copies of it) is the old folder's own: the new folder gets its own at its claim
-        return relative.getNameCount() > 1 || !NOT_COPIED.contains(name) && !name.startsWith(".atlas-device");
+        return relative.getNameCount() > 1 || !NOT_COPIED.contains(name) && !name.startsWith("atlas-device");
     }
 
     /**

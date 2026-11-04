@@ -357,7 +357,7 @@ library at a time.**
   OneDrive "Always keep on this device", in Dropbox "Available offline". A photo the sync app hasn't downloaded yet shows
   as a photo that can't be read.
 
-How it works: the library holds a small file, `.atlas-device.json`, naming the device that has it open. A library open on
+How it works: the library holds a small file, `atlas-device.json`, naming the device that has it open. A library open on
 another device is refused, with the device's name and when it was last seen; if that device is off or asleep, **Open here
 anyway** is offered once it hasn't been seen for 15 minutes (changes it didn't send are then lost, and the app warns you
 first). While the app runs, it works on a copy of the database in this device's config folder (`libraries/`) and sends it
