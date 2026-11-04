@@ -361,7 +361,8 @@ How it works: the library holds a small file, `.atlas-device.json`, naming the d
 another device is refused, with the device's name and when it was last seen; if that device is off or asleep, **Open here
 anyway** is offered once it hasn't been seen for 15 minutes (changes it didn't send are then lost, and the app warns you
 first). While the app runs, it works on a copy of the database in this device's config folder (`libraries/`) and sends it
-to the library's `atlas.db` a few seconds after each change, so the file the sync app sees is always complete. If it can't
+to the library's `atlas.db` within a minute of each change, at once when an import or update ends, and when you quit, so
+the file the sync app sees is always complete. Every change is saved on this device straight away. If it can't
 (the drive is full, the sync app's drive is missing), a bar says so and it tries again once a minute; don't open the library
 on another device until the bar goes away. If changes made on a device couldn't be sent before another device changed the
 library, they are discarded at its next start, and it says so.

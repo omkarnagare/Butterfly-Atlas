@@ -53,11 +53,12 @@ class PublisherTest {
     }
 
     @Test
-    void aPublishFollows5SecondsAfterTheLastWrite() throws Exception {
+    void aPublishFollowsAMinuteAfterTheFirstUnsentWriteHoweverManyWritesFollow() throws Exception {
         a.write("one");
-        after(Duration.ofSeconds(4));
-        a.write("two"); // the wait starts again
-        after(Duration.ofSeconds(4));
+        after(Duration.ofSeconds(30));
+        a.write("two"); // the minute doesn't start again
+        after(Duration.ofSeconds(29));
+        a.write("three");
         assertThat(generation()).isEqualTo(1);
 
         after(Duration.ofSeconds(1));
@@ -66,6 +67,22 @@ class PublisherTest {
         assertThat(SyncState.read(a.db()).dirty()).isFalse();
         assertThat(MarkerFile.read(folder).marker().generation()).isEqualTo(2);
         assertThat(a.sync.publishing()).isNull();
+    }
+
+    @Test
+    void writesWhileEditingGoOnArePublishedOnceAMinute() throws Exception {
+        a.write("one");
+        after(LibrarySync.PUBLISH_EVERY);
+        assertThat(generation()).isEqualTo(2);
+
+        a.write("two");
+        after(Duration.ofSeconds(59));
+        assertThat(generation()).isEqualTo(2);
+        after(Duration.ofSeconds(1));
+        assertThat(generation()).isEqualTo(3);
+
+        after(LibrarySync.PUBLISH_EVERY);
+        assertThat(generation()).isEqualTo(3); // nothing new: nothing published
     }
 
     @Test
@@ -85,7 +102,7 @@ class PublisherTest {
     void aFailingPublishIsTriedOnceAMinute5TimesThenStopsUntilTryAgain() throws Exception {
         Files.setPosixFilePermissions(folder, PosixFilePermissions.fromString("r-xr-xr-x"));
         a.write("unsent");
-        after(LibrarySync.DEBOUNCE);
+        after(LibrarySync.PUBLISH_EVERY);
 
         LibrarySync.Publishing first = a.sync.publishing();
         assertThat(first.state()).isEqualTo(LibrarySync.RETRYING);
@@ -123,7 +140,7 @@ class PublisherTest {
     void tryAgainThatWorksClearsTheBar() throws Exception {
         Files.setPosixFilePermissions(folder, PosixFilePermissions.fromString("r-xr-xr-x"));
         a.write("unsent");
-        after(LibrarySync.DEBOUNCE);
+        after(LibrarySync.PUBLISH_EVERY);
         for (int i = 0; i < 4; i++) {
             after(LibrarySync.RETRY);
         }
@@ -139,7 +156,7 @@ class PublisherTest {
         Files.writeString(folder.resolve(MarkerFile.NAME), "half a marker");
         a.write("unsent");
 
-        after(LibrarySync.DEBOUNCE);
+        after(LibrarySync.PUBLISH_EVERY);
 
         assertThat(a.sync.publishing()).isEqualTo(new LibrarySync.Publishing(LibrarySync.RETRYING,
                 LibrarySync.FOLDER_UNREADABLE, 1));

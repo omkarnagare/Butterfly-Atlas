@@ -130,7 +130,7 @@ class OpenedElsewhereTest {
         MarkerFile.write(folderA, new Marker("someone", null, Marker.OPEN, clock.instant(), clock.instant(), 1));
         a.write("here");
 
-        clock.advance(LibrarySync.DEBOUNCE);
+        clock.advance(LibrarySync.PUBLISH_EVERY);
         a.ticker.runDue();
 
         assertThat(a.sync.status().openedElsewhere().name()).isNull(); // "another device"

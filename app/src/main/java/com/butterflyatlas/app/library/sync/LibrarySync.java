@@ -62,8 +62,11 @@ public final class LibrarySync {
     record Claim(Path folder, Library library, Instant since, boolean unsent) {
     }
 
-    /** How long after the last write a publish follows (§5). */
-    public static final Duration DEBOUNCE = Duration.ofSeconds(5);
+    /**
+     * How long after the first unsent write a publish follows (§5): once a minute while editing goes on, so the sync app
+     * keeps few old copies and meets the snapshot in use less often; later writes don't restart the wait.
+     */
+    public static final Duration PUBLISH_EVERY = Duration.ofMinutes(1);
     /** How long after a failed publish the next try comes, and how many tries a round has (§5). */
     public static final Duration RETRY = Duration.ofMinutes(1);
     public static final int TRIES = 5;
@@ -358,7 +361,8 @@ public final class LibrarySync {
     }
 
     /**
-     * The claimed library has opened ({@code library}): its writes are published from now on (5 seconds after the last),
+     * The claimed library has opened ({@code library}): its writes are published from now on (a minute after the first
+     * unsent one),
      * and unsent changes (of the last session, or of the opening) are published at once. Nothing for another library.
      */
     public void start(Library library) {
@@ -397,16 +401,16 @@ public final class LibrarySync {
         }
     }
 
-    /** A write committed: the publish waits 5 seconds more (not while failed tries go on: they publish it). */
+    /**
+     * A write committed: a publish follows a minute later, unless one is already waiting (not while failed tries go on:
+     * they publish it).
+     */
     private void written() {
         synchronized (publishing) {
-            if (!running() || tries > 0) {
+            if (!running() || tries > 0 || debounce != null) {
                 return;
             }
-            if (debounce != null) {
-                debounce.cancel();
-            }
-            debounce = ticker.schedule(this::attemptLogged, DEBOUNCE);
+            debounce = ticker.schedule(this::attemptLogged, PUBLISH_EVERY);
         }
     }
 
@@ -497,7 +501,7 @@ public final class LibrarySync {
                 tries = 0;
                 reason = null;
                 if (((Publish.Published) result).dirty()) {
-                    debounce = ticker.schedule(this::attemptLogged, DEBOUNCE);
+                    debounce = ticker.schedule(this::attemptLogged, PUBLISH_EVERY);
                 }
             }
             return true;
