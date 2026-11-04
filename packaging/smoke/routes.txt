@@ -142,3 +142,4 @@ POST /api/library/moved-note/dismiss | library change
 DELETE /api/library/old-copy | library change
 
 POST /api/library/publish | one device
+POST /api/library/opened-elsewhere/quit | one device

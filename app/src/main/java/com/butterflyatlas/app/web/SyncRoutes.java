@@ -6,7 +6,8 @@ import com.butterflyatlas.app.sync.LibrarySync;
 import io.javalin.Javalin;
 
 /**
- * One device at a time while running (one-device contract §2): Try again when publishing has stopped. Without one device
+ * One device at a time while running (one-device contract §2): Try again when publishing has stopped, and Quit once the
+ * library was opened on another device (the app quits 1.5 seconds later). Without one device
  * at a time (tests whose libraries open in place) every route answers as when there is nothing to act on.
  */
 final class SyncRoutes {
@@ -28,6 +29,14 @@ final class SyncRoutes {
                         "Butterfly Atlas is not waiting for you to try sending your changes again.");
             }
             ctx.status(202).json(new Published(sync.tryAgain()));
+        });
+        app.post("/api/library/opened-elsewhere/quit", ctx -> {
+            if (sync == null) {
+                throw new AtlasException(AtlasException.Kind.CONFLICT, ErrorCodes.NOT_OPENED_ELSEWHERE,
+                        "Your library wasn't opened on another device.");
+            }
+            sync.quit();
+            ctx.status(202);
         });
     }
 }

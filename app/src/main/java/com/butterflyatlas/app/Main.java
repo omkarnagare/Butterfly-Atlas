@@ -263,13 +263,15 @@ public final class Main {
         LibraryChange change = new LibraryChange(holder::library, setup, ChangeSteps.REAL, LibraryDrive::usableSpace,
                 LibraryChange.Background.of(holder::library), setup::rememberChange,
                 RunningWork.of(exports, backups, imports, updates, processing, startupWork::running));
-        return new AtlasServices(setup, taxa, new SearchWordService(holder, clock),
+        AtlasServices services = new AtlasServices(setup, taxa, new SearchWordService(holder, clock),
                 search, photos, photoQueries, new TagService(holder::library),
                 thumbnails, rescan, processing, new FolderBrowser(holder::current, imports.store(), home), imports,
                 placeSearch, new UserPlaces(() -> holder.library().database(), clock, placeSearch,
                         new ImportPlaceChoices(holder::library)),
                 photoPlaces, filters, exports, custom, updates, splits, new LibraryDrive(holder), placeNotes, backups, heic,
                 change, sync);
+        sync.stopWorkWith(() -> beginClose(services)); // the library was opened on another device: work stops
+        return services;
     }
 
     /**

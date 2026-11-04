@@ -4,6 +4,8 @@ import com.butterflyatlas.app.AtlasServer;
 import com.butterflyatlas.app.library.LibraryHolder;
 import com.butterflyatlas.app.sync.LibrarySync;
 import com.butterflyatlas.app.sync.ManualTicker;
+import com.butterflyatlas.app.sync.Marker;
+import com.butterflyatlas.app.sync.MarkerFile;
 import com.butterflyatlas.app.testing.RawHttp;
 import com.butterflyatlas.app.testing.TestClock;
 import com.butterflyatlas.app.testing.TestServices;
@@ -74,6 +76,50 @@ class OneDeviceStatusApiTest {
             RawHttp.Response again = RawHttp.send(server.port(), "POST", "/api/library/publish", headers, "{}");
             assertThat(again.status()).isEqualTo(202);
             assertThat(again.body()).isEqualTo("{\"publish\":null}");
+        } finally {
+            services.exports().close();
+            services.thumbnails().close();
+        }
+    }
+
+    @Test
+    void onceOpenedElsewhereEveryRequestButTheStatusAndQuitIs409() throws Exception {
+        TestClock clock = new TestClock();
+        ManualTicker ticker = new ManualTicker(clock);
+        LibrarySync sync = new LibrarySync(home.resolve("config"), () -> "Mac", clock, millis -> { }, ticker);
+        AtlasServices services = TestServices.oneDevice(home, sync);
+        Path library = home.resolve("Atlas");
+        services.setup().setup(library.toString());
+        java.util.concurrent.atomic.AtomicInteger quits = new java.util.concurrent.atomic.AtomicInteger();
+        sync.quitWith(quits::incrementAndGet);
+        try (AtlasServer server = AtlasServer.start(0, services)) {
+            Map<String, String> headers = Map.of("Origin", "http://127.0.0.1:" + server.port(), "Content-Type",
+                    "application/json");
+            RawHttp.Response notYet = RawHttp.send(server.port(), "POST", "/api/library/opened-elsewhere/quit", headers, "{}");
+            assertThat(notYet.status()).isEqualTo(409);
+            assertThat(notYet.body()).contains("\"code\":\"not_opened_elsewhere\"");
+            assertThat(RawHttp.send(server.port(), "GET", "/api/summary", headers, null).status()).isEqualTo(200);
+
+            java.time.Instant since = clock.instant();
+            MarkerFile.write(library, new Marker("other", "DESKTOP-PUNE", Marker.OPEN, since, since, 1));
+            clock.advance(LibrarySync.HEARTBEAT);
+            ticker.runDue();
+
+            RawHttp.Response refused = RawHttp.send(server.port(), "GET", "/api/summary", headers, null);
+            assertThat(refused.status()).isEqualTo(409);
+            assertThat(refused.body()).contains("\"code\":\"library_opened_elsewhere\"",
+                    "This device has stopped saving to your library.");
+            assertThat(RawHttp.send(server.port(), "POST", "/api/setup/retry", headers, "{}").status()).isEqualTo(409);
+            RawHttp.Response status = RawHttp.send(server.port(), "GET", "/api/status", headers, null);
+            assertThat(status.status()).isEqualTo(200);
+            assertThat(status.body()).contains("\"openedElsewhere\":{\"name\":\"DESKTOP-PUNE\",\"at\":\"" + since
+                    + "\",\"unsentSince\":null}");
+
+            RawHttp.Response quit = RawHttp.send(server.port(), "POST", "/api/library/opened-elsewhere/quit", headers, "{}");
+            assertThat(quit.status()).isEqualTo(202);
+            clock.advance(LibrarySync.QUIT_WAIT);
+            ticker.runDue();
+            assertThat(quits).hasValue(1);
         } finally {
             services.exports().close();
             services.thumbnails().close();

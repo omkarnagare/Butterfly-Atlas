@@ -294,6 +294,9 @@ final class AppStart {
         Running app = new Running(server, services, timer, closing, pointer, keys.instanceKey(), launchFiles, sweeper,
                 this::releaseInstanceLock, reopener(running));
         running.set(app);
+        if (services.sync() != null) {
+            services.sync().quitWith(() -> quit("Your library was opened on another device.", running, 0));
+        }
         services.change().reopenWith(app.reopener(), LibraryChange.REOPEN_WAIT); // a library change ends this copy so
         world.shutdownHook().accept(new Thread(app::close, "atlas-shutdown"));
         log.info("Butterfly Atlas " + AtlasVersion.current() + " is running on port " + server.port());

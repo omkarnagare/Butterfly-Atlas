@@ -106,8 +106,22 @@ public final class LibrarySync {
     private int tries;
     private String reason;
     private boolean stopped;
-    /** Whether a publish sent the last session's unsent changes (§5 case 2; Home's note until dismissed). */
+    /** Whether a publish of this run sent the last session's unsent changes (§5 case 2; Home's note until dismissed). */
     private volatile boolean sent;
+    /** The library was opened on another device while open here (§6); null unless. */
+    private volatile OpenedElsewhere openedElsewhere;
+    private Ticker.Later heartbeat;
+    /** Stops the app's work, as a quit's first step does (set once the app's services exist). */
+    private volatile Runnable stopWork = () -> { };
+    /** Quits the app (set once it runs). */
+    private volatile Runnable quitter = () -> LOG.warn("No app to quit");
+
+    /** How often the marker is read again and this device's {@code seen} written (§5 Heartbeat). */
+    public static final Duration HEARTBEAT = Duration.ofMinutes(1);
+    /** How long every window has to read that the app quits before it does (as a library change's quit). */
+    public static final Duration QUIT_WAIT = Duration.ofMillis(1500);
+    /** What every request but the status's and the quit's answers once the library was opened elsewhere (contract §3). */
+    public static final String STOPPED_SAVING = "This device has stopped saving to your library.";
 
     /**
      * {@code configDir}: where {@code device-id} and the working copies are; {@code deviceName}: this device's name, read
@@ -336,6 +350,9 @@ public final class LibrarySync {
             return;
         }
         library.database().onWrite(this::written);
+        synchronized (publishing) {
+            heartbeat = ticker.schedule(this::beatLogged, HEARTBEAT);
+        }
         boolean dirty;
         try {
             dirty = SyncState.read(library.database()).dirty();
@@ -450,17 +467,124 @@ public final class LibrarySync {
         }
     }
 
-    /** The library's marker names another device (§6): nothing is published from now on. */
-    void elsewhere(Marker marker) {
-        synchronized (publishing) {
-            stopped = true;
+    /** Every minute (§5 Heartbeat): the marker is read again; then rewritten with a new {@code seen}. */
+    private void beatLogged() {
+        try {
+            beat();
+        } catch (RuntimeException | Error e) {
+            LOG.error("The library's heartbeat stopped on an unexpected error", e);
         }
-        LOG.warn("The library was opened on another device ({}); this device has stopped saving to it", marker.name());
+    }
+
+    /**
+     * Reads the marker again (§6): another device's means the library was opened elsewhere; this device's (or none, which
+     * is written again) is rewritten with a new {@code seen}. One that can't be read twice in a row is left as it is
+     * (publishing waits on it and says so). The next heartbeat follows a minute later.
+     */
+    void beat() {
+        synchronized (publishRun) {
+            Claim c = claimed;
+            synchronized (publishing) {
+                heartbeat = null;
+                if (c == null || stopped) {
+                    return;
+                }
+            }
+            try {
+                MarkerFile.Read read = MarkerFile.readSettled(c.folder(), pause);
+                if (read.unreadable()) {
+                    LOG.warn("The library's device marker couldn't be read ({}); it is read again in a minute", read.problem());
+                } else if (read.marker() != null && !read.marker().names(device().id())) {
+                    elsewhere(read.marker());
+                    return;
+                } else {
+                    long generation = read.marker() != null ? read.marker().generation()
+                            : SyncState.read(c.library().database()).generation();
+                    Device me = device();
+                    MarkerFile.write(c.folder(), new Marker(me.id(), me.name(), Marker.OPEN, c.since(), clock.instant(),
+                            generation));
+                }
+            } catch (IOException | RuntimeException e) {
+                LOG.warn("Could not write this device's heartbeat into the library's marker", e);
+            }
+            synchronized (publishing) {
+                if (!stopped) {
+                    heartbeat = ticker.schedule(this::beatLogged, HEARTBEAT);
+                }
+            }
+        }
+    }
+
+    /**
+     * The library's marker names another device (§6): this device stops all work, publishes nothing from now on, and every
+     * window says what happened (with the time this device was last in step when it has unsent changes).
+     */
+    void elsewhere(Marker marker) {
+        Claim c = claimed;
+        synchronized (publishing) {
+            if (stopped) {
+                return;
+            }
+            stopped = true;
+            for (Ticker.Later later : new Ticker.Later[] {debounce, retry, heartbeat}) {
+                if (later != null) {
+                    later.cancel();
+                }
+            }
+            debounce = null;
+            retry = null;
+            heartbeat = null;
+        }
+        String unsent = null;
+        try {
+            SyncState mine = SyncState.read(c.library().database());
+            if (mine.dirty() && mine.publishedAt() != null) {
+                unsent = mine.publishedAt().toString();
+            }
+        } catch (RuntimeException e) {
+            LOG.warn("Could not read whether this device has unsent changes", e);
+        }
+        openedElsewhere = new OpenedElsewhere(marker.name(), marker.since().toString(), unsent);
+        LOG.warn("The library was opened on another device ({}) at {}; this device has stopped saving to it",
+                marker.name(), marker.since());
+        try {
+            stopWork.run();
+        } catch (RuntimeException e) {
+            LOG.warn("Could not stop all work after the library was opened elsewhere", e);
+        }
+    }
+
+    /** What stops the app's work (a quit's first step); set once the services exist. */
+    public void stopWorkWith(Runnable stopWork) {
+        this.stopWork = stopWork;
+    }
+
+    /** What quits the app; set once it runs. */
+    public void quitWith(Runnable quitter) {
+        this.quitter = quitter;
+    }
+
+    /** Whether the library was opened on another device while open here: every request but a few is refused (§3). */
+    public boolean openedElsewhere() {
+        return openedElsewhere != null;
+    }
+
+    /**
+     * Quit on the opened-elsewhere page (contract §2): the app quits after {@link #QUIT_WAIT}. 409
+     * {@code not_opened_elsewhere} unless the library was opened elsewhere.
+     */
+    public void quit() {
+        if (openedElsewhere == null) {
+            throw new AtlasException(AtlasException.Kind.CONFLICT, ErrorCodes.NOT_OPENED_ELSEWHERE,
+                    "Your library wasn't opened on another device.");
+        }
+        LOG.info("Butterfly Atlas quits: the library was opened on another device");
+        ticker.schedule(() -> quitter.run(), QUIT_WAIT);
     }
 
     /** The status's part, from memory. */
     public StatusPart status() {
-        return new StatusPart(publishing(), null, null);
+        return new StatusPart(publishing(), openedElsewhere, null);
     }
 
     /** The status's {@code publish}: null while publishing works. */

@@ -93,7 +93,7 @@ class PublisherTest {
         assertThat(first.reason()).isNotBlank().doesNotContain("Exception");
         assertThat(a.sync.status().publish()).isEqualTo(first);
         a.write("more");
-        assertThat(a.ticker.waiting()).isEqualTo(1); // an edit starts no extra try
+        assertThat(a.ticker.waiting()).isEqualTo(2); // the next try and the heartbeat: an edit starts no extra try
         assertThatThrownBy(a.sync::tryAgain).isInstanceOfSatisfying(AtlasException.class,
                 e -> assertThat(e.code()).isEqualTo(ErrorCodes.NOT_STOPPED));
 
@@ -105,7 +105,7 @@ class PublisherTest {
         after(LibrarySync.RETRY);
 
         assertThat(a.sync.publishing()).isEqualTo(new LibrarySync.Publishing(LibrarySync.STOPPED, first.reason(), 5));
-        assertThat(a.ticker.waiting()).isZero();
+        assertThat(a.ticker.waiting()).isEqualTo(1); // the heartbeat only
         after(Duration.ofHours(1));
         assertThat(a.sync.publishing().state()).isEqualTo(LibrarySync.STOPPED);
 

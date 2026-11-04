@@ -46,6 +46,10 @@ public final class Api {
             app.before(new SessionGuard(session.keys(), app::port, session.mode())::check);
         }
         app.before(new ChangeGate(services.change()::blocks)::check); // while the library folder changes (its contract §4)
+        if (services.sync() != null) {
+            // once the library was opened on another device while open here (one-device contract §3)
+            app.before(new ElsewhereGate(services.sync()::openedElsewhere)::check);
+        }
         ErrorHandling.install(app, services.drive());
         // Whatever the answer, no other site may embed or sniff it.
         app.after("/api/*", ctx -> {
