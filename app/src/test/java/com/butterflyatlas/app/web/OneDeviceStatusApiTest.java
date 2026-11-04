@@ -117,6 +117,7 @@ class OneDeviceStatusApiTest {
 
             RawHttp.Response quit = RawHttp.send(server.port(), "POST", "/api/library/opened-elsewhere/quit", headers, "{}");
             assertThat(quit.status()).isEqualTo(202);
+            assertThat(quit.body()).isEqualTo("{\"quitting\":true}"); // the UI reads every answer but a 204 as JSON
             clock.advance(LibrarySync.QUIT_WAIT);
             ticker.runDue();
             assertThat(quits).hasValue(1);

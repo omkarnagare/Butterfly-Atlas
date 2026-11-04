@@ -17,6 +17,10 @@ final class SyncRoutes {
     record Published(LibrarySync.Publishing publish) {
     }
 
+    /** {@code POST /api/library/opened-elsewhere/quit}'s answer: the app quits 1.5 seconds later. */
+    record Quitting(boolean quitting) {
+    }
+
     private final LibrarySync sync;
 
     SyncRoutes(LibrarySync sync) {
@@ -43,7 +47,7 @@ final class SyncRoutes {
                         "Your library wasn't opened on another device.");
             }
             sync.quit();
-            ctx.status(202);
+            ctx.status(202).json(new Quitting(true));
         });
     }
 }
