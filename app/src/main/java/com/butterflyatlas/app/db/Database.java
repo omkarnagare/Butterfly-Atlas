@@ -36,8 +36,9 @@ public final class Database {
     private final SQLiteDataSource dataSource;
     /** Whether the schema has {@code sync_state} (V16): every write transaction then marks the database dirty. */
     private final boolean tracked;
-    /** The write transactions begun to commit since it opened (counted inside the transaction, before the commit). */
+    /** The tracked write transactions begun since it opened, and those of them that have ended (committed or not). */
     private final AtomicLong writes = new AtomicLong();
+    private final AtomicLong ended = new AtomicLong();
     /** Told after each tracked write commits (the publisher's debounce); keep it quick. */
     private volatile Runnable onWrite = () -> { };
     /** Wraps each connection: as it is in the app; tests make one fail in ways SQLite never does on demand. */
@@ -213,9 +214,18 @@ public final class Database {
         return write(work, () -> { }, false);
     }
 
-    /** The write transactions that began to commit since the database opened (a write during a publish shows here). */
+    /** The tracked write transactions begun since the database opened (a write during a publish shows here). */
     public long writes() {
         return writes.get();
+    }
+
+    /**
+     * Whether a tracked write transaction may be under way now (begun and not ended): a copy made now may or may not hold
+     * it.
+     */
+    public boolean writing() {
+        long done = ended.get();
+        return writes.get() != done;
     }
 
     /** {@code listener} is told after each tracked write commits, on the writing thread; keep it quick. */
@@ -234,6 +244,19 @@ public final class Database {
     }
 
     private <T> T write(Work<T> work, Runnable undo, boolean track) {
+        if (track) {
+            writes.incrementAndGet(); // before the transaction: a publish that reads the count later sees this write
+        }
+        try {
+            return transaction(work, undo, track);
+        } finally {
+            if (track) {
+                ended.incrementAndGet();
+            }
+        }
+    }
+
+    private <T> T transaction(Work<T> work, Runnable undo, boolean track) {
         boolean committed = false;
         T done;
         boolean undone = false;
@@ -245,9 +268,6 @@ public final class Database {
                     try (Statement st = connection.createStatement()) {
                         st.executeUpdate("UPDATE sync_state SET value = '1' WHERE key = 'dirty' AND value IS NOT '1'");
                     }
-                }
-                if (track) {
-                    writes.incrementAndGet(); // before the commit: a publish that reads the count after it sees this write
                 }
                 connection.commit();
                 committed = true;
