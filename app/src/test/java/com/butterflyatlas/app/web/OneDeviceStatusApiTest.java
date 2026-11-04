@@ -125,4 +125,28 @@ class OneDeviceStatusApiTest {
             services.thumbnails().close();
         }
     }
+
+    @Test
+    void homesNoteIsInTheStatusUntilDismissed() throws Exception {
+        TestClock clock = new TestClock();
+        LibrarySync sync = new LibrarySync(home.resolve("config"), () -> "Mac", clock, millis -> { },
+                new ManualTicker(clock));
+        AtlasServices services = TestServices.oneDevice(home, sync);
+        services.setup().setup(home.resolve("Atlas").toString());
+        try (AtlasServer server = AtlasServer.start(0, services)) {
+            Map<String, String> headers = Map.of("Origin", "http://127.0.0.1:" + server.port(), "Content-Type",
+                    "application/json");
+            assertThat(RawHttp.send(server.port(), "GET", "/api/status", headers, null).body())
+                    .contains("\"syncNote\":\"before_other_device\"");
+
+            RawHttp.Response dismissed = RawHttp.send(server.port(), "POST", "/api/library/sync-note/dismiss", headers, "{}");
+
+            assertThat(dismissed.status()).isEqualTo(204);
+            assertThat(RawHttp.send(server.port(), "GET", "/api/status", headers, null).body())
+                    .contains("\"syncNote\":null");
+        } finally {
+            services.exports().close();
+            services.thumbnails().close();
+        }
+    }
 }

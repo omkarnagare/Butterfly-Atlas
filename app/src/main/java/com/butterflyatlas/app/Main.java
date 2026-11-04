@@ -116,7 +116,8 @@ public final class Main {
      * its record so the next start reports the import as stopped (they need the library and the thumbnails, which a
      * filing batch adopts previews into); then the export's copy closes, waiting at most {@code ExportJobs.CLOSE_WAIT}
      * for the photo it is copying, whose progress is saved (the export stays running, so the next start pauses it as
-     * closing); then the thumbnails stop. The library's database stays open for the JVM's exit.
+     * closing); then the thumbnails stop; then (one device at a time) what is unsent is published and the library's marker
+ * closed. The library's database stays open for the JVM's exit.
      */
     static void shutdown(AtlasServer server, AtlasServices services) {
         // A taxonomy update's moves, import work and the export's copy are asked to stop first, so a long walk or copy
@@ -155,7 +156,14 @@ public final class Main {
                         try {
                             services.thumbnails().close();
                         } finally {
-                            services.placeNotes().close(); // its count under way ends before the library goes
+                            try {
+                                services.placeNotes().close(); // its count under way ends before the library goes
+                            } finally {
+                                if (services.sync() != null) {
+                                    // last, once nothing writes: what is unsent is published, and the marker closed
+                                    services.sync().close();
+                                }
+                            }
                         }
                     }
                 }

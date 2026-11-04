@@ -688,6 +688,7 @@ public final class SmokeTest {
             expect(publish.text().contains("not_stopped"), "Try again while publishing works: " + publish.text());
             Resp quit = http.call("POST /api/library/opened-elsewhere/quit", "/api/library/opened-elsewhere/quit", "{}", 409);
             expect(quit.text().contains("not_opened_elsewhere"), "Quit while the library is open only here: " + quit.text());
+            http.call("POST /api/library/sync-note/dismiss", "/api/library/sync-note/dismiss", "{}", 204);
         }
 
         void export() throws Exception {

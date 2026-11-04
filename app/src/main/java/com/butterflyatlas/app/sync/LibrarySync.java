@@ -116,6 +116,19 @@ public final class LibrarySync {
     /** Quits the app (set once it runs). */
     private volatile Runnable quitter = () -> LOG.warn("No app to quit");
 
+    /** Whether Home's note "before you open your library on another device" waits to be dismissed (§8). */
+    private volatile boolean beforeOtherDevice;
+    /** Whether the working copies not claimed for 30 days were looked for in this run. */
+    private boolean cleaned;
+
+    /** Home's one-time notes (contract §2): the last session's changes were sent; quit before using another device. */
+    public static final String SENT_LAST_SESSION = "sent_last_session";
+    public static final String BEFORE_OTHER_DEVICE = "before_other_device";
+    /** The {@code library_setting} key that records the second note dismissed on a device (its ID follows). */
+    static final String NOTE_DISMISSED = "sync.before_other_device_dismissed.";
+    /** Working copies whose library this device hasn't claimed for this long are deleted at start (§5 Disk space). */
+    public static final Duration KEEP_UNCLAIMED = Duration.ofDays(30);
+
     /** How often the marker is read again and this device's {@code seen} written (§5 Heartbeat). */
     public static final Duration HEARTBEAT = Duration.ofMinutes(1);
     /** How long every window has to read that the app quits before it does (as a library change's quit). */
@@ -170,6 +183,10 @@ public final class LibrarySync {
      */
     public synchronized Library claim(Path folder, boolean anyway, boolean discard, Opener opener) {
         Device me = device();
+        if (!cleaned) {
+            cleaned = true;
+            cleanUp();
+        }
         try {
             Files.createDirectories(folder);
         } catch (IOException e) {
@@ -350,6 +367,20 @@ public final class LibrarySync {
             return;
         }
         library.database().onWrite(this::written);
+        try {
+            String key = NOTE_DISMISSED + device().id();
+            beforeOtherDevice = library.database().read(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement("SELECT 1 FROM library_setting WHERE key = ?")) {
+                    ps.setString(1, key);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        return !rs.next();
+                    }
+                }
+            });
+        } catch (RuntimeException e) {
+            LOG.warn("Could not read whether Home's note about other devices was dismissed; it is shown", e);
+            beforeOtherDevice = true;
+        }
         synchronized (publishing) {
             heartbeat = ticker.schedule(this::beatLogged, HEARTBEAT);
         }
@@ -584,7 +615,135 @@ public final class LibrarySync {
 
     /** The status's part, from memory. */
     public StatusPart status() {
-        return new StatusPart(publishing(), openedElsewhere, null);
+        return new StatusPart(publishing(), openedElsewhere, syncNote());
+    }
+
+    /** Home's one-time note (contract §2): the last session's changes sent first, then the other; null when neither. */
+    public String syncNote() {
+        if (claimed == null || openedElsewhere != null) {
+            return null;
+        }
+        return sent ? SENT_LAST_SESSION : beforeOtherDevice ? BEFORE_OTHER_DEVICE : null;
+    }
+
+    /**
+     * Dismisses Home's current note (contract §2): {@code sent_last_session} in memory; {@code before_other_device} saved in
+     * the library for this device. A save that fails throws, and the note stays.
+     */
+    public void dismissNote() {
+        String note = syncNote();
+        if (SENT_LAST_SESSION.equals(note)) {
+            sent = false;
+        } else if (BEFORE_OTHER_DEVICE.equals(note)) {
+            String key = NOTE_DISMISSED + device().id();
+            claimed.library().database().write(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement("INSERT OR REPLACE INTO library_setting (key, value)"
+                        + " VALUES (?, ?)")) {
+                    ps.setString(1, key);
+                    ps.setString(2, clock.instant().toString());
+                    ps.executeUpdate();
+                }
+                return null;
+            });
+            beforeOtherDevice = false;
+        }
+    }
+
+    /**
+     * At quit (§8), once the app's work has stopped: a publish when anything is unsent, then the marker written as
+     * {@code closed}. When either fails (the library's drive has gone), it is logged: the marker stays {@code open} for this
+     * device and the working copy keeps its unsent changes, so the next start here sends them. Nothing once the library
+     * was opened elsewhere (the marker is another device's).
+     */
+    public void close() {
+        synchronized (publishRun) {
+            Claim c = claimed;
+            synchronized (publishing) {
+                for (Ticker.Later later : new Ticker.Later[] {debounce, retry, heartbeat}) {
+                    if (later != null) {
+                        later.cancel();
+                    }
+                }
+                debounce = null;
+                retry = null;
+                heartbeat = null;
+                if (c == null || stopped) {
+                    stopped = true;
+                    return;
+                }
+                stopped = true;
+            }
+            try {
+                Device me = device();
+                SyncState mine = SyncState.read(c.library().database());
+                long generation = mine.generation();
+                if (mine.dirty()) {
+                    Publish.Result result = Publish.run(c.library().database(), c.folder(), me, c.since(), clock.instant(),
+                            null, pause, () -> { });
+                    if (result instanceof Publish.NotOurs notOurs) {
+                        LOG.warn("At quit, the library was open on another device ({}); nothing was sent",
+                                notOurs.marker().name());
+                        return;
+                    }
+                    generation = ((Publish.Published) result).generation();
+                }
+                MarkerFile.Read read = MarkerFile.readSettled(c.folder(), pause);
+                if (read.marker() != null && !read.marker().names(me.id())) {
+                    LOG.warn("At quit, the library's marker names another device ({}); it is left as it is",
+                            read.marker().name());
+                    return;
+                }
+                MarkerFile.write(c.folder(), new Marker(me.id(), me.name(), Marker.CLOSED, c.since(), clock.instant(),
+                        generation));
+                LOG.info("The library at {} is closed on this device (generation {})", c.folder(), generation);
+            } catch (IOException | SQLException | RuntimeException e) {
+                LOG.warn("Could not send the library's last changes or mark it closed at quit; the next start on this"
+                        + " device sends them", e);
+            }
+        }
+    }
+
+    /**
+     * Deletes the working copies of libraries this device hasn't claimed for 30 days (§5 Disk space), unless they hold
+     * unsent changes (they wait for that library's claim, §7). What can't be read or deleted is logged and kept.
+     */
+    void cleanUp() {
+        Path root = workingCopies();
+        if (!Files.isDirectory(root)) {
+            return;
+        }
+        Instant now = clock.instant();
+        List<Path> folders;
+        try (java.util.stream.Stream<Path> list = Files.list(root)) {
+            folders = list.filter(Files::isDirectory).toList();
+        } catch (IOException e) {
+            LOG.warn("Could not look for old working copies in {}", root, e);
+            return;
+        }
+        for (Path folder : folders) {
+            WorkingCopy copy = WorkingCopy.at(folder);
+            Instant last = copy.lastClaimed();
+            if (last == null || Duration.between(last, now).compareTo(KEEP_UNCLAIMED) < 0) {
+                continue;
+            }
+            try {
+                if (copy.exists() && copy.state().dirty()) {
+                    LOG.info("The working copy {} holds unsent changes; it waits for its library to be opened", folder);
+                    continue;
+                }
+            } catch (SQLException e) {
+                LOG.warn("Could not read the working copy {}; it is kept", folder, e);
+                continue;
+            }
+            try (java.util.stream.Stream<Path> walk = Files.walk(folder)) {
+                for (Path p : walk.sorted(java.util.Comparator.reverseOrder()).toList()) {
+                    Files.deleteIfExists(p);
+                }
+                LOG.info("Deleted the working copy {}: its library hasn't been opened on this device for 30 days", folder);
+            } catch (IOException e) {
+                LOG.warn("Could not delete the old working copy {}", folder, e);
+            }
+        }
     }
 
     /** The status's {@code publish}: null while publishing works. */

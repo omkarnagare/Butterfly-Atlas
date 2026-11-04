@@ -6,7 +6,8 @@ import com.butterflyatlas.app.sync.LibrarySync;
 import io.javalin.Javalin;
 
 /**
- * One device at a time while running (one-device contract §2): Try again when publishing has stopped, and Quit once the
+ * One device at a time while running (one-device contract §2): Try again when publishing has stopped, putting Home's
+ * one-time note away, and Quit once the
  * library was opened on another device (the app quits 1.5 seconds later). Without one device
  * at a time (tests whose libraries open in place) every route answers as when there is nothing to act on.
  */
@@ -29,6 +30,12 @@ final class SyncRoutes {
                         "Butterfly Atlas is not waiting for you to try sending your changes again.");
             }
             ctx.status(202).json(new Published(sync.tryAgain()));
+        });
+        app.post("/api/library/sync-note/dismiss", ctx -> {
+            if (sync != null) {
+                sync.dismissNote();
+            }
+            ctx.status(204);
         });
         app.post("/api/library/opened-elsewhere/quit", ctx -> {
             if (sync == null) {
