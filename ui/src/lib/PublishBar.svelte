@@ -3,6 +3,7 @@
   import { NOT_STOPPED } from './codes.js';
   import { PUBLISH_BAR_LABEL, TRY_AGAIN, TRYING_AGAIN, publishLine } from './messages.js';
   import { refreshStatus, status } from './status.svelte.js';
+  import { PUBLISH_STOPPED } from './states.js';
 
   /**
    * The bar under the header on every screen while changes can't be sent to the library folder (one-device design §5,
@@ -15,7 +16,7 @@
   let error = $state('');
 
   let publish = $derived(status.publish);
-  let stopped = $derived(publish?.state === 'stopped');
+  let stopped = $derived(publish?.state === PUBLISH_STOPPED);
 
   async function tryAgain() {
     if (trying) return;

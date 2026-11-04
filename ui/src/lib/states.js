@@ -25,3 +25,9 @@ export const ITEM_READ = 'read';
 export const ITEM_UNSUPPORTED = 'unsupported';
 export const ITEM_FAILED = 'failed';
 export const ITEM_MISSING = 'missing';
+
+/** One device at a time (contract §2): the publishing bar's `publish.state`, and Home's `syncNote`. */
+export const PUBLISH_RETRYING = 'retrying';
+export const PUBLISH_STOPPED = 'stopped';
+export const SYNC_SENT_LAST_SESSION = 'sent_last_session';
+export const SYNC_BEFORE_OTHER_DEVICE = 'before_other_device';

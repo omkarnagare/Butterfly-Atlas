@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import Home from './Home.svelte';
-import { cancelBackup, cancelExport, checkBackup, dismissMovedNote, dismissPlaceUpdate, dismissRescanLeft, getBackups, getFsRoots, listFolder, resumeBackup, setBackupPreference, getPlaceUpdate, getSplits, getStatus, getSummary, getTagNames, getTags, resumeExport } from '../lib/api.js';
+import { cancelBackup, cancelExport, checkBackup, dismissMovedNote, dismissSyncNote, dismissPlaceUpdate, dismissRescanLeft, getBackups, getFsRoots, listFolder, resumeBackup, setBackupPreference, getPlaceUpdate, getSplits, getStatus, getSummary, getTagNames, getTags, resumeExport } from '../lib/api.js';
 import { resetStatus, status } from '../lib/status.svelte.js';
 import { modal } from '../lib/modal.js';
 import { resetAsk } from '../lib/backups.js';
@@ -12,7 +12,7 @@ vi.mock('../lib/api.js', () => ({
   getSplits: vi.fn(), getCustomMatches: vi.fn(), retryUpdate: vi.fn(), mergeCustomMatch: vi.fn(), declineCustomMatch: vi.fn(),
   getPlaceUpdate: vi.fn(), dismissPlaceUpdate: vi.fn(), getBackups: vi.fn(), getBackup: vi.fn(), resumeBackup: vi.fn(), cancelBackup: vi.fn(), pauseBackup: vi.fn(),
   setBackupPreference: vi.fn(), checkBackup: vi.fn(), startBackup: vi.fn(), getFsRoots: vi.fn(), listFolder: vi.fn(),
-  dismissRescanLeft: vi.fn(), checkHeic: vi.fn(), getTagNames: vi.fn(), dismissTagNames: vi.fn(), dismissMovedNote: vi.fn(),
+  dismissRescanLeft: vi.fn(), checkHeic: vi.fn(), getTagNames: vi.fn(), dismissTagNames: vi.fn(), dismissMovedNote: vi.fn(), dismissSyncNote: vi.fn(),
   photoThumb: (photo) => `./api/photos/${photo.id}/thumb?v=1`,
   thumbUrl: (id, v) => `./api/photos/${id}/thumb?v=${v}`,
 }));
@@ -639,4 +639,44 @@ test('on another system Home\'s line says there is no decoder Butterfly Atlas ca
   getStatus.mockResolvedValue({ rescanning: false, previews: { pending: 0, done: 0 }, deletedCount: 0, heic: status.heic });
   render(Home);
   expect(await screen.findByText('Some photos are HEIC, and this device has no HEIC decoder Butterfly Atlas can use. See Settings → About.')).toBeTruthy();
+});
+
+/* ---------- one device at a time: the one-time sync notes (design §5 case 2, §8; contract §2) ---------- */
+
+test('Home says once that the last session\'s changes were sent, then the reminder before using another device, each until Dismiss', async () => {
+  getSummary.mockResolvedValue(summary);
+  status.syncNote = 'sent_last_session';
+  getStatus.mockResolvedValue({ rescanning: false, previews: { pending: 0, done: 0 }, deletedCount: 0, syncNote: 'before_other_device' });
+  dismissSyncNote.mockResolvedValue(null);
+  render(Home);
+
+  let note = await screen.findByRole('region', { name: 'Changes sent' });
+  expect(within(note).getByText('Changes from your last session on this device were sent to the library.')).toBeTruthy();
+  await fireEvent.click(within(note).getByRole('button', { name: 'Dismiss' }));
+  expect(dismissSyncNote).toHaveBeenCalledOnce();
+  note = await screen.findByRole('region', { name: 'Before using another device' });
+  expect(screen.queryByRole('region', { name: 'Changes sent' })).toBeNull();
+  expect(within(note).getByText('Before you open your library on another device, quit Butterfly Atlas here and let your sync app finish.')).toBeTruthy();
+
+  getStatus.mockResolvedValue({ rescanning: false, previews: { pending: 0, done: 0 }, deletedCount: 0, syncNote: null });
+  await fireEvent.click(within(note).getByRole('button', { name: 'Dismiss' }));
+  expect(dismissSyncNote).toHaveBeenCalledTimes(2);
+  await vi.waitFor(() => expect(screen.queryByRole('region', { name: 'Before using another device' })).toBeNull());
+});
+
+test('a Dismiss of the sync note that fails says why and keeps it; no note when there is none', async () => {
+  getSummary.mockResolvedValue(summary);
+  status.syncNote = 'before_other_device';
+  getStatus.mockResolvedValue({ rescanning: false, previews: { pending: 0, done: 0 }, deletedCount: 0, syncNote: 'before_other_device' });
+  dismissSyncNote.mockRejectedValue(new Error('Butterfly Atlas could not reach its service. Close the app and open it again.'));
+  const { unmount } = render(Home);
+  const note = await screen.findByRole('region', { name: 'Before using another device' });
+  await fireEvent.click(within(note).getByRole('button', { name: 'Dismiss' }));
+  expect((await within(note).findByRole('alert')).textContent).toBe('Butterfly Atlas could not reach its service. Close the app and open it again.');
+  expect(screen.getByRole('region', { name: 'Before using another device' })).toBeTruthy();
+  unmount();
+  status.syncNote = null;
+  render(Home);
+  await screen.findByRole('heading', { name: 'Families' });
+  expect(screen.queryByRole('region', { name: /Changes sent|Before using another device/ })).toBeNull();
 });

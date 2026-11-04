@@ -110,3 +110,12 @@ test('the status carries the publishing bar\'s state; an older server has none',
   await refreshStatus();
   expect(status.publish).toBeNull();
 });
+
+test('the status carries Home\'s sync note; an older server has none', async () => {
+  getStatus.mockResolvedValue({ rescanning: false, syncNote: 'sent_last_session' });
+  await refreshStatus();
+  expect(status.syncNote).toBe('sent_last_session');
+  getStatus.mockResolvedValue({ rescanning: false });
+  await refreshStatus();
+  expect(status.syncNote).toBeNull();
+});
