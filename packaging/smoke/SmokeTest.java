@@ -682,6 +682,10 @@ public final class SmokeTest {
             expect(previous.text().contains("no_previous"), "the old library without a change: " + previous.text());
             Json status = Json.parse(http.call("GET /api/status", "/api/status", null, 200).text());
             expect(status.isNull("changing") && status.isNull("libraryMoved"), "the status names a change: " + status);
+            expect(status.isNull("publish") && status.isNull("openedElsewhere"), "the status says publishing failed or the"
+                    + " library was opened elsewhere: " + status);
+            Resp publish = http.call("POST /api/library/publish", "/api/library/publish", "{}", 409);
+            expect(publish.text().contains("not_stopped"), "Try again while publishing works: " + publish.text());
         }
 
         void export() throws Exception {

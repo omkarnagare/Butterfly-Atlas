@@ -1,9 +1,12 @@
 package com.butterflyatlas.app.sync;
 
+import com.butterflyatlas.app.AtlasException;
+import com.butterflyatlas.app.ErrorCodes;
 import com.butterflyatlas.app.db.Database;
 import com.butterflyatlas.app.db.DatabaseException;
 import com.butterflyatlas.app.db.LibraryTooNewException;
 import com.butterflyatlas.app.library.Library;
+import com.butterflyatlas.app.library.SetupService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sqlite.SQLiteConfig;
@@ -19,6 +22,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -49,19 +53,73 @@ public final class LibrarySync {
     private final Supplier<String> deviceName;
     private final Clock clock;
     private final MarkerFile.Pause pause;
+    private final Ticker ticker;
     private volatile Device device;
     /** The library claimed in this run (null until one is). */
     private volatile Claim claimed;
 
-    /** What this run claimed. */
-    record Claim(Path folder, Library library, Instant since, boolean sent) {
+    /** What this run claimed; {@code unsent}: the working copy had unsent changes of the last session (§5 case 2). */
+    record Claim(Path folder, Library library, Instant since, boolean unsent) {
     }
+
+    /** How long after the last write a publish follows (§5). */
+    public static final Duration DEBOUNCE = Duration.ofSeconds(5);
+    /** How long after a failed publish the next try comes, and how many tries a round has (§5). */
+    public static final Duration RETRY = Duration.ofMinutes(1);
+    public static final int TRIES = 5;
+
+    /** Publishing is trying again once a minute ({@code tries}: failed so far in this round, 1–4). */
+    public static final String RETRYING = "retrying";
+    /** 5 tries failed: Try again is offered. */
+    public static final String STOPPED = "stopped";
+
+    /**
+     * What {@code GET /api/status} answers of one device at a time (one-device contract §2): publishing failing
+     * ({@code publish}, null while it works), the library opened on another device ({@code openedElsewhere}, null
+     * unless), and Home's one-time note ({@code syncNote}, null when none).
+     */
+    public record StatusPart(Publishing publish, OpenedElsewhere openedElsewhere, String syncNote) {
+        public static final StatusPart NONE = new StatusPart(null, null, null);
+    }
+
+    /**
+     * The library was opened on another device while open here (§6): its name (null: unknown), when it opened it (its
+     * marker's {@code since}), and when this device was last in step when it has unsent changes (else null).
+     */
+    public record OpenedElsewhere(String name, String at, String unsentSince) {
+    }
+
+    /** The status's {@code publish} (one-device contract §2): null while publishing works. */
+    public record Publishing(String state, String reason, int tries) {
+    }
+
+    /** Why a publish failed when the marker couldn't be read (§10). */
+    static final String FOLDER_UNREADABLE = "Butterfly Atlas couldn't read your library folder. Check that it is there and"
+            + " that your sync app is running, then try again.";
+
+    /** Guards the publishing state below (held only briefly: a write's listener takes it). */
+    private final Object publishing = new Object();
+    /** Held while a publish runs: one at a time. */
+    private final Object publishRun = new Object();
+    private Ticker.Later debounce;
+    private Ticker.Later retry;
+    private int tries;
+    private String reason;
+    private boolean stopped;
+    /** Whether a publish sent the last session's unsent changes (§5 case 2; Home's note until dismissed). */
+    private volatile boolean sent;
 
     /**
      * {@code configDir}: where {@code device-id} and the working copies are; {@code deviceName}: this device's name, read
      * once; {@code pause}: the wait before a marker that can't be read is read again.
      */
     public LibrarySync(Path configDir, Supplier<String> deviceName, Clock clock, MarkerFile.Pause pause) {
+        this(configDir, deviceName, clock, pause, (task, delay) -> () -> { });
+    }
+
+    /** As above, with {@code ticker} running the publishes and tries that come later. */
+    public LibrarySync(Path configDir, Supplier<String> deviceName, Clock clock, MarkerFile.Pause pause, Ticker ticker) {
+        this.ticker = ticker;
         this.configDir = configDir;
         this.deviceName = deviceName;
         this.clock = clock;
@@ -171,24 +229,9 @@ public final class LibrarySync {
             throw new UncheckedIOException(e);
         }
         working.claimed(now);
-        boolean sent = false;
-        if (SyncState.read(opened.database()).dirty()) {
-            sent = publishAtClaim(folder, opened, me, now) && unsent;
-        }
-        claimed = new Claim(folder, opened, now, sent);
+        claimed = new Claim(folder, opened, now, unsent);
         LOG.info("This device claimed the library at {} (generation {}, {})", folder, library.generation(), claim);
         return opened;
-    }
-
-    /** A publish right after the claim (§5 case 2, or writes the opening made); a failure is logged, the copy stays dirty. */
-    private boolean publishAtClaim(Path folder, Library opened, Device me, Instant now) {
-        try {
-            Publish.Result result = Publish.run(opened.database(), folder, me, now, clock.instant(), null, pause, () -> { });
-            return result instanceof Publish.Published;
-        } catch (IOException | SQLException | RuntimeException e) {
-            LOG.warn("Could not publish the library at {} after claiming it", folder, e);
-            return false;
-        }
     }
 
     /**
@@ -278,10 +321,175 @@ public final class LibrarySync {
         return out;
     }
 
-    /** Whether the claim of this run published unsent changes of the last session (§5 case 2). */
+    /** Whether a publish of this run sent unsent changes of the last session (§5 case 2). */
     public boolean sentLastSession() {
+        return sent;
+    }
+
+    /**
+     * The claimed library has opened ({@code library}): its writes are published from now on (5 seconds after the last),
+     * and unsent changes (of the last session, or of the opening) are published at once. Nothing for another library.
+     */
+    public void start(Library library) {
         Claim c = claimed;
-        return c != null && c.sent();
+        if (c == null || c.library() != library) {
+            return;
+        }
+        library.database().onWrite(this::written);
+        boolean dirty;
+        try {
+            dirty = SyncState.read(library.database()).dirty();
+        } catch (RuntimeException e) {
+            LOG.warn("Could not read whether the library has unsent changes; it is published", e);
+            dirty = true;
+        }
+        if (dirty) {
+            boolean worked = attempt();
+            sent = worked && c.unsent();
+        }
+    }
+
+    /** A write committed: the publish waits 5 seconds more (not while failed tries go on: they publish it). */
+    private void written() {
+        synchronized (publishing) {
+            if (!running() || tries > 0) {
+                return;
+            }
+            if (debounce != null) {
+                debounce.cancel();
+            }
+            debounce = ticker.schedule(this::attemptLogged, DEBOUNCE);
+        }
+    }
+
+    /**
+     * An import's filing, a taxonomy or place update, or a backup ended (§5): the library is published now when it has
+     * unsent changes (not while failed tries go on).
+     */
+    public void workEnded() {
+        Claim c = claimed;
+        synchronized (publishing) {
+            if (c == null || !running() || tries > 0) {
+                return;
+            }
+        }
+        try {
+            if (SyncState.read(c.library().database()).dirty()) {
+                ticker.schedule(this::attemptLogged, Duration.ZERO);
+            }
+        } catch (RuntimeException e) {
+            LOG.warn("Could not read whether the library has unsent changes", e);
+        }
+    }
+
+    /** Whether this run has a library it may publish to. */
+    private boolean running() {
+        return claimed != null && !stopped;
+    }
+
+    private void attemptLogged() {
+        try {
+            attempt();
+        } catch (RuntimeException | Error e) {
+            LOG.error("Publishing the library stopped on an unexpected error", e);
+        }
+    }
+
+    /**
+     * One publish now; true when it worked. A failure counts as one of the round's 5 tries: another follows a minute later,
+     * and after the 5th the publishing stops until Try again (§5). A write meanwhile leaves another publish to follow.
+     */
+    boolean attempt() {
+        synchronized (publishRun) {
+            Claim c = claimed;
+            synchronized (publishing) {
+                if (c == null || stopped) {
+                    return false;
+                }
+                if (debounce != null) {
+                    debounce.cancel();
+                    debounce = null;
+                }
+                if (retry != null) {
+                    retry.cancel();
+                    retry = null;
+                }
+            }
+            Publish.Result result;
+            try {
+                result = Publish.run(c.library().database(), c.folder(), device(), c.since(), clock.instant(), null, pause,
+                        () -> { });
+            } catch (IOException | SQLException | RuntimeException e) {
+                failed(c.folder(), e);
+                return false;
+            }
+            if (result instanceof Publish.NotOurs notOurs) {
+                elsewhere(notOurs.marker());
+                return false;
+            }
+            synchronized (publishing) {
+                tries = 0;
+                reason = null;
+                if (((Publish.Published) result).dirty()) {
+                    debounce = ticker.schedule(this::attemptLogged, DEBOUNCE);
+                }
+            }
+            return true;
+        }
+    }
+
+    private void failed(Path folder, Exception e) {
+        String why = e instanceof Publish.MarkerUnreadable ? FOLDER_UNREADABLE : SetupService.reasonFor(folder, e);
+        synchronized (publishing) {
+            tries++;
+            reason = why;
+            LOG.warn("Could not publish the library at {} (try {} of {})", folder, tries, TRIES, e);
+            if (tries < TRIES) {
+                retry = ticker.schedule(this::attemptLogged, RETRY);
+            }
+        }
+    }
+
+    /** The library's marker names another device (§6): nothing is published from now on. */
+    void elsewhere(Marker marker) {
+        synchronized (publishing) {
+            stopped = true;
+        }
+        LOG.warn("The library was opened on another device ({}); this device has stopped saving to it", marker.name());
+    }
+
+    /** The status's part, from memory. */
+    public StatusPart status() {
+        return new StatusPart(publishing(), null, null);
+    }
+
+    /** The status's {@code publish}: null while publishing works. */
+    public Publishing publishing() {
+        synchronized (publishing) {
+            if (tries == 0 || stopped) {
+                return null;
+            }
+            return new Publishing(tries >= TRIES ? STOPPED : RETRYING, reason, Math.min(tries, TRIES));
+        }
+    }
+
+    /**
+     * Try again (one-device contract §2): one attempt now; when it fails, another round of 5 tries starts (this one counts
+     * as the first). 409 {@code not_stopped} unless publishing has stopped. Answers the status's {@code publish}.
+     */
+    public Publishing tryAgain() {
+        synchronized (publishRun) {
+            synchronized (publishing) {
+                Publishing now = publishing();
+                if (now == null || !STOPPED.equals(now.state())) {
+                    throw new AtlasException(AtlasException.Kind.CONFLICT, ErrorCodes.NOT_STOPPED,
+                            "Butterfly Atlas is not waiting for you to try sending your changes again.");
+                }
+                tries = 0;
+            }
+            attempt();
+            return publishing();
+        }
     }
 
     /** The library this run claimed, if any. */

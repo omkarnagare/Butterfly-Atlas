@@ -37,6 +37,10 @@ import com.butterflyatlas.app.places.PlaceBundles;
 import com.butterflyatlas.app.places.PlaceSearch;
 import com.butterflyatlas.app.places.UserPlaces;
 import com.butterflyatlas.app.search.SearchService;
+import com.butterflyatlas.app.sync.Device;
+import com.butterflyatlas.app.sync.LibrarySync;
+import com.butterflyatlas.app.sync.MarkerFile;
+import com.butterflyatlas.app.sync.Ticker;
 import com.butterflyatlas.app.taxa.SearchWordService;
 import com.butterflyatlas.app.taxa.TaxonService;
 import com.butterflyatlas.app.taxonomy.TaxonomyBundles;
@@ -169,6 +173,11 @@ public final class Main {
                 .orElseGet(TaxonomyBundles::fromClasspath);
         PlaceBundles places = options.placesDir().map(PlaceBundles::fromDirectory).orElseGet(PlaceBundles::fromClasspath);
         LibraryHolder holder = new LibraryHolder();
+        // One device at a time (one-device design): each library is claimed for this device before it opens, and its live
+        // database is this device's working copy in the config folder, published to the library's atlas.db.
+        LibrarySync sync = new LibrarySync(options.configDir(), Device::systemName, clock, MarkerFile.Pause.REAL,
+                Ticker.real());
+        holder.whenOpened(sync::start);
         // The computer's HEIC decoder (Phase 7b): its working folder is the open library's .thumbs/.decode/.
         HeicDecoders heic = new HeicDecoders(() -> holder.current()
                 .map(library -> library.folder().resolve(Thumbnails.FOLDER).resolve(".decode")).orElse(null));
@@ -200,6 +209,9 @@ public final class Main {
         Updates updates = new Updates(holder::library, bundles, imports, exports, backups, clock);
         // a backup of Everything holds the photos while it copies them; it neither starts nor resumes while an import files
         backups.importFiling(imports::filing);
+        imports.onWorkEnded(sync::workEnded); // the library is published when an import's filing ends,
+        backups.onWorkEnded(sync::workEnded); // when a backup ends,
+        updates.whenFinished(sync::workEnded); // and when a taxonomy update ends (a place update runs as it opens)
         holder.whenOpened(library -> {
             library.photoHold().heldBy(backups::photoRefusal);
             library.openImports().filing(imports::filing); // a tag, place or species an import files with stays
@@ -237,7 +249,7 @@ public final class Main {
             Api.readStatus(photos, imports, exports, backups); // a status poll never reads the database
         }));
         SetupService setup = new SetupService(new ConfigStore(options.configDir()), holder, bundles, places, home, clock,
-                locks);
+                locks, sync);
         setup.startup(options.dataDir());
         PlaceSearch placeSearch = new PlaceSearch(() -> holder.library().database(), places);
         TaxonService taxa = new TaxonService(holder);
@@ -257,7 +269,7 @@ public final class Main {
                 placeSearch, new UserPlaces(() -> holder.library().database(), clock, placeSearch,
                         new ImportPlaceChoices(holder::library)),
                 photoPlaces, filters, exports, custom, updates, splits, new LibraryDrive(holder), placeNotes, backups, heic,
-                change);
+                change, sync);
     }
 
     /**

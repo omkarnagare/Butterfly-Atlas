@@ -36,6 +36,7 @@ import com.butterflyatlas.app.places.PlaceBundles;
 import com.butterflyatlas.app.places.PlaceSearch;
 import com.butterflyatlas.app.places.UserPlaces;
 import com.butterflyatlas.app.search.SearchService;
+import com.butterflyatlas.app.sync.LibrarySync;
 import com.butterflyatlas.app.taxa.SearchWordService;
 import com.butterflyatlas.app.taxa.TaxonService;
 import com.butterflyatlas.app.taxonomy.TaxonomyBundles;
@@ -89,8 +90,31 @@ public final class TestServices {
      */
     private static AtlasServices unconfigured(Path home, PhotoProcessor processor, Duration cancelWait, LibraryHolder holder,
                                               TaxonomyBundles bundles, ToLongFunction<Path> usableSpace, PlaceBundles places) {
+        return unconfigured(home, processor, cancelWait, holder, bundles, usableSpace, places, null);
+    }
+
+    /**
+     * No library chosen yet, with one device at a time ({@code sync}, whose config folder should be
+     * {@code home/config}): each library is claimed for this device and its live database is a working copy.
+     */
+    public static AtlasServices oneDevice(Path home, LibrarySync sync) {
+        return oneDevice(home, sync, new LibraryHolder());
+    }
+
+    /** As {@link #oneDevice(Path, LibrarySync)}, opening the library into {@code holder}. */
+    public static AtlasServices oneDevice(Path home, LibrarySync sync, LibraryHolder holder) {
+        return unconfigured(home, new ImageIoPhotoProcessor(), null, holder, TestBundles.fixture(),
+                LibraryDrive::usableSpace, TestPlaces.bundles(), sync);
+    }
+
+    private static AtlasServices unconfigured(Path home, PhotoProcessor processor, Duration cancelWait, LibraryHolder holder,
+                                              TaxonomyBundles bundles, ToLongFunction<Path> usableSpace, PlaceBundles places,
+                                              LibrarySync sync) {
+        if (sync != null) {
+            holder.whenOpened(sync::start);
+        }
         SetupService setup = new SetupService(new ConfigStore(home.resolve("config")), holder, bundles,
-                places, home, TestBundles.CLOCK);
+                places, home, TestBundles.CLOCK, null, sync);
         Thumbnails thumbnails = new Thumbnails(holder::library, processor, TestBundles.CLOCK);
         SearchService search = new SearchService(holder);
         int placeVersion = places.position(places.version());
@@ -106,6 +130,11 @@ public final class TestServices {
         Backups backups = new Backups(holder::library, TestBundles.CLOCK);
         Updates updates = new Updates(holder::library, bundles, imports, exports, backups, TestBundles.CLOCK);
         backups.importFiling(imports::filing);
+        if (sync != null) {
+            imports.onWorkEnded(sync::workEnded);
+            backups.onWorkEnded(sync::workEnded);
+            updates.whenFinished(sync::workEnded);
+        }
         holder.whenOpened(library -> {
             library.photoHold().heldBy(backups::photoRefusal);
             library.openImports().filing(imports::filing); // a tag, place or species an import files with stays
@@ -144,7 +173,7 @@ public final class TestServices {
                 new SplitSorter(holder::library, photos, photoQueries, updates::libraryChanged),
                 new LibraryDrive(() -> holder.current().map(Library::folder), usableSpace, System::nanoTime), placeNotes,
                 backups, TestDecoders.none("mac", () -> holder.current().map(l -> l.folder().resolve(Thumbnails.FOLDER)
-                        .resolve(".decode")).orElse(null)), change);
+                        .resolve(".decode")).orElse(null)), change, sync);
     }
 
     /** The same services with {@code change} as their library change (tests of a change's steps). */

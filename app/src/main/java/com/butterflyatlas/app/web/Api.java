@@ -4,6 +4,7 @@ import com.butterflyatlas.app.backup.Backups;
 import com.butterflyatlas.app.exports.Exports;
 import com.butterflyatlas.app.imports.Imports;
 import com.butterflyatlas.app.photos.PhotoStore;
+import com.butterflyatlas.app.sync.LibrarySync;
 import io.javalin.Javalin;
 import io.javalin.json.JavalinJackson;
 import org.slf4j.Logger;
@@ -71,10 +72,12 @@ public final class Api {
         new PlaceUpdateRoutes(services.placeNotes()).register(app);
         new HeicRoutes(services.heic()).register(app);
         new LibraryChangeRoutes(services.change(), services.setup()).register(app);
+        new SyncRoutes(services.sync()).register(app);
         StatusRoutes status = new StatusRoutes(services.rescan(), services.thumbnails(), services.photos(),
                 services.processing(), services.imports(), services.exports(), services.updates(), services.drive(),
                 services.placeNotes(), services.backups(), services.setup()::theme,
-                () -> services.change().changing().orElse(null), services.setup()::libraryMoved);
+                () -> services.change().changing().orElse(null), services.setup()::libraryMoved,
+                () -> services.sync() == null ? LibrarySync.StatusPart.NONE : services.sync().status());
         status.register(app);
         JavalinJackson json = new JavalinJackson();
         SessionRoutes sessions = session == null ? null : new SessionRoutes(session, services.setup(),

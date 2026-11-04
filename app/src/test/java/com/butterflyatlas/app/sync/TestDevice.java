@@ -27,9 +27,13 @@ final class TestDevice {
     final LibrarySync sync;
     final SetupService setup;
 
+    final ManualTicker ticker;
+
     TestDevice(Path home, Path config, String name, Clock clock) {
         this.config = config;
-        this.sync = new LibrarySync(config, () -> name, clock, millis -> { });
+        this.ticker = new ManualTicker(clock);
+        this.sync = new LibrarySync(config, () -> name, clock, millis -> { }, ticker);
+        holder.whenOpened(sync::start);
         this.setup = new SetupService(new ConfigStore(config), holder, TestBundles.fixture(), TestPlaces.bundles(), home,
                 clock, null, sync);
     }

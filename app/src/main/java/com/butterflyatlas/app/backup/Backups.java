@@ -425,6 +425,11 @@ public final class Backups implements AutoCloseable {
                         : CLOSED.equals(r.pausedBy()) ? HOLDS_CLOSED : HOLDS_PAUSED);
     }
 
+    /** {@code listener} is told each time a backup's copy ends, however it ended: the library is published then. */
+    public void onWorkEnded(Runnable listener) {
+        jobs.onEnded(listener);
+    }
+
     /** What tells whether an import is filing: while one is, a backup neither starts nor resumes (409 import_filing). */
     public void importFiling(java.util.function.BooleanSupplier filing) {
         this.importFiling = filing;

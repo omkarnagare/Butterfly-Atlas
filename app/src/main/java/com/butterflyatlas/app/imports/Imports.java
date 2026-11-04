@@ -339,6 +339,11 @@ public final class Imports implements AutoCloseable {
         return jobs.filing(id);
     }
 
+    /** {@code listener} is told each time an import's work (its filing among it) ends: the library is published then. */
+    public void onWorkEnded(Runnable listener) {
+        jobs.onEnded(listener);
+    }
+
     /** Whether any import is filing or about to (a taxonomy update waits for it). */
     public boolean filing() {
         return jobs.filingAny();
