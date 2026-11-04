@@ -2,7 +2,7 @@
   import { tick } from 'svelte';
   import Dialog from './Dialog.svelte';
   import DeviceWords from './DeviceWords.svelte';
-  import { continueDiscarded, getSetup, openHereAnyway, retrySetup } from './api.js';
+  import { continueDiscarded, openHereAnyway, retrySetup } from './api.js';
   import { NOT_ON_OTHER_DEVICE, NOTHING_DISCARDED, TOO_SOON } from './codes.js';
   import { clockOf, dayAt, dayClock, minutesSince } from './dates.js';
   import {
@@ -19,7 +19,9 @@
    *   10 s, so the button and "… minutes ago" move without a reload.
    * - `notSynced`: the database hasn't arrived yet; Try again.
    * - `discarded`: unsent changes were discarded, with the photos left out of the atlas; Continue.
-   * While another device or the sync app is waited for, the status is read again every minute (GET /api/setup).
+   * While another device or the sync app is waited for, the checks run again every minute (POST /api/setup/retry, contract
+   * §1), without the "Tried again" line, which is for the user's own Try again; a refusal of Open here anyway or Continue
+   * runs them again at once.
    * Every answer goes to `onStatus` (the setup screen opens the app when it is `configured`); every failure is said.
    * @type {{ status: object, onStatus: (next: object) => void }}
    */
@@ -62,12 +64,14 @@
 
   async function reread() {
     try {
-      const next = await getSetup();
+      const next = await retrySetup();
       pollError = '';
       now = new Date();
       onStatus(next);
     } catch (e) {
-      pollError = e?.message ?? String(e);
+      // Nothing is refused any more (the library was opened meanwhile): the app starts as usual.
+      if (e?.code === 'not_failed') onStatus({ configured: true });
+      else pollError = e?.message ?? String(e);
     }
   }
 

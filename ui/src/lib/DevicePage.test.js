@@ -1,12 +1,12 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import Setup from '../screens/Setup.svelte';
-import { continueDiscarded, getSetup, inspectFolder, openHereAnyway, retrySetup } from './api.js';
+import { continueDiscarded, inspectFolder, openHereAnyway, retrySetup } from './api.js';
 import { resetStatus } from './status.svelte.js';
 
 vi.mock('./api.js', () => ({
   inspectFolder: vi.fn(), setUpLibrary: vi.fn(), retrySetup: vi.fn(), getFsRoots: vi.fn(), listFolder: vi.fn(), usePreviousLibrary: vi.fn(),
-  getSetup: vi.fn(), openHereAnyway: vi.fn(), continueDiscarded: vi.fn(),
+  openHereAnyway: vi.fn(), continueDiscarded: vi.fn(),
   getStatus: vi.fn(), getExport: vi.fn(), getBackup: vi.fn(), checkHeic: vi.fn(),
 }));
 
@@ -62,24 +62,24 @@ test('15 minutes or more: the other wording, and Open here anyway… asks first;
   await vi.waitFor(() => expect(onDone).toHaveBeenCalledOnce());
 });
 
-test('Open here anyway… appears when the clock reaches 15 minutes, and goes when the minute\'s poll brings a newer seen', async () => {
+test('Open here anyway… appears when the clock reaches 15 minutes, and goes when the minute\'s retry brings a newer seen', async () => {
   vi.setSystemTime(new Date(2026, 10, 4, 11, 19, 50));
-  getSetup.mockResolvedValue(onOther({ seen: at(11, 20), openAnywayFrom: at(11, 35) }));
+  retrySetup.mockResolvedValue(onOther({ seen: at(11, 20), openAnywayFrom: at(11, 35) }));
   render(Setup, { status: onOther(), onDone: vi.fn() });
   expect(screen.queryByRole('button', { name: 'Open here anyway…' })).toBeNull();
   await vi.advanceTimersByTimeAsync(15_000);
   expect(screen.getByRole('button', { name: 'Open here anyway…' })).toBeTruthy();
   expect(page().textContent).toContain('(last seen 4 Nov at 11:05, 15 minutes ago)');
-  expect(getSetup).not.toHaveBeenCalled();
+  expect(retrySetup).not.toHaveBeenCalled();
   await vi.advanceTimersByTimeAsync(45_000);
-  expect(getSetup).toHaveBeenCalledOnce();
+  expect(retrySetup).toHaveBeenCalledOnce();
   await vi.waitFor(() => expect(screen.queryByRole('button', { name: 'Open here anyway…' })).toBeNull());
   expect(page().textContent).toContain('(last seen 4 Nov at 11:20, just now)');
 });
 
 test('a poll that fails is said, and goes when one answers', async () => {
-  getSetup.mockRejectedValueOnce(new Error('Butterfly Atlas could not reach its service. Close the app and open it again.'));
-  getSetup.mockResolvedValue(onOther());
+  retrySetup.mockRejectedValueOnce(new Error('Butterfly Atlas could not reach its service. Close the app and open it again.'));
+  retrySetup.mockResolvedValue(onOther());
   render(Setup, { status: onOther(), onDone: vi.fn() });
   await vi.advanceTimersByTimeAsync(60_000);
   expect((await screen.findByRole('alert')).textContent).toBe('Butterfly Atlas could not reach its service. Close the app and open it again.');
@@ -99,13 +99,13 @@ test('a device whose name couldn\'t be read is "another device", not bold', asyn
 test('Open here anyway refused as too soon says why and reads the status again', async () => {
   vi.setSystemTime(new Date(2026, 10, 4, 11, 45));
   openHereAnyway.mockRejectedValue(Object.assign(new Error('You can open the library here from 11:50.'), { code: 'too_soon' }));
-  getSetup.mockResolvedValue(onOther({ seen: at(11, 35), openAnywayFrom: at(11, 50) }));
+  retrySetup.mockResolvedValue(onOther({ seen: at(11, 35), openAnywayFrom: at(11, 50) }));
   render(Setup, { status: onOther(), onDone: vi.fn() });
   await fireEvent.click(screen.getByRole('button', { name: 'Open here anyway…' }));
   await fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Open here anyway' }));
   expect((await screen.findByRole('alert')).textContent).toBe('You can open the library here from 11:50.');
   expect(screen.queryByRole('dialog')).toBeNull();
-  await vi.waitFor(() => expect(getSetup).toHaveBeenCalledOnce());
+  await vi.waitFor(() => expect(retrySetup).toHaveBeenCalledOnce());
   await vi.waitFor(() => expect(screen.queryByRole('button', { name: 'Open here anyway…' })).toBeNull());
 });
 
@@ -133,14 +133,14 @@ test('Try again that is still refused says when it tried; one that fails says wh
 });
 
 test('not synced: what to do, the folder, Try again, and the minute\'s poll', async () => {
-  getSetup.mockResolvedValue({ ...base, notSynced: { folder: '/Users/me/Google Drive/Atlas' } });
+  retrySetup.mockResolvedValue({ ...base, notSynced: { folder: '/Users/me/Google Drive/Atlas' } });
   render(Setup, { status: { ...base, notSynced: { folder: '/Users/me/Google Drive/Atlas' } }, onDone: vi.fn() });
   expect(screen.getByRole('heading', { level: 1, name: "Your library hasn't finished syncing" })).toBeTruthy();
   expect(screen.getByText("This library's database hasn't finished syncing to this device yet. Let your sync app finish, then choose Try again.")).toBeTruthy();
   expect(screen.getByText('/Users/me/Google Drive/Atlas')).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
   await vi.advanceTimersByTimeAsync(60_000);
-  expect(getSetup).toHaveBeenCalledOnce();
+  expect(retrySetup).toHaveBeenCalledOnce();
 });
 
 test('discarded: who used it and when, what was lost, up to 20 photos and how many more, and Continue', async () => {
@@ -157,7 +157,7 @@ test('discarded: who used it and when, what was lost, up to 20 photos and how ma
   expect(within(list).getAllByRole('listitem').map((li) => li.textContent)).toEqual([...photos, 'and 3 more']);
   // nothing waits on another device here: no poll
   await vi.advanceTimersByTimeAsync(60_000);
-  expect(getSetup).not.toHaveBeenCalled();
+  expect(retrySetup).not.toHaveBeenCalled();
   await fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
   expect(continueDiscarded).toHaveBeenCalledOnce();
   await vi.waitFor(() => expect(onDone).toHaveBeenCalledOnce());
@@ -178,6 +178,36 @@ test('Try again answered "nothing failed" (the library opened meanwhile) starts 
   const onDone = vi.fn();
   render(Setup, { status: onOther(), onDone });
   await fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+  await vi.waitFor(() => expect(onDone).toHaveBeenCalledOnce());
+  expect(screen.queryByRole('alert')).toBeNull();
+});
+
+test('the minute\'s retry says no "Tried again" line, starts the app when it opens, and follows a discarded answer', async () => {
+  retrySetup.mockResolvedValueOnce(onOther());
+  retrySetup.mockResolvedValueOnce({ ...base, discarded: { by: 'DESKTOP-PUNE', at: at(14, 20), since: at(14, 2), photos: [], photosMore: 0 } });
+  const onDone = vi.fn();
+  render(Setup, { status: onOther(), onDone });
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(retrySetup).toHaveBeenCalledOnce();
+  expect(screen.getByRole('status').textContent).toBe('');
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(await screen.findByRole('heading', { level: 1, name: 'Unsent changes were discarded' })).toBeTruthy();
+  expect(onDone).not.toHaveBeenCalled();
+});
+
+test('a minute\'s retry that opens the library starts the app', async () => {
+  retrySetup.mockResolvedValueOnce({ configured: true });
+  const onDone = vi.fn();
+  render(Setup, { status: { ...base, notSynced: { folder: '/Users/me/Google Drive/Atlas' } }, onDone });
+  await vi.advanceTimersByTimeAsync(60_000);
+  await vi.waitFor(() => expect(onDone).toHaveBeenCalledOnce());
+});
+
+test('a minute\'s retry answered "nothing failed" starts the app, with nothing said', async () => {
+  retrySetup.mockRejectedValueOnce(Object.assign(new Error('Nothing failed.'), { code: 'not_failed' }));
+  const onDone = vi.fn();
+  render(Setup, { status: onOther(), onDone });
+  await vi.advanceTimersByTimeAsync(60_000);
   await vi.waitFor(() => expect(onDone).toHaveBeenCalledOnce());
   expect(screen.queryByRole('alert')).toBeNull();
 });
