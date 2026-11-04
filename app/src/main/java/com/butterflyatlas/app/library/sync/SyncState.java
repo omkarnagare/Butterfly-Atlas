@@ -1,4 +1,4 @@
-package com.butterflyatlas.app.sync;
+package com.butterflyatlas.app.library.sync;
 
 import com.butterflyatlas.app.db.Database;
 import org.sqlite.SQLiteConfig;

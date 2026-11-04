@@ -2,7 +2,7 @@ package com.butterflyatlas.app.web;
 
 import com.butterflyatlas.app.AtlasException;
 import com.butterflyatlas.app.ErrorCodes;
-import com.butterflyatlas.app.sync.LibrarySync;
+import com.butterflyatlas.app.library.sync.LibrarySync;
 import io.javalin.Javalin;
 
 /**

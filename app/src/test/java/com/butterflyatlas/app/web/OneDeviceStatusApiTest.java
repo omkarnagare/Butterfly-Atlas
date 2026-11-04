@@ -2,10 +2,10 @@ package com.butterflyatlas.app.web;
 
 import com.butterflyatlas.app.AtlasServer;
 import com.butterflyatlas.app.library.LibraryHolder;
-import com.butterflyatlas.app.sync.LibrarySync;
-import com.butterflyatlas.app.sync.ManualTicker;
-import com.butterflyatlas.app.sync.Marker;
-import com.butterflyatlas.app.sync.MarkerFile;
+import com.butterflyatlas.app.library.sync.LibrarySync;
+import com.butterflyatlas.app.library.sync.ManualTicker;
+import com.butterflyatlas.app.library.sync.Marker;
+import com.butterflyatlas.app.library.sync.MarkerFile;
 import com.butterflyatlas.app.testing.RawHttp;
 import com.butterflyatlas.app.testing.TestClock;
 import com.butterflyatlas.app.testing.TestServices;

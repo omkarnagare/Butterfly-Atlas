@@ -4,7 +4,7 @@ import com.butterflyatlas.app.backup.Backups;
 import com.butterflyatlas.app.exports.Exports;
 import com.butterflyatlas.app.imports.Imports;
 import com.butterflyatlas.app.photos.PhotoStore;
-import com.butterflyatlas.app.sync.LibrarySync;
+import com.butterflyatlas.app.library.sync.LibrarySync;
 import io.javalin.Javalin;
 import io.javalin.json.JavalinJackson;
 import org.slf4j.Logger;

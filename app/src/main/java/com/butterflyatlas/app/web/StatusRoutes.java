@@ -12,7 +12,7 @@ import com.butterflyatlas.app.photos.PhotoStore;
 import com.butterflyatlas.app.photos.Rescan;
 import com.butterflyatlas.app.photos.Thumbnails;
 import com.butterflyatlas.app.placeupdates.PlaceNotes;
-import com.butterflyatlas.app.sync.LibrarySync;
+import com.butterflyatlas.app.library.sync.LibrarySync;
 import com.butterflyatlas.app.updates.UpdateViews;
 import com.butterflyatlas.app.updates.Updates;
 import com.fasterxml.jackson.annotation.JsonProperty;

@@ -1,7 +1,7 @@
 package com.butterflyatlas.app.web;
 
 import com.butterflyatlas.app.ErrorCodes;
-import com.butterflyatlas.app.sync.LibrarySync;
+import com.butterflyatlas.app.library.sync.LibrarySync;
 import io.javalin.http.Context;
 import io.javalin.http.HandlerType;
 

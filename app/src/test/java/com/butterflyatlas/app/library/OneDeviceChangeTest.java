@@ -2,11 +2,11 @@ package com.butterflyatlas.app.library;
 
 import com.butterflyatlas.app.config.ConfigStore;
 import com.butterflyatlas.app.db.Database;
-import com.butterflyatlas.app.sync.LibrarySync;
-import com.butterflyatlas.app.sync.Marker;
-import com.butterflyatlas.app.sync.MarkerFile;
-import com.butterflyatlas.app.sync.SyncState;
-import com.butterflyatlas.app.sync.WorkingCopy;
+import com.butterflyatlas.app.library.sync.LibrarySync;
+import com.butterflyatlas.app.library.sync.Marker;
+import com.butterflyatlas.app.library.sync.MarkerFile;
+import com.butterflyatlas.app.library.sync.SyncState;
+import com.butterflyatlas.app.library.sync.WorkingCopy;
 import com.butterflyatlas.app.testing.TestBundles;
 import com.butterflyatlas.app.testing.TestClock;
 import com.butterflyatlas.app.testing.TestPlaces;

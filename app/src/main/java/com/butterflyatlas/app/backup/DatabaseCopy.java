@@ -1,6 +1,7 @@
 package com.butterflyatlas.app.backup;
 
 import com.butterflyatlas.app.db.Database;
+import com.butterflyatlas.app.db.OnlineCopy;
 import org.sqlite.SQLiteConfig;
 
 import java.nio.file.Files;
@@ -15,12 +16,13 @@ import java.sql.Statement;
  * The database's copy for a backup (design §6): SQLite's online backup, made while the app runs (never a plain file copy of
  * a live database), into a {@code .part} the caller puts in place; and the check that it can be read back, which a backup
  * needs before it counts (audit 8): opened read-only, it passes {@code integrity_check}. {@link #sanitise} takes the
- * backup's own record out of the copy first. Publishing a library's snapshot (one-device design §5) makes the same copy.
+ * backup's own record out of the copy first. Publishing a library's snapshot (one-device design §5) makes the same copy
+ * ({@link OnlineCopy}).
  */
-public final class DatabaseCopy {
+final class DatabaseCopy {
 
     /** A copy that cannot be used, in plain words. */
-    public static final class CopyException extends Exception {
+    static final class CopyException extends Exception {
 
         CopyException(String message, Throwable cause) {
             super(message, cause);
@@ -34,20 +36,8 @@ public final class DatabaseCopy {
      * Makes a consistent copy of the open database at {@code target} (a file that does not exist yet), as one file: the
      * library keeps a write-ahead log, which the copy does not need (it would be two more files beside it when opened).
      */
-    public static void copy(Database db, Path target) throws SQLException {
-        String path = target.toAbsolutePath().toString();
-        if (path.indexOf('\'') >= 0) {
-            throw new SQLException("The backup's path has a quote in it: " + path);
-        }
-        db.read(c -> {
-            try (Statement st = c.createStatement()) {
-                st.executeUpdate("backup to \"" + path + "\"");
-            }
-            return null;
-        });
-        try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + path); Statement st = c.createStatement()) {
-            st.execute("PRAGMA journal_mode = DELETE");
-        }
+    static void copy(Database db, Path target) throws SQLException {
+        OnlineCopy.copy(db, target);
     }
 
     /**
@@ -87,7 +77,7 @@ public final class DatabaseCopy {
     }
 
     /** Opens the copy read-only and checks it; throws when it is missing, is not a database, or fails the check. */
-    public static void verify(Path copy) throws CopyException {
+    static void verify(Path copy) throws CopyException {
         if (!Files.isRegularFile(copy)) {
             throw new CopyException("The copy of the database could not be read back: it is not there.", null);
         }

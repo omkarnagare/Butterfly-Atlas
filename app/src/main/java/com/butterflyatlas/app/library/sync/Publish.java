@@ -1,7 +1,7 @@
-package com.butterflyatlas.app.sync;
+package com.butterflyatlas.app.library.sync;
 
-import com.butterflyatlas.app.backup.DatabaseCopy;
 import com.butterflyatlas.app.db.Database;
+import com.butterflyatlas.app.db.OnlineCopy;
 import com.butterflyatlas.app.library.Library;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,7 +18,7 @@ import java.time.Instant;
 /**
  * Publishing a snapshot of the working copy into the library folder (one-device design §5):
  * <ol>
- *   <li>{@link DatabaseCopy#copy} into {@code atlas.db.part} in the library</li>
+ *   <li>{@link OnlineCopy#copy} (as a backup's database) into {@code atlas.db.part} in the library</li>
  *   <li>the copy's {@code generation} set to the working copy's plus one and its {@code dirty} to 0, then checked
  *   ({@code quick_check})</li>
  *   <li>the marker read again: when it names another device, it stops here and the {@code .part} goes</li>
@@ -74,7 +74,7 @@ public final class Publish {
         Path part = library.resolve(PART);
         Files.deleteIfExists(part);
         try {
-            DatabaseCopy.copy(working, part);
+            OnlineCopy.copy(working, part);
             try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + part.toAbsolutePath())) {
                 c.setAutoCommit(false);
                 SyncState.set(c, SyncState.GENERATION, Long.toString(next));

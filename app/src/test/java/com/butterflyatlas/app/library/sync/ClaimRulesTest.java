@@ -1,4 +1,4 @@
-package com.butterflyatlas.app.sync;
+package com.butterflyatlas.app.library.sync;
 
 import org.junit.jupiter.api.Test;
 

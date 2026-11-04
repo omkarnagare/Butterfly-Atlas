@@ -21,7 +21,7 @@ import com.butterflyatlas.app.placeupdates.PlaceNotes;
 import com.butterflyatlas.app.places.PlaceSearch;
 import com.butterflyatlas.app.places.UserPlaces;
 import com.butterflyatlas.app.search.SearchService;
-import com.butterflyatlas.app.sync.LibrarySync;
+import com.butterflyatlas.app.library.sync.LibrarySync;
 import com.butterflyatlas.app.taxa.SearchWordService;
 import com.butterflyatlas.app.taxa.TaxonService;
 import com.butterflyatlas.app.updates.SplitSorter;
