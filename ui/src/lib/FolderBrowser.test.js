@@ -62,6 +62,23 @@ test('opens at Pictures with shortcuts, the path and the folders inside with the
   expect(screen.getByText('3 photos in this folder, more in the folders inside.')).toBeTruthy();
 });
 
+test('a cloud folder shortcut shows a cloud and opens where the sync app keeps it', async () => {
+  const myDrive = folder('/Users/you/Library/CloudStorage/GoogleDrive-you/My Drive');
+  setUp(myDrive);
+  getFsRoots.mockResolvedValue([
+    ...roots.slice(0, 2), { name: 'Google Drive', path: myDrive.path, kind: 'cloud' }, roots[2],
+  ]);
+  render(FolderBrowser, { onChoose: vi.fn(), onClose: vi.fn() });
+  await screen.findByRole('list', { name: 'Folders in Pictures' });
+
+  const shortcut = screen.getByRole('button', { name: 'Google Drive' });
+  expect(shortcut.querySelector('svg').dataset.kind).toBe('cloud');
+  await fireEvent.click(shortcut);
+
+  await vi.waitFor(() => expect(listFolder).toHaveBeenCalledWith(myDrive.path, expect.anything()));
+  await vi.waitFor(() => expect(shortcut.getAttribute('aria-current')).toBe('true'));
+});
+
 test('opening a folder lists it and moves focus to its first folder; the path goes back up', async () => {
   setUp();
   render(FolderBrowser, { onChoose: vi.fn(), onClose: vi.fn() });
