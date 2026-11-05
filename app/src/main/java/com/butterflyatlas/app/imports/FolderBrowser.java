@@ -20,6 +20,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
@@ -58,9 +59,11 @@ public final class FolderBrowser {
     private final Supplier<List<Path>> drives;
     private final LongSupplier nanoClock;
     private final List<Path> driveParents;
+    private final Function<Path, List<Root>> cloud;
 
     public FolderBrowser(Supplier<Optional<Library>> library, ImportStore store, Path home) {
-        this(library, store, home, FolderBrowser::systemDrives);
+        this(library, store, home, FolderBrowser::systemDrives, System::nanoTime, systemDriveParents(),
+                CloudFolders::system);
     }
 
     /** With the drives given (tests). */
@@ -77,6 +80,13 @@ public final class FolderBrowser {
     /** With the folders that hold drives given too (tests); a listing only does arithmetic on these. */
     FolderBrowser(Supplier<Optional<Library>> library, ImportStore store, Path home, Supplier<List<Path>> drives,
                   LongSupplier nanoClock, List<Path> driveParents) {
+        this(library, store, home, drives, nanoClock, driveParents, folder -> List.of());
+    }
+
+    /** With the cloud folders given too (tests; this device's are {@link CloudFolders#system}). */
+    FolderBrowser(Supplier<Optional<Library>> library, ImportStore store, Path home, Supplier<List<Path>> drives,
+                  LongSupplier nanoClock, List<Path> driveParents, Function<Path, List<Root>> cloud) {
+        this.cloud = cloud;
         this.driveParents = driveParents;
         this.nanoClock = nanoClock;
         this.library = library;
@@ -85,7 +95,10 @@ public final class FolderBrowser {
         this.drives = drives;
     }
 
-    /** Home, Pictures, Desktop, Documents (those that exist), then drives and volumes. */
+    /**
+     * Home, Pictures, Desktop, Documents (those that exist), then the folders sync apps keep in step ({@link CloudFolders}:
+     * Google Drive, OneDrive, Dropbox…), then drives and volumes.
+     */
     public List<Root> roots() {
         List<Root> roots = new ArrayList<>();
         if (Files.isDirectory(home)) {
@@ -96,6 +109,11 @@ public final class FolderBrowser {
             if (Files.isDirectory(folder)) {
                 roots.add(new Root(shortcut[0], folder.toString(), shortcut[1]));
             }
+        }
+        try {
+            roots.addAll(cloud.apply(home));
+        } catch (RuntimeException e) {
+            LOG.debug("Could not find the cloud folders", e);
         }
         for (Path drive : drives.get()) {
             if (Files.isDirectory(drive)) {
