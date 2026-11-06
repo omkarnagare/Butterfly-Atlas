@@ -57,7 +57,42 @@ class SessionApiTest {
                 home.resolve("config").resolve("logs"), Duration.ofMillis(100), () -> {
                     windowsAsked.incrementAndGet();
                     return windowOpens.get();
-                }));
+                }, connected::incrementAndGet, coming::incrementAndGet));
+    }
+
+    private final java.util.concurrent.atomic.AtomicInteger connected = new java.util.concurrent.atomic.AtomicInteger();
+    private final java.util.concurrent.atomic.AtomicInteger coming = new java.util.concurrent.atomic.AtomicInteger();
+
+    @Test
+    void aKeyHandedToASecondLaunchTellsTheDesktopAWindowIsComing() throws Exception {
+        assertThat(RawHttp.send(server.port(), "POST", "/launch/new", Map.of("X-Atlas-Key", "nope"), null).status())
+                .isEqualTo(401);
+        assertThat(coming.get()).isZero();
+
+        RawHttp.Response given = RawHttp.send(server.port(), "POST", "/launch/new",
+                Map.of("X-Atlas-Key", keys.instanceKey()), null);
+
+        assertThat(given.status()).isEqualTo(200);
+        assertThat(coming.get()).isEqualTo(1);
+
+        closing.set(true);
+        RawHttp.send(server.port(), "POST", "/launch/new", Map.of("X-Atlas-Key", keys.instanceKey()), null);
+        assertThat(coming.get()).as("no key while quitting, so no window").isEqualTo(1);
+    }
+
+    @Test
+    void anOpenStreamTellsTheDesktopAWindowConnected() throws Exception {
+        try (Socket refused = openStream(Map.of())) {
+            assertThat(new BufferedReader(new InputStreamReader(refused.getInputStream(), StandardCharsets.UTF_8)).readLine())
+                    .contains("401");
+        }
+        assertThat(connected.get()).isZero();
+
+        try (Socket socket = openStream(cookie())) {
+            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+            readUntil(in, ": open", 1);
+            assertThat(connected.get()).isEqualTo(1);
+        }
     }
 
     @AfterEach

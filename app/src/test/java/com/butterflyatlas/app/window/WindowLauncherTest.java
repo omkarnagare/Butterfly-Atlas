@@ -2,6 +2,7 @@ package com.butterflyatlas.app.window;
 
 import com.butterflyatlas.app.testing.FakeProcess;
 import com.butterflyatlas.app.testing.TestClock;
+import com.butterflyatlas.app.window.desktop.NoDesktop;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -46,7 +47,88 @@ class WindowLauncherTest {
         return launcher(browser, "Mac OS X");
     }
 
+    @Test
+    void theDesktopsArgumentsComeAfterTheUsualOnesAndNothingElseIsAdded() throws Exception {
+        desktop = new FakeDesktop(List.of("--class=butterfly-atlas"));
+
+        launcher(Optional.of(Path.of("/usr/bin/google-chrome")), "Linux").open();
+
+        Path page = redirects().get(0);
+        assertThat(started).containsExactly(List.of(Path.of("/usr/bin/google-chrome").toString(), "--app=" + page.toUri(),
+                "--user-data-dir=" + config.resolve("browser_profile"), "--no-first-run", "--no-default-browser-check",
+                "--start-maximized", "--class=butterfly-atlas"));
+    }
+
+    @Test
+    void theLauncherWithoutADesktopAddsNothing() {
+        plainLauncher(Optional.of(Path.of("/bin/chrome")), "Linux").open();
+
+        assertThat(started.get(0)).hasSize(6);
+    }
+
+    @Test
+    void eachStartIsToldWithItsProcessAndThenTheDesktopHearsAWindowIsComing() {
+        WindowLauncher launcher = launcher(Optional.of(Path.of("/bin/chrome")));
+
+        launcher.open();
+        launcher(Optional.of(Path.of("/bin/chrome"))).open();
+
+        assertThat(told).containsExactly(process, process);
+        assertThat(desktop.coming).isEqualTo(2);
+    }
+
+    @Test
+    void aStartThatFailsOrNoBrowserTellsNothingAndNoWindowIsComing() {
+        startFails = true;
+        launcher(Optional.of(Path.of("/bin/chrome"))).open();
+        startFails = false;
+        launcher(Optional.empty()).open();
+
+        assertThat(told).isEmpty();
+        assertThat(desktop.coming).isZero();
+    }
+
     private WindowLauncher launcher(Optional<Path> browser, String osName) {
+        return new WindowLauncher(browser, osName, config.resolve("browser_profile"),
+                () -> URI.create("http://127.0.0.1:7878/launch?k=key" + keys.incrementAndGet()),
+                new LaunchFiles(config, clock), command -> {
+            started.add(command);
+            if (startFails) {
+                throw new IOException("Permission denied");
+            }
+            return process;
+        }, uri -> {
+            tabs.add(uri);
+            return tabWorks;
+        }, console::add, log, nanos::get, problems::add, desktop, told::add);
+    }
+
+    /** A desktop piece that asks for extra arguments and counts the windows said to be coming. */
+    private final class FakeDesktop extends NoDesktop {
+        private final List<String> arguments;
+        int coming;
+
+        FakeDesktop(List<String> arguments) {
+            this.arguments = arguments;
+        }
+
+        @Override
+        public List<String> browserArguments() {
+            return arguments;
+        }
+
+        @Override
+        public void windowComing() {
+            coming++;
+            events.add("coming");
+        }
+    }
+
+    private final List<String> events = new ArrayList<>();
+    private final List<Process> told = new ArrayList<>();
+    private FakeDesktop desktop = new FakeDesktop(List.of());
+
+    private WindowLauncher plainLauncher(Optional<Path> browser, String osName) {
         return new WindowLauncher(browser, osName, config.resolve("browser_profile"),
                 () -> URI.create("http://127.0.0.1:7878/launch?k=key" + keys.incrementAndGet()),
                 new LaunchFiles(config, clock), command -> {

@@ -5,9 +5,10 @@ import java.util.List;
 
 /**
  * The desktop piece that does nothing (spec §3): for the tests, for {@code -Datlas.noBrowser}, on a headless system and
- * on an OS not listed. The icon then behaves as it did before this piece existed.
+ * on an OS not listed. The icon then behaves as it did before this piece existed. Not final: a test's fake extends it and
+ * overrides what it means to watch.
  */
-public final class NoDesktop implements DesktopIntegration {
+public class NoDesktop implements DesktopIntegration {
 
     @Override
     public List<String> browserArguments() {
