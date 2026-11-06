@@ -86,6 +86,32 @@ class IconClicksTest {
     }
 
     @Test
+    void whenAWindowOnItsWayCannotBeBroughtForwardNoSecondWindowOpens() {
+        // a click while the app starts: the browser process is not known yet, but its window is coming
+        pending.set(true);
+        forwards.set(false);
+
+        clicks.clicked();
+
+        assertThat(did).containsExactly("forward");
+    }
+
+    @Test
+    void aClickHeldDuringTheStartOpensNoSecondWindow() {
+        AtlasLog log = AtlasLog.open(config, new TestClock());
+        IconClicks starting = new IconClicks(closing::get, mode::get, streams::get, pending::get, () -> {
+            did.add("forward");
+            return false;
+        }, () -> did.add("new window"), () -> did.add("relaunch"), nanos::get, Runnable::run, log);
+        starting.clicked();
+        pending.set(true); // the first window was launched, not connected yet
+
+        starting.ready();
+
+        assertThat(did).containsExactly("forward");
+    }
+
+    @Test
     void inTabModeAClickOpensANewTabEvenWithOneOpen() {
         mode.set(WindowLauncher.Mode.TAB);
         streams.set(1);

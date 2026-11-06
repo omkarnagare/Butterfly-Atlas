@@ -241,15 +241,15 @@ class AppStartTest {
     }
 
     @Test
-    void aClickThatCannotBringAWindowForwardOpensANewOne() {
+    void aClickWhileTheFirstWindowIsComingOpensNoSecondOneEvenWhenItCannotBeBroughtForward() {
+        // right after the start the browser process is not known yet (hand check, step 9: two windows opened)
         desktop.forwards = false;
         start(options(false, 0, Optional.empty()));
 
         desktop.events.iconClicked().run();
 
         assertThat(desktop.calls).contains("forward");
-        assertThat(started).hasSize(2);
-        assertThat(started.get(1)).endsWith("--fake-desktop");
+        assertThat(started).hasSize(1);
     }
 
     @Test

@@ -17,8 +17,9 @@ import java.util.function.Supplier;
  *   on once {@link #ready} is called;</li>
  *   <li>while the app quits, it starts again once the quit is done, once however many clicks come;</li>
  *   <li>in the default-browser fallback a new tab opens, since a tab cannot be brought forward;</li>
- *   <li>with a window open, or one on its way (opened by this copy, not connected yet, within the start wait), the
- *   windows are brought forward, and a new window opens when that fails;</li>
+ *   <li>with a window open, the windows are brought forward, and a new window opens when that fails (all minimised);</li>
+ *   <li>with only a window on its way (opened by this copy, not connected yet, within the start wait), it is brought
+ *   forward if it can be, and no other window opens: it shows by itself;</li>
  *   <li>otherwise a new window opens;</li>
  *   <li>a second click within {@value #TWICE_MILLIS} ms of the last one acted on is dropped (a click also makes the app
  *   active, which macOS tells as a second event).</li>
@@ -118,8 +119,12 @@ public final class IconClicks {
                 newWindow.run();
                 return;
             }
-            if (streams.getAsInt() > 0 || windowPending.getAsBoolean()) {
-                if (bringForward.getAsBoolean()) {
+            boolean open = streams.getAsInt() > 0;
+            boolean coming = windowPending.getAsBoolean();
+            if (open || coming) {
+                if (bringForward.getAsBoolean() || !open) {
+                    // a window on its way shows by itself: while the app starts its browser process is not known yet, so
+                    // bringing forward fails, and a new window then would be a second one
                     return;
                 }
             }
