@@ -31,6 +31,20 @@ class MainDockTest {
     }
 
     @Test
+    void macOsNamesTheAppButterflyAtlasNotItsMainClass() {
+        properties.put("jpackage.app-path", "/Applications/Butterfly Atlas.app/Contents/MacOS/Butterfly Atlas");
+
+        assertThat(Main.appKitProperties(properties::get))
+                .containsExactly(Map.entry("apple.awt.application.name", "Butterfly Atlas"));
+    }
+
+    @Test
+    void aDevelopmentRunIsNamedTooAndHidden() {
+        assertThat(Main.appKitProperties(properties::get)).containsOnly(
+                Map.entry("apple.awt.application.name", "Butterfly Atlas"), Map.entry("apple.awt.UIElement", "true"));
+    }
+
+    @Test
     void noBrowserHidesItEvenForTheInstalledApp() {
         properties.put("jpackage.app-path", "/Applications/Butterfly Atlas.app/Contents/MacOS/Butterfly Atlas");
         properties.put("atlas.noBrowser", "true");

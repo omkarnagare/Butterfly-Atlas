@@ -55,7 +55,9 @@ import com.butterflyatlas.app.window.StartupFailure;
 
 import java.nio.file.Path;
 import java.time.Clock;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -90,11 +92,9 @@ public final class Main {
     }
 
     public static void main(String[] args) {
-        // The installed app has a Dock tile of its own, which the desktop piece answers (app-icon spec §4.1); a development
-        // run (a generic Java tile) and -Datlas.noBrowser (no window of ours) keep it hidden.
-        if (hiddenFromDock(System::getProperty)) {
-            System.setProperty("apple.awt.UIElement", "true");
-        }
+        // The installed app has a Dock tile of its own, which the desktop piece answers (app-icon spec §4.1), named
+        // Butterfly Atlas; a development run (a generic Java tile) and -Datlas.noBrowser (no window of ours) keep it hidden.
+        appKitProperties(System::getProperty).forEach(System::setProperty);
 
         Path config = AppDirs.currentConfigDir();
         try {
@@ -114,6 +114,22 @@ public final class Main {
             return;
         }
         new AppStart(options, log, AppStart.World.system()).run();
+    }
+
+    /** The name macOS shows for the running app (Cmd-Tab, the menu bar, the Dock tile). */
+    static final String APP_NAME = "Butterfly Atlas";
+
+    /**
+     * The properties AppKit reads when it starts, set before anything loads AWT: the app's name (without it macOS names
+     * the running app after its main class, "Main"), and, when {@link #hiddenFromDock}, no Dock tile.
+     */
+    static Map<String, String> appKitProperties(Function<String, String> property) {
+        Map<String, String> set = new LinkedHashMap<>();
+        set.put("apple.awt.application.name", APP_NAME);
+        if (hiddenFromDock(property)) {
+            set.put("apple.awt.UIElement", "true");
+        }
+        return set;
     }
 
     /**
