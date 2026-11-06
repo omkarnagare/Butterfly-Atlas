@@ -59,6 +59,15 @@
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-imaging</artifactId>
         </dependency>
+        <!-- Native calls for the app's icon (the Windows taskbar, the macOS Dock); loaded only when first used. -->
+        <dependency>
+            <groupId>net.java.dev.jna</groupId>
+            <artifactId>jna</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>net.java.dev.jna</groupId>
+            <artifactId>jna-platform</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.junit.jupiter</groupId>

@@ -56,6 +56,8 @@ import com.butterflyatlas.app.window.StartupFailure;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 /**
@@ -99,6 +101,8 @@ public final class Main {
         }
         AtlasLog log = AtlasLog.open(config);
         log.captureStdErr(); // what the libraries print goes to the log too (nobody sees the console of an installed app)
+        // before anything can load JNA: a run without the shipped library unpacks it in the config folder, not in /tmp
+        useJnaTmpdir(System::getProperty, System::setProperty, config);
         AppOptions options;
         try {
             options = AppOptions.fromSystem();
@@ -107,6 +111,42 @@ public final class Main {
             return;
         }
         new AppStart(options, log, AppStart.World.system()).run();
+    }
+
+    /** The property the installed app's launcher sets to the {@code native/} folder JNA's library ships in. */
+    static final String JNA_LIBRARY_PATH = "jna.boot.library.path";
+    /** Where JNA unpacks its library when none was shipped. */
+    static final String JNA_TMPDIR = "jna.tmpdir";
+
+    /**
+     * Where JNA should unpack its native library (contract §3): nowhere for the installed app, whose launcher names the
+     * library it ships ({@code jna.boot.library.path}); otherwise (a development run, the tests) {@code <config>/native},
+     * a folder only this user can open, never the shared temp folder another user could write into.
+     */
+    static Optional<Path> jnaTmpdir(Function<String, String> property, Path config) {
+        String shipped = property.apply(JNA_LIBRARY_PATH);
+        if (shipped != null && !shipped.isBlank()) {
+            return Optional.empty();
+        }
+        return Optional.of(config.resolve("native"));
+    }
+
+    /**
+     * Makes the folder {@link #jnaTmpdir} names (owner-only, like the config folder) and points {@code jna.tmpdir} at it.
+     * A folder that cannot be made is not a reason to stop: JNA then fails to load, which is logged where it is used, and
+     * the app runs as it did before it had JNA.
+     */
+    static void useJnaTmpdir(Function<String, String> property, BiConsumer<String, String> set, Path config) {
+        Optional<Path> folder = jnaTmpdir(property, config);
+        if (folder.isEmpty()) {
+            return;
+        }
+        try {
+            AppDirs.createConfigDir(folder.get());
+        } catch (RuntimeException e) {
+            System.out.println("Butterfly Atlas could not prepare " + folder.get() + ": " + e.getMessage());
+        }
+        set.accept(JNA_TMPDIR, folder.get().toString());
     }
 
     /**

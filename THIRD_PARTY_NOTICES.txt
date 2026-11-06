@@ -104,6 +104,13 @@ Photos and metadata
   Apache Commons IO 2.19.0                       Apache-2.0   https://commons.apache.org/proper/commons-io/
   Apache Commons Lang 3.17.0                     Apache-2.0   https://commons.apache.org/proper/commons-lang/
 
+Native calls (the app's icon in the taskbar and the Dock)
+  Java Native Access (JNA) 5.19.1 (jna, jna-platform, and its native library jnidispatch)
+                                                  Apache-2.0 (JNA is offered under Apache-2.0 or LGPL-2.1-or-later;
+                                                  Butterfly Atlas uses it under Apache-2.0)
+                                                  https://github.com/java-native-access/jna
+  libffi (inside JNA's native library)           MIT          https://sourceware.org/libffi/
+
 3. SOFTWARE AND FONTS IN THE USER INTERFACE
 -------------------------------------------
 
@@ -145,6 +152,7 @@ have one follow it. The Java runtime's own licences are in the runtime's legal f
   SLF4J 2.0.17: Copyright (c) 2004-2022 QOS.ch Sarl (Switzerland). All rights reserved.
   Svelte 5: Copyright (c) 2016-2025 Svelte Contributors (https://github.com/sveltejs/svelte/graphs/contributors)
   FastDoubleParser (inside jackson-core): Copyright (c) 2023 Werner Randelshofer, Switzerland
+  libffi (inside JNA's native library): Copyright (c) 1996-2024 Anthony Green, Red Hat, Inc and others
 
     Permission is hereby granted, free  of charge, to any person obtaining
     a  copy  of this  software  and  associated  documentation files  (the
