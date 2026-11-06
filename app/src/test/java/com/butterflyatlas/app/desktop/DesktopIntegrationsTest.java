@@ -53,6 +53,11 @@ class DesktopIntegrationsTest {
     }
 
     @Test
+    void macOsGetsItsDockPiece() {
+        assertThat(forOs("Mac OS X", false, false)).isInstanceOf(com.butterflyatlas.app.desktop.mac.MacDesktop.class);
+    }
+
+    @Test
     void anOsNotListedGetsNothing() {
         assertThat(forOs("FreeBSD", false, false)).isInstanceOf(NoDesktop.class);
         assertThat(forOs("SunOS", false, false)).isInstanceOf(NoDesktop.class);

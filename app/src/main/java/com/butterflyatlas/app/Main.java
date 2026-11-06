@@ -90,8 +90,11 @@ public final class Main {
     }
 
     public static void main(String[] args) {
-        // AWT is only used to open the default browser: keep it from showing a Java icon in the Dock.
-        System.setProperty("apple.awt.UIElement", "true");
+        // The installed app has a Dock tile of its own, which the desktop piece answers (app-icon spec §4.1); a development
+        // run (a generic Java tile) and -Datlas.noBrowser (no window of ours) keep it hidden.
+        if (hiddenFromDock(System::getProperty)) {
+            System.setProperty("apple.awt.UIElement", "true");
+        }
 
         Path config = AppDirs.currentConfigDir();
         try {
@@ -111,6 +114,16 @@ public final class Main {
             return;
         }
         new AppStart(options, log, AppStart.World.system()).run();
+    }
+
+    /**
+     * Whether macOS should show no Dock tile for this run ({@code apple.awt.UIElement}): a development run (no
+     * {@code jpackage.app-path}, which would show a generic Java tile) and {@code -Datlas.noBrowser}; never the installed
+     * app, whose tile with the butterfly can be kept in the Dock.
+     */
+    static boolean hiddenFromDock(Function<String, String> property) {
+        String app = property.apply(com.butterflyatlas.app.window.Relaunch.APP_PATH);
+        return app == null || app.isBlank() || Boolean.parseBoolean(property.apply("atlas.noBrowser"));
     }
 
     /** The property the installed app's launcher sets to the {@code native/} folder JNA's library ships in. */
