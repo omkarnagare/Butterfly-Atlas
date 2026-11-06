@@ -47,7 +47,20 @@
         <node.version>v22.16.0</node.version>
         <frontend-plugin.version>1.15.1</frontend-plugin.version>
         <skipTests>false</skipTests>
+        <!-- The real-window checks (JUnit tag "window") run only with the profile window-checks. -->
+        <windowChecks.skip>true</windowChecks.skip>
     </properties>
+
+    <profiles>
+        <!-- The real-window checks: a second Surefire run in the app module with only the tests tagged "window", which
+             open real browser windows (CI's build step uses it on every runner; locally: verify -Pwindow-checks). -->
+        <profile>
+            <id>window-checks</id>
+            <properties>
+                <windowChecks.skip>false</windowChecks.skip>
+            </properties>
+        </profile>
+    </profiles>
 
     <dependencyManagement>
         <dependencies>

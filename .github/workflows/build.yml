@@ -3,8 +3,8 @@ name: Build
 # Runs on a pull request to master once it is marked Ready for review (drafts run nothing), and again on each push while
 # it is ready; the build tests the pull request merged with master. It is a required check on master, so nothing is
 # merged unless it passes on all three systems. It can also be started by hand (Actions tab -> Build -> Run workflow, or
-# `gh workflow run build.yml --ref <branch>`). Every change is still verified locally with `./mvnw -B -ntp clean verify`
-# before it is pushed.
+# `gh workflow run build.yml --ref <branch>`). Every change is still verified locally with
+# `./mvnw -B -ntp clean verify -Pwindow-checks` before it is pushed.
 on:
   workflow_dispatch:
   pull_request:
@@ -46,6 +46,19 @@ jobs:
           path: ~/.npm
           key: npm-${{ runner.os }}-${{ hashFiles('ui/package-lock.json') }}
 
+      # The real-window checks need a display on Linux: a virtual one (xvfb-run), and xprop (x11-utils) to read a
+      # window's class.
+      - name: Install a virtual display (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y xvfb x11-utils
+
+      # With the real-window checks (profile window-checks): they open Edge or Chrome app windows, and fail rather than
+      # skip when no browser is found, since CI is true.
       - name: Build and test
         shell: bash
-        run: ./mvnw -B -ntp verify
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            xvfb-run -a ./mvnw -B -ntp verify -Pwindow-checks
+          else
+            ./mvnw -B -ntp verify -Pwindow-checks
+          fi
