@@ -22,6 +22,7 @@ import com.butterflyatlas.app.window.WindowLauncher;
 import com.butterflyatlas.app.desktop.BrowserWindows;
 import com.butterflyatlas.app.desktop.DesktopIntegration;
 import com.butterflyatlas.app.desktop.DesktopIntegrations;
+import com.butterflyatlas.app.desktop.IconClicks;
 import com.butterflyatlas.app.desktop.NoDesktop;
 
 import java.awt.Desktop;
@@ -40,6 +41,7 @@ import java.util.function.IntConsumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -197,6 +199,18 @@ final class AppStart {
     private DesktopIntegration desktop = new NoDesktop();
     /** Which browser process shows the windows (null until the first copy's start makes it). */
     private BrowserWindows browserWindows;
+    /** What a click on the app's icon does (null until the first copy's start makes it). */
+    private IconClicks iconClicks;
+    /** A quit was asked for (the quit timer fired, or Quit from the Dock or the OS): a click starts the app again. */
+    private final AtomicBoolean quitting = new AtomicBoolean();
+    /** When this copy last opened a window that has not connected yet ({@link Long#MIN_VALUE}: none). */
+    private final AtomicLong pendingSince = new AtomicLong(Long.MIN_VALUE);
+    /** Guards {@link #relaunchWanted} and {@link #quitBegun}. */
+    private final Object relaunchLock = new Object();
+    /** A click came while quitting: the installed app starts again once the quit has begun. */
+    private boolean relaunchWanted;
+    /** The quit has begun (the pointer and the instance lock are gone): a new copy can start as a launch of its own. */
+    private boolean quitBegun;
 
     AppStart(AppOptions options, AtlasLog log, World world) {
         this.options = options;
@@ -273,7 +287,7 @@ final class AppStart {
         AtomicReference<WindowLauncher> launcher = new AtomicReference<>();
         AtomicReference<Running> running = new AtomicReference<>();
         AtomicReference<Session> sessionNow = new AtomicReference<>();
-        startDesktop(launcher, running, sessionNow);
+        startDesktop(launcher, running, sessionNow, closing);
 
         // a copy that was quitting when this one was opened is waited for, once, while it lets go of the library
         AtomicBoolean first = new AtomicBoolean(true);
@@ -304,7 +318,13 @@ final class AppStart {
         Session session = new Session(keys, timer, () -> launcher.get() == null ? WindowLauncher.Mode.WINDOW
                 : launcher.get().mode(), closing::get, options.configDir(), log.folder(), Session.PING,
                 () -> newWindow(() -> serving.get().baseUri().resolve(SessionKeys.LAUNCH_QUERY + keys.newKey()), launchFiles,
-                        timer::streams), desktop::windowConnected, desktop::windowComing);
+                        timer::streams), () -> {
+                    pendingSince.set(Long.MIN_VALUE);
+                    desktop.windowConnected();
+                }, () -> {
+                    pendingSince.set(System.nanoTime());
+                    desktop.windowComing();
+                });
         sessionNow.set(session);
         AtlasServer server;
         try {
@@ -358,33 +378,41 @@ final class AppStart {
             window.open();
         }
         timer.start();
+        iconClicks.ready(); // a click held while the app started is acted on now
         return app;
     }
 
     /**
      * Makes the piece for the app's icon and hooks up the OS's events (app-icon contract §4): New window opens one as
      * {@code POST /api/window} does (nothing before the server runs); Quit asks the browser to close our windows, waiting
-     * up to {@link #CLOSE_WINDOWS_WAIT}, then quits as the quit timer does, never asking; a click on the icon is not acted
-     * on yet (a later step).
+     * up to {@link #CLOSE_WINDOWS_WAIT}, then quits as the quit timer does, never asking; a click on the icon goes to
+     * {@link IconClicks}, which holds it until the server runs and the first window has been launched.
      */
     private void startDesktop(AtomicReference<WindowLauncher> launcher, AtomicReference<Running> running,
-                              AtomicReference<Session> session) {
+                              AtomicReference<Session> session, AtomicBoolean closing) {
         Path profile = options.configDir().resolve(BROWSER_PROFILE);
         String os = System.getProperty("os.name");
         browserWindows = new BrowserWindows(() -> world.browser().get().browser(), profile,
                 DesktopIntegrations.profileHolder(os, log), BrowserWindows.Processes.SYSTEM, System::nanoTime, log);
         Supplier<WindowLauncher.Mode> mode = () -> launcher.get() == null ? WindowLauncher.Mode.WINDOW : launcher.get().mode();
         desktop = world.desktop().create(options.noBrowser(), browserWindows, log, mode, world.appPath());
-        desktop.start(new DesktopIntegration.Events(() -> {
-            // the icon clicked: acted on in a later step; until then the OS does what it did before
-        }, () -> {
+        Runnable newWindow = () -> {
             Session now = session.get();
             if (now == null) {
                 log.info("New window from the Dock or the OS came before Butterfly Atlas was ready; not opened.");
                 return;
             }
             now.newWindow().open();
-        }, () -> {
+        };
+        long startNanos = options.startSeconds() * 1_000_000_000L;
+        iconClicks = new IconClicks(() -> quitting.get() || closing.get(), mode,
+                () -> session.get() == null ? 0 : session.get().quit().streams(), () -> {
+                    long since = pendingSince.get();
+                    return since != Long.MIN_VALUE && System.nanoTime() - since < startNanos;
+                }, () -> desktop.bringForward(), newWindow, this::relaunchAfterQuit, System::nanoTime,
+                task -> new Thread(task, "atlas-icon-click").start(), log);
+        desktop.start(new DesktopIntegration.Events(iconClicks::clicked, newWindow, () -> {
+            quitting.set(true);
             try {
                 desktop.closeWindows(CLOSE_WINDOWS_WAIT);
             } catch (RuntimeException e) {
@@ -398,14 +426,55 @@ final class AppStart {
     /** The last window closed (or none ever opened): the quit starts at once, the exit follows on a thread of its own. */
     private void quit(String why, AtomicReference<Running> running, int code) {
         log.info(why + " Butterfly Atlas is quitting.");
+        quitting.set(true);
         Running app = running.get();
-        Thread quitting = new Thread(() -> {
+        Thread thread = new Thread(() -> {
             if (app != null) {
                 app.beginQuit();
             }
+            boolean again;
+            synchronized (relaunchLock) {
+                quitBegun = true;
+                again = relaunchWanted;
+            }
+            if (again) {
+                startAgain();
+            }
             world.exit().accept(code);
         }, "atlas-quit");
-        quitting.start();
+        thread.start();
+    }
+
+    /**
+     * A click on the icon while the app quits (app-icon spec §4.1): the installed app starts again once the quit has
+     * begun, so the click is never lost; the new copy waits for this one to let go of the library, as after a library
+     * change.
+     */
+    private void relaunchAfterQuit() {
+        boolean now;
+        synchronized (relaunchLock) {
+            relaunchWanted = true;
+            now = quitBegun;
+        }
+        if (now) {
+            startAgain();
+        }
+    }
+
+    /** Starts the installed app's program again ({@link Relaunch}); only when there is one (not in a development run). */
+    private void startAgain() {
+        Relaunch.Plan plan = Relaunch.plan(world.appPath().get());
+        if (!plan.restarts()) {
+            log.info("The app's icon was clicked while Butterfly Atlas was quitting; it does not start again ("
+                    + plan.why() + ")");
+            return;
+        }
+        try {
+            world.starter().start(plan.command());
+            log.info("The app's icon was clicked while Butterfly Atlas was quitting; it started again.");
+        } catch (IOException | RuntimeException e) {
+            log.error("Could not start Butterfly Atlas again after the app's icon was clicked while it quit", e);
+        }
     }
 
     /**
@@ -507,6 +576,7 @@ final class AppStart {
         return new WindowLauncher(found.browser(), System.getProperty("os.name"),
                 options.configDir().resolve(BROWSER_PROFILE), address, files, world.starter(), world.defaultBrowser()::test,
                 world.console(), log, System::nanoTime, problem, desktop, process -> {
+                    pendingSince.set(System.nanoTime());
                     if (windows != null) {
                         windows.started(process, System.nanoTime());
                     }

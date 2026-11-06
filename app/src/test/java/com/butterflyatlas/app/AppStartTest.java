@@ -105,6 +105,8 @@ class AppStartTest {
         final List<String> calls = new CopyOnWriteArrayList<>();
         volatile DesktopIntegration.Events events;
         volatile boolean closes = true;
+        volatile boolean forwards = true;
+        volatile boolean clickAtStart;
 
         @Override
         public List<String> browserArguments() {
@@ -115,6 +117,15 @@ class AppStartTest {
         public void start(DesktopIntegration.Events events) {
             this.events = events;
             calls.add("start, pointer " + (new InstancePointer(config).read().isPresent() ? "written" : "not written"));
+            if (clickAtStart) {
+                events.iconClicked().run();
+            }
+        }
+
+        @Override
+        public boolean bringForward() {
+            calls.add("forward");
+            return forwards;
         }
 
         @Override
@@ -212,14 +223,77 @@ class AppStartTest {
         assertThat(started.get(1)).endsWith("--fake-desktop");
     }
 
+    private void awaitCall(String call) throws InterruptedException {
+        long deadline = System.nanoTime() + 5_000_000_000L;
+        while (!desktop.calls.contains(call) && System.nanoTime() < deadline) {
+            Thread.sleep(10);
+        }
+    }
+
     @Test
-    void aClickOnTheIconDoesNothingYetAndBreaksNothing() {
+    void aClickWhileTheFirstWindowIsOnItsWayBringsItForwardAndOpensNoOther() {
         start(options(false, 0, Optional.empty()));
 
         desktop.events.iconClicked().run();
 
+        assertThat(desktop.calls).contains("forward");
         assertThat(started).hasSize(1);
-        assertThat(exits).isEmpty();
+    }
+
+    @Test
+    void aClickThatCannotBringAWindowForwardOpensANewOne() {
+        desktop.forwards = false;
+        start(options(false, 0, Optional.empty()));
+
+        desktop.events.iconClicked().run();
+
+        assertThat(desktop.calls).contains("forward");
+        assertThat(started).hasSize(2);
+        assertThat(started.get(1)).endsWith("--fake-desktop");
+    }
+
+    @Test
+    void aClickWhileTheAppStartsIsHeldAndActedOnOnceItIsReadyWithOneWindow() throws Exception {
+        desktop.clickAtStart = true;
+        start(options(false, 0, Optional.empty()));
+
+        awaitCall("forward");
+
+        assertThat(desktop.calls).containsSubsequence("start, pointer not written", "coming", "forward");
+        assertThat(started).hasSize(1);
+    }
+
+    @Test
+    void aClickWhileTheAppQuitsStartsTheInstalledAppAgainAfterTheQuit() throws Exception {
+        Path program = Files.createFile(home.resolve("Butterfly Atlas"));
+        appPath = program.toString();
+        start(options(false, 0, Optional.empty()));
+
+        desktop.events.quit().run();
+        desktop.events.iconClicked().run();
+        awaitExit();
+        long deadline = System.nanoTime() + 5_000_000_000L;
+        while (!started.contains(List.of(program.toString())) && System.nanoTime() < deadline) {
+            Thread.sleep(10);
+        }
+
+        assertThat(exits).containsExactly(0);
+        assertThat(started).containsOnlyOnce(List.of(program.toString()));
+        assertThat(Files.readString(log.file())).contains("it started again");
+    }
+
+    @Test
+    void aClickWhileADevelopmentRunQuitsStartsNothingAndSaysWhy() throws Exception {
+        appPath = null;
+        start(options(false, 0, Optional.empty()));
+
+        desktop.events.quit().run();
+        desktop.events.iconClicked().run();
+        awaitExit();
+        Thread.sleep(100);
+
+        assertThat(started).hasSize(1);
+        assertThat(Files.readString(log.file())).contains("it does not start again");
     }
 
     @Test
