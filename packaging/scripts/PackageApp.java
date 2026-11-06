@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
@@ -66,6 +68,20 @@ public final class PackageApp {
             "InfoBeforeFile={#InfoFile}");
     /** Settings that would let the installer ask for administrator rights, or make people accept a licence. */
     static final List<String> INNO_FORBIDDEN = List.of("PrivilegesRequiredOverridesAllowed", "LicenseFile=");
+    /** The folder in the app image JNA's native library ships in. */
+    static final String JNA_FOLDER = "native";
+    /** The launcher's Java options for it: jpackage replaces $APPDIR with the app folder when the app starts. */
+    static final List<String> JNA_OPTIONS = List.of("-Djna.boot.library.path=$APPDIR/" + JNA_FOLDER, "-Djna.nosys=true");
+    /** The one place the Windows AppUserModelID is written in Java (app-icon contract §1), relative to the repository root. */
+    static final String WINDOWS_DESKTOP = "app/src/main/java/com/butterflyatlas/app/window/desktop/windows/WindowsDesktop.java";
+    /** How {@link #WINDOWS_DESKTOP} writes it, read from the source so the check needs no compiled classes. */
+    static final Pattern APP_ID = Pattern.compile("static final String APP_ID = \"([^\"]+)\";");
+    /** An Inno Setup {@code [Icons]} line's AppUserModelID parameter. */
+    static final Pattern INNO_APP_USER_MODEL_ID = Pattern.compile("(?i)\\bAppUserModelID:\\s*\"([^\"]*)\"");
+    /** The two {@code [Icons]} lines: how each starts, and what the problems call it. */
+    static final List<List<String>> INNO_SHORTCUTS = List.of(
+            List.of("Name: \"{userprograms}\\", "the Start menu shortcut"),
+            List.of("Name: \"{userdesktop}\\", "the desktop shortcut"));
     /** Modules the libraries load by name (or that jdeps cannot see); the smoke test proves the list is enough. */
     static final List<String> EXTRA_MODULES = List.of("java.sql", "java.naming", "java.management", "java.xml",
             "java.desktop", "java.net.http", "java.logging", "java.prefs", "jdk.unsupported", "jdk.zipfs");
@@ -167,10 +183,43 @@ public final class PackageApp {
         if (!isccCandidates(Map.of()).isEmpty()) {
             problems.add("the Inno Setup lookup invents places when no folder is known");
         }
+        problems.addAll(appUserModelIdProblems(root, lines));
         if (!problems.isEmpty()) {
             throw new StepFailed("check-windows", script + ":\n  " + String.join("\n  ", problems));
         }
         System.out.println("Windows installer script and Inno Setup lookup: OK");
+    }
+
+    /**
+     * The Start menu and desktop shortcuts carry the AppUserModelID the app gives its windows ({@code WindowsDesktop.APP_ID},
+     * read from the source), so the windows group under them on the taskbar (app-icon contract §2).
+     */
+    static List<String> appUserModelIdProblems(Path root, List<String> lines) throws IOException {
+        Path source = root.resolve(WINDOWS_DESKTOP);
+        Matcher declared = Files.isRegularFile(source) ? APP_ID.matcher(Files.readString(source)) : null;
+        if (declared == null || !declared.find()) {
+            return List.of("WindowsDesktop.APP_ID could not be read from " + source);
+        }
+        String expected = declared.group(1);
+        List<String> problems = new ArrayList<>();
+        for (List<String> shortcut : INNO_SHORTCUTS) {
+            String start = shortcut.get(0);
+            String name = shortcut.get(1);
+            List<String> found = lines.stream().filter(l -> l.regionMatches(true, 0, start, 0, start.length())).toList();
+            if (found.size() != 1) {
+                problems.add("has " + found.size() + " lines for " + name + " (expected 1)");
+                continue;
+            }
+            Matcher id = INNO_APP_USER_MODEL_ID.matcher(found.get(0));
+            if (!id.find()) {
+                problems.add(name + " has no AppUserModelID (expected \"" + expected
+                        + "\", from WindowsDesktop.APP_ID)");
+            } else if (!id.group(1).equals(expected)) {
+                problems.add(name + " has AppUserModelID \"" + id.group(1) + "\" (expected \"" + expected
+                        + "\")");
+            }
+        }
+        return problems;
     }
 
     // ---- step 1: the trimmed Java runtime (jdeps + jlink)
@@ -218,6 +267,11 @@ public final class PackageApp {
                 Files.copy(jar, input.resolve(jar.getFileName()));
             }
         }
+        Path jnaLibrary = jnaNative(work.resolve("libs"), input.resolve(JNA_FOLDER));
+        if (OS.equals("macos")) {
+            // Apple Silicon runs only signed code: the library is sealed ad hoc itself, and then covered by the app's seal.
+            run("codesign (JNA's library)", List.of("/usr/bin/codesign", "--force", "--sign", "-", jnaLibrary.toString()), false);
+        }
         Path image = work.resolve("image");
         deleteTree(image);
         Files.createDirectories(image);
@@ -228,6 +282,10 @@ public final class PackageApp {
                 "--runtime-image", work.resolve("runtime").toString(), "--dest", image.toString(),
                 "--icon", root.resolve("packaging/icons").resolve(icon()).toString(),
                 "--temp", work.resolve("jpackage-image-temp").toString()));
+        // JNA loads the library shipped in the app (nothing is unpacked at run time) and never a copy installed elsewhere.
+        for (String option : JNA_OPTIONS) {
+            command.addAll(List.of("--java-options", option));
+        }
         deleteTree(work.resolve("jpackage-image-temp"));
         if (!OS.equals("macos")) {
             // Windows and Linux: the licence, NOTICE and the notices sit in the application folder.
@@ -249,7 +307,61 @@ public final class PackageApp {
             run("codesign (ad hoc seal)", List.of("/usr/bin/codesign", "--force", "--deep", "--sign", "-", app.toString()),
                     false);
         }
+        Path shipped = appFolder(imageDir(work)).resolve(JNA_FOLDER).resolve(jnaLibrary.getFileName());
+        if (!Files.isRegularFile(shipped)) {
+            throw new StepFailed("jpackage image", "JNA's native library is not in the application image at " + shipped);
+        }
         System.out.println("Application image: " + imageDir(work));
+    }
+
+    /** The folder jpackage puts the jars in: {@code Contents/app} in the .app on macOS, {@code app} elsewhere. */
+    static Path appFolder(Path image) {
+        return OS.equals("macos") ? image.resolve("Contents").resolve("app") : image.resolve("app");
+    }
+
+    /**
+     * JNA's native library for the OS and processor being packaged, copied out of the JNA jar in {@code libs} into
+     * {@code folder} (the app image's {@code app/native/}, named by {@code jna.boot.library.path}); its path there.
+     */
+    static Path jnaNative(Path libs, Path folder) throws IOException {
+        Path jar;
+        try (Stream<Path> files = Files.list(libs)) {
+            jar = files.filter(p -> p.getFileName().toString().matches("jna-\\d[^/]*\\.jar")).findFirst()
+                    .orElseThrow(() -> new StepFailed("JNA", "The JNA jar (jna-<version>.jar) is not in " + libs));
+        }
+        String entry = "com/sun/jna/" + jnaPlatform(OS, arch()) + "/" + jnaLibraryName(OS);
+        Files.createDirectories(folder);
+        Path target = folder.resolve(jnaLibraryName(OS));
+        try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(jar.toFile())) {
+            java.util.zip.ZipEntry found = zip.getEntry(entry);
+            if (found == null) {
+                throw new StepFailed("JNA", jar.getFileName() + " has no " + entry);
+            }
+            try (java.io.InputStream in = zip.getInputStream(found)) {
+                Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+        }
+        System.out.println("JNA's native library: " + entry + " -> " + target);
+        return target;
+    }
+
+    /** JNA's folder name for an OS and processor ({@code Platform.RESOURCE_PREFIX}). */
+    static String jnaPlatform(String os, String arch) {
+        String cpu = arch.equals("arm64") ? "aarch64" : "x86-64";
+        return switch (os) {
+            case "windows" -> "win32-" + cpu;
+            case "macos" -> "darwin-" + cpu;
+            default -> "linux-" + cpu;
+        };
+    }
+
+    /** JNA's library file name on an OS. */
+    static String jnaLibraryName(String os) {
+        return switch (os) {
+            case "windows" -> "jnidispatch.dll";
+            case "macos" -> "libjnidispatch.jnilib";
+            default -> "libjnidispatch.so";
+        };
     }
 
     /** The folder the smoke test runs: the .app on macOS, the application folder elsewhere. */

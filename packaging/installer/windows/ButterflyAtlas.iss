@@ -75,8 +75,10 @@ Source: "{#ImageDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs c
 Source: "{#NoticesFile}"; Flags: dontcopy
 
 [Icons]
-Name: "{userprograms}\{#AppName}"; Filename: "{app}\{#AppName}.exe"
-Name: "{userdesktop}\{#AppName}"; Filename: "{app}\{#AppName}.exe"; Tasks: desktopicon
+; The AppUserModelID is the one the app gives its windows (WindowsDesktop.APP_ID; check-windows compares them), so the
+; windows group under these shortcuts on the taskbar, and a pinned shortcut is the app's own button.
+Name: "{userprograms}\{#AppName}"; Filename: "{app}\{#AppName}.exe"; AppUserModelID: "WeAreNaturalists.ButterflyAtlas"
+Name: "{userdesktop}\{#AppName}"; Filename: "{app}\{#AppName}.exe"; Tasks: desktopicon; AppUserModelID: "WeAreNaturalists.ButterflyAtlas"
 
 [Run]
 ; Started with no arguments, like the Start Menu entry: the launch key never appears in a program's arguments.
