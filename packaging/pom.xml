@@ -126,6 +126,22 @@
                                     </arguments>
                                 </configuration>
                             </execution>
+                            <!-- macOS: the app image keeps its Dock tile (no LSUIElement); nothing elsewhere. -->
+                            <execution>
+                                <id>check-mac-image</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <arguments>
+                                        <argument>${project.basedir}/scripts/PackageApp.java</argument>
+                                        <argument>check-mac-image</argument>
+                                        <argument>--work</argument>
+                                        <argument>${project.build.directory}/work</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
                             <execution>
                                 <id>smoke</id>
                                 <phase>verify</phase>

@@ -21,6 +21,7 @@ import java.util.stream.Stream;
  *   java packaging/scripts/PackageApp.java check-windows --root REPO  (any OS: the Windows installer script and the Inno Setup lookup)
  *   java packaging/scripts/PackageApp.java runtime    --work DIR
  *   java packaging/scripts/PackageApp.java image      --work DIR --root REPO --version 1.0.0
+ *   java packaging/scripts/PackageApp.java check-mac-image --work DIR  (macOS: the .app keeps its Dock tile; elsewhere nothing)
  *   java packaging/scripts/PackageApp.java smoke      --work DIR --root REPO --version 1.0.0
  *   java packaging/scripts/PackageApp.java installers --work DIR --root REPO --version 1.0.0 --dist DIR [--linux-types deb,rpm]
  * </pre>
@@ -82,6 +83,8 @@ public final class PackageApp {
     static final List<List<String>> INNO_SHORTCUTS = List.of(
             List.of("Name: \"{userprograms}\\", "the Start menu shortcut"),
             List.of("Name: \"{userdesktop}\\", "the desktop shortcut"));
+    /** The Info.plist key that would hide the app's Dock tile. */
+    static final String LS_UI_ELEMENT = "LSUIElement";
     /** Modules the libraries load by name (or that jdeps cannot see); the smoke test proves the list is enough. */
     static final List<String> EXTRA_MODULES = List.of("java.sql", "java.naming", "java.management", "java.xml",
             "java.desktop", "java.net.http", "java.logging", "java.prefs", "jdk.unsupported", "jdk.zipfs");
@@ -101,6 +104,7 @@ public final class PackageApp {
                 case "check-windows" -> checkWindows(path(options, "root"));
                 case "runtime" -> runtime(path(options, "work"));
                 case "image" -> image(path(options, "work"), path(options, "root"), required(options, "version"));
+                case "check-mac-image" -> checkMacImage(path(options, "work"));
                 case "smoke" -> smoke(path(options, "work"), path(options, "root"), required(options, "version"));
                 case "installers" -> installers(path(options, "work"), path(options, "root"), required(options, "version"),
                         path(options, "dist"), options.getOrDefault("linux-types", "deb,rpm"));
@@ -312,6 +316,35 @@ public final class PackageApp {
             throw new StepFailed("jpackage image", "JNA's native library is not in the application image at " + shipped);
         }
         System.out.println("Application image: " + imageDir(work));
+    }
+
+    /**
+     * macOS, after the image: the {@code .app}'s {@code Contents/Info.plist} has no {@code LSUIElement} key, so the
+     * installed app shows its Dock tile, which can be kept in the Dock and answers a click (app-icon contract §2). Nothing
+     * to check on other OSes.
+     */
+    static void checkMacImage(Path work) throws IOException {
+        if (!OS.equals("macos")) {
+            System.out.println("macOS app image check: not on macOS, nothing to check");
+            return;
+        }
+        Path plist = imageDir(work).resolve("Contents").resolve("Info.plist");
+        List<String> problems = infoPlistProblems(plist);
+        if (!problems.isEmpty()) {
+            throw new StepFailed("check-mac-image", plist + ":\n  " + String.join("\n  ", problems));
+        }
+        System.out.println("macOS app image keeps its Dock tile (no LSUIElement): OK");
+    }
+
+    /** What is wrong with the app's {@code Info.plist} for its Dock tile: missing, or it has {@link #LS_UI_ELEMENT}. */
+    static List<String> infoPlistProblems(Path plist) throws IOException {
+        if (!Files.isRegularFile(plist)) {
+            return List.of("the app's Info.plist is missing");
+        }
+        if (Pattern.compile("<key>\\s*" + LS_UI_ELEMENT + "\\s*</key>").matcher(Files.readString(plist)).find()) {
+            return List.of("has the key " + LS_UI_ELEMENT + " (expected none: the app keeps its Dock tile)");
+        }
+        return List.of();
     }
 
     /** The folder jpackage puts the jars in: {@code Contents/app} in the .app on macOS, {@code app} elsewhere. */
