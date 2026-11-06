@@ -19,6 +19,7 @@ import java.util.stream.Stream;
  *
  * <pre>
  *   java packaging/scripts/PackageApp.java check-windows --root REPO  (any OS: the Windows installer script and the Inno Setup lookup)
+ *   java packaging/scripts/PackageApp.java check-linux   --root REPO  (any OS: the Linux .desktop file's window class)
  *   java packaging/scripts/PackageApp.java runtime    --work DIR
  *   java packaging/scripts/PackageApp.java image      --work DIR --root REPO --version 1.0.0
  *   java packaging/scripts/PackageApp.java check-mac-image --work DIR  (macOS: the .app keeps its Dock tile; elsewhere nothing)
@@ -83,6 +84,23 @@ public final class PackageApp {
     static final List<List<String>> INNO_SHORTCUTS = List.of(
             List.of("Name: \"{userprograms}\\", "the Start menu shortcut"),
             List.of("Name: \"{userdesktop}\\", "the desktop shortcut"));
+    /**
+     * The folder passed to jpackage as {@code --resource-dir} for the .deb and .rpm, relative to the repository root: it
+     * holds only our own .desktop file.
+     */
+    static final String LINUX_RESOURCES = "packaging/linux";
+    /**
+     * The .desktop file in it, under the name jpackage looks for there: {@code <app name>.desktop} (jpackage's
+     * {@code DesktopIntegration} gives its {@code template.desktop} that public name, and fills the same placeholders in
+     * our copy as in its own).
+     */
+    static final String LINUX_DESKTOP_FILE = LINUX_RESOURCES + "/" + NAME + ".desktop";
+    /** The one place the Linux window class is written in Java (app-icon contract §1), relative to the repository root. */
+    static final String LINUX_DESKTOP = "app/src/main/java/com/butterflyatlas/app/desktop/linux/LinuxDesktop.java";
+    /** How {@link #LINUX_DESKTOP} writes it, read from the source so the check needs no compiled classes. */
+    static final Pattern WINDOW_CLASS = Pattern.compile("static final String WINDOW_CLASS = \"([^\"]+)\";");
+    /** A .desktop file's StartupWMClass line. */
+    static final Pattern STARTUP_WM_CLASS = Pattern.compile("^\\s*StartupWMClass\\s*=(.*)$");
     /** The Info.plist key that would hide the app's Dock tile. */
     static final String LS_UI_ELEMENT = "LSUIElement";
     /** Modules the libraries load by name (or that jdeps cannot see); the smoke test proves the list is enough. */
@@ -102,6 +120,7 @@ public final class PackageApp {
         try {
             switch (args[0]) {
                 case "check-windows" -> checkWindows(path(options, "root"));
+                case "check-linux" -> checkLinux(path(options, "root"));
                 case "runtime" -> runtime(path(options, "work"));
                 case "image" -> image(path(options, "work"), path(options, "root"), required(options, "version"));
                 case "check-mac-image" -> checkMacImage(path(options, "work"));
@@ -224,6 +243,54 @@ public final class PackageApp {
             }
         }
         return problems;
+    }
+
+    // ---- the Linux .desktop file, checked on every OS (the .deb and .rpm are made only on Linux)
+
+    /**
+     * Our .desktop file ({@link #LINUX_DESKTOP_FILE}) exists and has exactly one {@code StartupWMClass}, equal to the class
+     * the app gives the browser's windows ({@code LinuxDesktop.WINDOW_CLASS}, read from the source), so the dock groups the
+     * window under our launcher (app-icon contract §2).
+     */
+    static void checkLinux(Path root) throws IOException {
+        Path desktop = root.resolve(LINUX_DESKTOP_FILE);
+        List<String> problems = linuxDesktopProblems(root, desktop);
+        if (!problems.isEmpty()) {
+            throw new StepFailed("check-linux", desktop + ":\n  " + String.join("\n  ", problems));
+        }
+        System.out.println("Linux .desktop file's window class: OK");
+    }
+
+    static List<String> linuxDesktopProblems(Path root, Path desktop) throws IOException {
+        Path source = root.resolve(LINUX_DESKTOP);
+        Matcher declared = Files.isRegularFile(source) ? WINDOW_CLASS.matcher(Files.readString(source)) : null;
+        if (declared == null || !declared.find()) {
+            return List.of("LinuxDesktop.WINDOW_CLASS could not be read from " + source);
+        }
+        String expected = declared.group(1);
+        if (!Files.isRegularFile(desktop)) {
+            return List.of("the .desktop file is missing (expected StartupWMClass=" + expected
+                    + ", from LinuxDesktop.WINDOW_CLASS)");
+        }
+        List<String> found = new ArrayList<>();
+        for (String line : Files.readAllLines(desktop)) {
+            Matcher wmClass = STARTUP_WM_CLASS.matcher(line);
+            if (wmClass.matches()) {
+                found.add(wmClass.group(1).strip());
+            }
+        }
+        if (found.isEmpty()) {
+            return List.of("the .desktop file has no StartupWMClass (expected \"" + expected
+                    + "\", from LinuxDesktop.WINDOW_CLASS)");
+        }
+        if (found.size() > 1) {
+            return List.of("the .desktop file has " + found.size() + " StartupWMClass lines (expected 1)");
+        }
+        if (!found.get(0).equals(expected)) {
+            return List.of("the .desktop file has StartupWMClass \"" + found.get(0) + "\" (expected \"" + expected
+                    + "\")");
+        }
+        return List.of();
     }
 
     // ---- step 1: the trimmed Java runtime (jdeps + jlink)
@@ -438,9 +505,11 @@ public final class PackageApp {
             if (OS.equals("macos")) {
                 command.addAll(List.of("--mac-dmg-content", String.join(",", licenceFiles(root))));
             } else {
+                // our own .desktop file (jpackage's, plus StartupWMClass) from the resource folder
                 command.addAll(List.of("--linux-package-name", "butterfly-atlas", "--linux-shortcut",
                         "--linux-menu-group", "Education;Science;", "--linux-app-category", "science",
-                        "--license-file", root.resolve("LICENSE").toString()));
+                        "--license-file", root.resolve("LICENSE").toString(),
+                        "--resource-dir", root.resolve(LINUX_RESOURCES).toString()));
             }
             if (OS.equals("linux") && type.equals("rpm")) {
                 command.addAll(List.of("--linux-rpm-license-type", "Apache-2.0"));

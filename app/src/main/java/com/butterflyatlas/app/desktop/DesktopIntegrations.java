@@ -2,6 +2,7 @@ package com.butterflyatlas.app.desktop;
 
 import com.butterflyatlas.app.window.AtlasLog;
 import com.butterflyatlas.app.window.WindowLauncher;
+import com.butterflyatlas.app.desktop.linux.LinuxDesktop;
 import com.butterflyatlas.app.desktop.mac.MacDesktop;
 import com.butterflyatlas.app.desktop.windows.WindowsDesktop;
 import com.butterflyatlas.app.desktop.windows.WindowsNative;
@@ -12,8 +13,7 @@ import java.util.function.Supplier;
 /**
  * Chooses the desktop piece for this OS (contract §4): the only place {@code os.name} is read for the app's icon.
  * {@link NoDesktop} with {@code -Datlas.noBrowser} (there is no window of ours), on a headless system and on an OS not
- * listed; {@link MacDesktop} on macOS and {@link WindowsDesktop} on Windows. Linux gets its own piece in a later step;
- * until then it gets {@link NoDesktop} too.
+ * listed; {@link MacDesktop} on macOS, {@link WindowsDesktop} on Windows and {@link LinuxDesktop} on Linux.
  */
 public final class DesktopIntegrations {
 
@@ -34,6 +34,7 @@ public final class DesktopIntegrations {
         return switch (os(osName)) {
             case "mac" -> MacDesktop.system(windows, mode, log);
             case "windows" -> WindowsDesktop.system(windows, mode, appPath, log);
+            case "linux" -> new LinuxDesktop();
             default -> new NoDesktop();
         };
     }

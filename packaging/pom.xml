@@ -92,6 +92,22 @@
                                     </arguments>
                                 </configuration>
                             </execution>
+                            <!-- On every OS too: the Linux .desktop file's StartupWMClass is the app's window class. -->
+                            <execution>
+                                <id>check-linux</id>
+                                <phase>validate</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <arguments>
+                                        <argument>${project.basedir}/scripts/PackageApp.java</argument>
+                                        <argument>check-linux</argument>
+                                        <argument>--root</argument>
+                                        <argument>${project.basedir}/..</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
                             <execution>
                                 <id>runtime</id>
                                 <phase>package</phase>

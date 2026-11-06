@@ -58,6 +58,11 @@ class DesktopIntegrationsTest {
     }
 
     @Test
+    void linuxGetsItsWindowClassPiece() {
+        assertThat(forOs("Linux", false, false)).isInstanceOf(com.butterflyatlas.app.desktop.linux.LinuxDesktop.class);
+    }
+
+    @Test
     void anOsNotListedGetsNothing() {
         assertThat(forOs("FreeBSD", false, false)).isInstanceOf(NoDesktop.class);
         assertThat(forOs("SunOS", false, false)).isInstanceOf(NoDesktop.class);
