@@ -48,7 +48,7 @@ public final class WindowLauncher {
     }
 
     /** A browser that exits with an error sooner than this after starting did not show a window. */
-    static final long EARLY_NANOS = 5_000_000_000L;
+    public static final long EARLY_NANOS = 5_000_000_000L;
 
     private final Optional<Path> browser;
     private final boolean mac;

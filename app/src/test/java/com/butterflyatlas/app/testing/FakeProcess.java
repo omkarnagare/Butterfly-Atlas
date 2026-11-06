@@ -8,7 +8,26 @@ import java.util.concurrent.CompletableFuture;
 public final class FakeProcess extends Process {
 
     private final CompletableFuture<Process> exit = new CompletableFuture<>();
+    private final long pid;
     private volatile int code;
+
+    /** A program with no process ID ({@link #pid()} is unsupported, as for any {@link Process} the JDK did not start). */
+    public FakeProcess() {
+        this(-1);
+    }
+
+    /** A program with this process ID. */
+    public FakeProcess(long pid) {
+        this.pid = pid;
+    }
+
+    @Override
+    public long pid() {
+        if (pid < 0) {
+            throw new UnsupportedOperationException("a fake process with no ID");
+        }
+        return pid;
+    }
 
     /** The program ends with this exit code. */
     public void exits(int code) {
