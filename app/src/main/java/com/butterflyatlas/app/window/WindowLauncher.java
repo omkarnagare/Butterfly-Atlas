@@ -17,6 +17,9 @@ import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
+import com.butterflyatlas.app.desktop.DesktopIntegration;
+import com.butterflyatlas.app.desktop.NoDesktop;
+
 /**
  * Opens the app window (design §2): the browser found, started with {@code --app=<address>}, its own profile folder in
  * the config folder, {@code --no-first-run}, {@code --no-default-browser-check} and a maximized window (match-device
@@ -26,7 +29,9 @@ import java.util.function.Supplier;
  * (once: {@link #fallBack}); {@link #mode()} then says {@code tab}. Every address has a fresh one-time launch key, which
  * is never in a program's arguments, the log or the console: the browser (and the default browser) is opened on an owner-only
  * redirect file ({@link LaunchFiles}) that sends it to the address. If that file cannot be written nothing is opened, and
- * the problem is told ({@code problem}); the key is never put in the command instead.
+ * the problem is told ({@code problem}); the key is never put in the command instead. The desktop piece for the app's icon
+ * (app-icon spec §3) adds its own arguments after these, is told each browser process started ({@code started}, for
+ * {@code BrowserWindows}) and hears that a window is coming after each start.
  */
 public final class WindowLauncher {
 
@@ -48,7 +53,7 @@ public final class WindowLauncher {
     }
 
     /** A browser that exits with an error sooner than this after starting did not show a window. */
-    static final long EARLY_NANOS = 5_000_000_000L;
+    public static final long EARLY_NANOS = 5_000_000_000L;
 
     private final Optional<Path> browser;
     private final boolean mac;
@@ -61,6 +66,8 @@ public final class WindowLauncher {
     private final AtlasLog log;
     private final LongSupplier nanos;
     private final Consumer<StartupFailure.Message> problem;
+    private final DesktopIntegration desktop;
+    private final Consumer<Process> started;
     private final AtomicBoolean fellBack = new AtomicBoolean();
     private volatile Mode mode = Mode.WINDOW;
     private volatile boolean noWindow;
@@ -75,6 +82,20 @@ public final class WindowLauncher {
     public WindowLauncher(Optional<Path> browser, String osName, Path profile, Supplier<URI> launchUri, LaunchFiles files, Starter starter,
                           DefaultBrowser defaultBrowser, Consumer<String> console, AtlasLog log, LongSupplier nanos,
                           Consumer<StartupFailure.Message> problem) {
+        this(browser, osName, profile, launchUri, files, starter, defaultBrowser, console, log, nanos, problem, new NoDesktop(),
+                process -> { });
+    }
+
+    /**
+     * As above, with the desktop piece for the app's icon: its {@link DesktopIntegration#browserArguments()} follow the
+     * usual arguments, {@code started} is told each browser process started, and {@link DesktopIntegration#windowComing()}
+     * is called after each start.
+     */
+    public WindowLauncher(Optional<Path> browser, String osName, Path profile, Supplier<URI> launchUri, LaunchFiles files, Starter starter,
+                          DefaultBrowser defaultBrowser, Consumer<String> console, AtlasLog log, LongSupplier nanos,
+                          Consumer<StartupFailure.Message> problem, DesktopIntegration desktop, Consumer<Process> started) {
+        this.desktop = desktop;
+        this.started = started;
         this.browser = browser;
         this.mac = osName != null && osName.toLowerCase(Locale.ROOT).startsWith("mac");
         this.profile = profile;
@@ -100,7 +121,7 @@ public final class WindowLauncher {
             settled.complete(null);
             return;
         }
-        List<String> command = command(browser.get(), profile, page.toUri(), mac);
+        List<String> command = command(browser.get(), profile, page.toUri(), mac, desktop.browserArguments());
         long began = nanos.getAsLong();
         try {
             Files.createDirectories(profile);
@@ -116,6 +137,8 @@ public final class WindowLauncher {
                 }
             });
             log.info("Opened the app window with " + browser.get());
+            started.accept(process);
+            desktop.windowComing();
         } catch (IOException | RuntimeException e) {
             log.warn("Could not start " + browser.get(), e);
             fallBack("The browser " + browser.get().getFileName() + " could not be started");
@@ -211,8 +234,11 @@ public final class WindowLauncher {
     }
 
     /** {@code page} is the redirect file's address ({@code file:} URI), never the launch address with its key. */
-    static List<String> command(Path browser, Path profile, URI page, boolean mac) {
-        return List.of(browser.toString(), "--app=" + page, "--user-data-dir=" + profile, "--no-first-run",
-                "--no-default-browser-check", mac ? "--window-size=10000,10000" : "--start-maximized");
+    static List<String> command(Path browser, Path profile, URI page, boolean mac, List<String> extra) {
+        List<String> command = new java.util.ArrayList<>(List.of(browser.toString(), "--app=" + page,
+                "--user-data-dir=" + profile, "--no-first-run", "--no-default-browser-check",
+                mac ? "--window-size=10000,10000" : "--start-maximized"));
+        command.addAll(extra);
+        return List.copyOf(command);
     }
 }

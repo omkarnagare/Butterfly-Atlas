@@ -92,6 +92,22 @@
                                     </arguments>
                                 </configuration>
                             </execution>
+                            <!-- On every OS too: the Linux .desktop file's StartupWMClass is the app's window class. -->
+                            <execution>
+                                <id>check-linux</id>
+                                <phase>validate</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <arguments>
+                                        <argument>${project.basedir}/scripts/PackageApp.java</argument>
+                                        <argument>check-linux</argument>
+                                        <argument>--root</argument>
+                                        <argument>${project.basedir}/..</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
                             <execution>
                                 <id>runtime</id>
                                 <phase>package</phase>
@@ -123,6 +139,22 @@
                                         <argument>${project.basedir}/..</argument>
                                         <argument>--version</argument>
                                         <argument>${project.version}</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <!-- macOS: the app image keeps its Dock tile (no LSUIElement); nothing elsewhere. -->
+                            <execution>
+                                <id>check-mac-image</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <arguments>
+                                        <argument>${project.basedir}/scripts/PackageApp.java</argument>
+                                        <argument>check-mac-image</argument>
+                                        <argument>--work</argument>
+                                        <argument>${project.build.directory}/work</argument>
                                     </arguments>
                                 </configuration>
                             </execution>

@@ -13,10 +13,12 @@ import java.util.function.Supplier;
  * What the per-launch secret needs (contract §2): the keys, the quit timer the window streams drive, how the page was
  * opened, whether the app is quitting, the folders About shows, and how one more window is opened ({@code POST
  * /api/window}). {@code Main} supplies one; tests that do not mean to test the secret start the server without it, so
- * every request is answered as before.
+ * every request is answered as before. The desktop piece for the app's icon (app-icon contract §4) hears of windows:
+ * {@code windowConnected} when a window's stream opens, {@code windowComing} when a second launch is handed a key.
  */
 public record Session(SessionKeys keys, QuitTimer quit, Supplier<WindowLauncher.Mode> mode, BooleanSupplier closing,
-                      Path configFolder, Path logFolder, Duration ping, NewWindow newWindow) {
+                      Path configFolder, Path logFolder, Duration ping, NewWindow newWindow, Runnable windowConnected,
+                      Runnable windowComing) {
 
     /**
      * Opens one more window on this copy, as a second launch does (multi-window contract §2, audit A12/A13): a fresh key, a
@@ -34,6 +36,12 @@ public record Session(SessionKeys keys, QuitTimer quit, Supplier<WindowLauncher.
      * contract's fifteen, which would make a quit take up to twenty-five).
      */
     public static final Duration PING = Duration.ofSeconds(1);
+
+    /** With no desktop piece to tell of windows. */
+    public Session(SessionKeys keys, QuitTimer quit, Supplier<WindowLauncher.Mode> mode, BooleanSupplier closing,
+                   Path configFolder, Path logFolder, Duration ping, NewWindow newWindow) {
+        this(keys, quit, mode, closing, configFolder, logFolder, ping, newWindow, () -> { }, () -> { });
+    }
 
     public Session(SessionKeys keys, QuitTimer quit, Supplier<WindowLauncher.Mode> mode, BooleanSupplier closing,
                    Path configFolder, Path logFolder) {

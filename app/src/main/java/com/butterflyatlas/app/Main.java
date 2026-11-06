@@ -55,7 +55,11 @@ import com.butterflyatlas.app.window.StartupFailure;
 
 import java.nio.file.Path;
 import java.time.Clock;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 /**
@@ -88,8 +92,9 @@ public final class Main {
     }
 
     public static void main(String[] args) {
-        // AWT is only used to open the default browser: keep it from showing a Java icon in the Dock.
-        System.setProperty("apple.awt.UIElement", "true");
+        // The installed app has a Dock tile of its own, which the desktop piece answers (app-icon spec §4.1), named
+        // Butterfly Atlas; a development run (a generic Java tile) and -Datlas.noBrowser (no window of ours) keep it hidden.
+        appKitProperties(System::getProperty).forEach(System::setProperty);
 
         Path config = AppDirs.currentConfigDir();
         try {
@@ -99,6 +104,8 @@ public final class Main {
         }
         AtlasLog log = AtlasLog.open(config);
         log.captureStdErr(); // what the libraries print goes to the log too (nobody sees the console of an installed app)
+        // before anything can load JNA: a run without the shipped library unpacks it in the config folder, not in /tmp
+        useJnaTmpdir(System::getProperty, System::setProperty, config);
         AppOptions options;
         try {
             options = AppOptions.fromSystem();
@@ -107,6 +114,68 @@ public final class Main {
             return;
         }
         new AppStart(options, log, AppStart.World.system()).run();
+    }
+
+    /** The name macOS shows for the running app (Cmd-Tab, the menu bar, the Dock tile). */
+    static final String APP_NAME = "Butterfly Atlas";
+
+    /**
+     * The properties AppKit reads when it starts, set before anything loads AWT: the app's name (without it macOS names
+     * the running app after its main class, "Main"), and, when {@link #hiddenFromDock}, no Dock tile.
+     */
+    static Map<String, String> appKitProperties(Function<String, String> property) {
+        Map<String, String> set = new LinkedHashMap<>();
+        set.put("apple.awt.application.name", APP_NAME);
+        if (hiddenFromDock(property)) {
+            set.put("apple.awt.UIElement", "true");
+        }
+        return set;
+    }
+
+    /**
+     * Whether macOS should show no Dock tile for this run ({@code apple.awt.UIElement}): a development run (no
+     * {@code jpackage.app-path}, which would show a generic Java tile) and {@code -Datlas.noBrowser}; never the installed
+     * app, whose tile with the butterfly can be kept in the Dock.
+     */
+    static boolean hiddenFromDock(Function<String, String> property) {
+        String app = property.apply(com.butterflyatlas.app.window.Relaunch.APP_PATH);
+        return app == null || app.isBlank() || Boolean.parseBoolean(property.apply("atlas.noBrowser"));
+    }
+
+    /** The property the installed app's launcher sets to the {@code native/} folder JNA's library ships in. */
+    static final String JNA_LIBRARY_PATH = "jna.boot.library.path";
+    /** Where JNA unpacks its library when none was shipped. */
+    static final String JNA_TMPDIR = "jna.tmpdir";
+
+    /**
+     * Where JNA should unpack its native library (contract §3): nowhere for the installed app, whose launcher names the
+     * library it ships ({@code jna.boot.library.path}); otherwise (a development run, the tests) {@code <config>/native},
+     * a folder only this user can open, never the shared temp folder another user could write into.
+     */
+    static Optional<Path> jnaTmpdir(Function<String, String> property, Path config) {
+        String shipped = property.apply(JNA_LIBRARY_PATH);
+        if (shipped != null && !shipped.isBlank()) {
+            return Optional.empty();
+        }
+        return Optional.of(config.resolve("native"));
+    }
+
+    /**
+     * Makes the folder {@link #jnaTmpdir} names (owner-only, like the config folder) and points {@code jna.tmpdir} at it.
+     * A folder that cannot be made is not a reason to stop: JNA then fails to load, which is logged where it is used, and
+     * the app runs as it did before it had JNA.
+     */
+    static void useJnaTmpdir(Function<String, String> property, BiConsumer<String, String> set, Path config) {
+        Optional<Path> folder = jnaTmpdir(property, config);
+        if (folder.isEmpty()) {
+            return;
+        }
+        try {
+            AppDirs.createConfigDir(folder.get());
+        } catch (RuntimeException e) {
+            System.out.println("Butterfly Atlas could not prepare " + folder.get() + ": " + e.getMessage());
+        }
+        set.accept(JNA_TMPDIR, folder.get().toString());
     }
 
     /**

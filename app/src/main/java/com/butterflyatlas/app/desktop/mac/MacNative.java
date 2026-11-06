@@ -1,0 +1,191 @@
+package com.butterflyatlas.app.desktop.mac;
+
+import com.sun.jna.Library;
+import com.sun.jna.Native;
+import com.sun.jna.NativeLibrary;
+import com.sun.jna.Pointer;
+import com.sun.jna.ptr.LongByReference;
+
+/**
+ * The macOS calls behind the app's icon, through JNA (spec §4.1, contract §4). Nothing here loads JNA until a method runs,
+ * so making one costs nothing. The calls run only on macOS; elsewhere they throw.
+ *
+ * <ul>
+ *   <li>{@link #activate}: {@code [NSRunningApplication runningApplicationWithProcessIdentifier:]} then
+ *   {@code activateWithOptions:} with all windows. On macOS 14 and later activation is cooperative: when this app is
+ *   active (the user just clicked its tile or switched to it) it first yields activation to the browser
+ *   ({@code [NSApp yieldActivationToApplication:]}), which lets the browser come forward.</li>
+ *   <li>{@link #terminate}: {@code [NSRunningApplication terminate]}, the same as Quit from the browser's own menu; never
+ *   {@code forceTerminate}.</li>
+ *   <li>{@link #windows}: {@code CGWindowListCopyWindowInfo}, once for every window and once for those on screen, counting
+ *   the process's ordinary ones (layer 0). The owner and the layer need no Screen Recording permission.</li>
+ * </ul>
+ * Each call runs inside an autorelease pool of its own, since it runs on a thread AppKit did not make. Every call is
+ * made with a fixed number of arguments ({@code objc_msgSend} is not variadic on Apple Silicon).
+ */
+public final class MacNative implements MacApps {
+
+    /** {@code NSApplicationActivateAllWindows}. */
+    static final long ACTIVATE_ALL_WINDOWS = 1L;
+    /** {@code NSApplicationActivateIgnoringOtherApps}: needed before macOS 14, ignored from it on. */
+    static final long ACTIVATE_IGNORING_OTHER_APPS = 2L;
+    /** {@code kCGWindowListOptionAll}. */
+    static final int LIST_ALL = 0;
+    /** {@code kCGWindowListOptionOnScreenOnly}. */
+    static final int LIST_ON_SCREEN = 1;
+    /** {@code kCGNullWindowID}. */
+    static final int NULL_WINDOW = 0;
+    /** {@code kCFNumberSInt64Type}. */
+    static final long CF_SINT64 = 4L;
+    /** {@code kCFStringEncodingUTF8}. */
+    static final int CF_UTF8 = 0x08000100;
+
+    /** The Objective-C runtime, with each {@code objc_msgSend} shape this class uses. */
+    interface ObjC extends Library {
+        Pointer objc_getClass(String name);
+
+        Pointer sel_registerName(String name);
+
+        Pointer objc_msgSend(Pointer receiver, Pointer selector);
+
+        Pointer objc_msgSend(Pointer receiver, Pointer selector, int value);
+
+        Pointer objc_msgSend(Pointer receiver, Pointer selector, long value);
+
+        Pointer objc_msgSend(Pointer receiver, Pointer selector, Pointer value);
+
+    }
+
+    /** Core Foundation, for reading the window list. */
+    interface CoreFoundation extends Library {
+        long CFArrayGetCount(Pointer array);
+
+        Pointer CFArrayGetValueAtIndex(Pointer array, long index);
+
+        Pointer CFDictionaryGetValue(Pointer dictionary, Pointer key);
+
+        byte CFNumberGetValue(Pointer number, long type, LongByReference value);
+
+        Pointer CFStringCreateWithCString(Pointer allocator, String text, int encoding);
+
+        void CFRelease(Pointer object);
+    }
+
+    /** Core Graphics' window list. */
+    interface CoreGraphics extends Library {
+        Pointer CGWindowListCopyWindowInfo(int option, int relativeToWindow);
+    }
+
+    /** The libraries, loaded on first use. */
+    private static final class Libraries {
+        static final NativeLibrary APP_KIT = NativeLibrary.getInstance("AppKit");
+        static final ObjC OBJC = Native.load("objc", ObjC.class);
+        static final CoreFoundation CF = Native.load("CoreFoundation", CoreFoundation.class);
+        static final CoreGraphics CG = Native.load("CoreGraphics", CoreGraphics.class);
+    }
+
+    @Override
+    public boolean activate(long pid) {
+        return inPool(objc -> {
+            Pointer app = runningApp(objc, pid);
+            Pointer nsApp = Libraries.APP_KIT.getGlobalVariableAddress("NSApp").getPointer(0);
+            Pointer yield = objc.sel_registerName("yieldActivationToApplication:");
+            if (nsApp != null && bool(objc.objc_msgSend(nsApp, objc.sel_registerName("respondsToSelector:"), yield))) {
+                objc.objc_msgSend(nsApp, yield, app);
+            }
+            return bool(objc.objc_msgSend(app, objc.sel_registerName("activateWithOptions:"),
+                    ACTIVATE_ALL_WINDOWS | ACTIVATE_IGNORING_OTHER_APPS));
+        });
+    }
+
+    @Override
+    public boolean terminate(long pid) {
+        return inPool(objc -> bool(objc.objc_msgSend(runningApp(objc, pid), objc.sel_registerName("terminate"))));
+    }
+
+    @Override
+    public Windows windows(long pid) {
+        Libraries.APP_KIT.getName(); // AppKit's classes are there for the pool
+        return inPool(objc -> new Windows(count(pid, LIST_ALL), count(pid, LIST_ON_SCREEN)));
+    }
+
+    /** The process's ordinary windows (layer 0) in the window list made with {@code option}. */
+    private static int count(long pid, int option) {
+        CoreFoundation cf = Libraries.CF;
+        Pointer list = Libraries.CG.CGWindowListCopyWindowInfo(option, NULL_WINDOW);
+        if (list == null) {
+            throw new IllegalStateException("The window list could not be read");
+        }
+        Pointer ownerKey = cf.CFStringCreateWithCString(null, "kCGWindowOwnerPID", CF_UTF8);
+        Pointer layerKey = cf.CFStringCreateWithCString(null, "kCGWindowLayer", CF_UTF8);
+        try {
+            int found = 0;
+            long size = cf.CFArrayGetCount(list);
+            for (long i = 0; i < size; i++) {
+                Pointer window = cf.CFArrayGetValueAtIndex(list, i);
+                if (number(cf, cf.CFDictionaryGetValue(window, ownerKey)) == pid
+                        && number(cf, cf.CFDictionaryGetValue(window, layerKey)) == 0) {
+                    found++;
+                }
+            }
+            return found;
+        } finally {
+            cf.CFRelease(list);
+            if (ownerKey != null) {
+                cf.CFRelease(ownerKey);
+            }
+            if (layerKey != null) {
+                cf.CFRelease(layerKey);
+            }
+        }
+    }
+
+    private static long number(CoreFoundation cf, Pointer number) {
+        if (number == null) {
+            return Long.MIN_VALUE;
+        }
+        LongByReference value = new LongByReference();
+        return cf.CFNumberGetValue(number, CF_SINT64, value) != 0 ? value.getValue() : Long.MIN_VALUE;
+    }
+
+    /** The {@code NSRunningApplication} of the process; throws when there is none (it is not running, or not an app). */
+    private static Pointer runningApp(ObjC objc, long pid) {
+        Pointer app = objc.objc_msgSend(objc.objc_getClass("NSRunningApplication"),
+                objc.sel_registerName("runningApplicationWithProcessIdentifier:"), processId(pid));
+        if (app == null) {
+            throw new IllegalStateException("No running app has the process ID " + pid);
+        }
+        return app;
+    }
+
+    private static int processId(long pid) {
+        if (pid <= 0 || pid > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("Not a process ID: " + pid);
+        }
+        return (int) pid;
+    }
+
+    /** An Objective-C {@code BOOL} returned in a register: only its low byte counts. */
+    private static boolean bool(Pointer value) {
+        return value != null && (Pointer.nativeValue(value) & 0xFF) != 0;
+    }
+
+    private interface Call<T> {
+        T run(ObjC objc);
+    }
+
+    /** Runs {@code call} inside an autorelease pool of its own. */
+    private static <T> T inPool(Call<T> call) {
+        Libraries.APP_KIT.getName(); // loads AppKit, whose classes the calls use
+        ObjC objc = Libraries.OBJC;
+        Pointer pool = objc.objc_msgSend(objc.objc_msgSend(objc.objc_getClass("NSAutoreleasePool"),
+                objc.sel_registerName("alloc")), objc.sel_registerName("init"));
+        try {
+            return call.run(objc);
+        } finally {
+            if (pool != null) {
+                objc.objc_msgSend(pool, objc.sel_registerName("drain"));
+            }
+        }
+    }
+}

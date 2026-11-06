@@ -59,6 +59,15 @@
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-imaging</artifactId>
         </dependency>
+        <!-- Native calls for the app's icon (the Windows taskbar, the macOS Dock); loaded only when first used. -->
+        <dependency>
+            <groupId>net.java.dev.jna</groupId>
+            <artifactId>jna</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>net.java.dev.jna</groupId>
+            <artifactId>jna-platform</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -90,6 +99,32 @@
             </resource>
         </resources>
         <plugins>
+            <!-- The tests tagged "window" open real browser windows: left out of the usual run, and run on their own by
+                 the root pom's profile window-checks. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>default-test</id>
+                        <configuration>
+                            <excludedGroups>window</excludedGroups>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>window-checks</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${windowChecks.skip}</skip>
+                            <groups>window</groups>
+                            <reportsDirectory>${project.build.directory}/surefire-reports-window</reportsDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>

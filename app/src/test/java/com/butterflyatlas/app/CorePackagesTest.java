@@ -13,15 +13,16 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Every package except the web layer and the desktop imaging adapter must not depend on Javalin,
- * AWT/Swing or the web layer, so the same logic can later run behind a different shell (design D6:
+ * Every package except the web layer, the desktop imaging adapter and the OS shell for the app's icon must not depend
+ * on Javalin, AWT/Swing or the web layer, so the same logic can later run behind a different shell (design D6:
  * e.g. an Android app). Files directly in the root package (Main, AtlasServer) are the shell and are
- * excluded.
+ * excluded. {@code desktop} is shell like {@code imaging}: it is the app's icon in the Dock, the taskbar or the
+ * launcher, and on macOS it hears the Dock through {@code java.awt.desktop} and {@code java.awt.Taskbar}.
  */
 class CorePackagesTest {
 
     private static final Path ROOT = Path.of("src/main/java/com/butterflyatlas/app");
-    private static final List<String> SHELL = List.of("web", "imaging");
+    private static final List<String> SHELL = List.of("web", "imaging", "desktop");
     private static final List<String> FORBIDDEN = List.of("io.javalin.", "java.awt.", "javax.swing.",
             "com.butterflyatlas.app.web.");
 
@@ -36,7 +37,7 @@ class CorePackagesTest {
     void theExpectedCorePackagesAreChecked() throws Exception {
         assertThat(corePackages()).contains("config", "db", "taxonomy", "library", "taxa", "search", "photos", "imports", "places",
                         "filters", "exports", "custom", "updates")
-                .doesNotContain("web", "imaging");
+                .doesNotContain("web", "imaging", "desktop");
     }
 
     @ParameterizedTest
