@@ -1,4 +1,4 @@
-package com.butterflyatlas.app.window.desktop;
+package com.butterflyatlas.app.desktop;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;

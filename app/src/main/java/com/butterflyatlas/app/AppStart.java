@@ -19,10 +19,10 @@ import com.butterflyatlas.app.window.SecondLaunch;
 import com.butterflyatlas.app.window.SessionKeys;
 import com.butterflyatlas.app.window.StartupFailure;
 import com.butterflyatlas.app.window.WindowLauncher;
-import com.butterflyatlas.app.window.desktop.BrowserWindows;
-import com.butterflyatlas.app.window.desktop.DesktopIntegration;
-import com.butterflyatlas.app.window.desktop.DesktopIntegrations;
-import com.butterflyatlas.app.window.desktop.NoDesktop;
+import com.butterflyatlas.app.desktop.BrowserWindows;
+import com.butterflyatlas.app.desktop.DesktopIntegration;
+import com.butterflyatlas.app.desktop.DesktopIntegrations;
+import com.butterflyatlas.app.desktop.NoDesktop;
 
 import java.awt.Desktop;
 import java.awt.GraphicsEnvironment;

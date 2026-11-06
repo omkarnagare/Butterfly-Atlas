@@ -2,7 +2,7 @@ package com.butterflyatlas.app.window;
 
 import com.butterflyatlas.app.testing.FakeProcess;
 import com.butterflyatlas.app.testing.TestClock;
-import com.butterflyatlas.app.window.desktop.NoDesktop;
+import com.butterflyatlas.app.desktop.NoDesktop;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

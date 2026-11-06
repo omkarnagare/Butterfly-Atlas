@@ -73,7 +73,7 @@ public final class PackageApp {
     /** The launcher's Java options for it: jpackage replaces $APPDIR with the app folder when the app starts. */
     static final List<String> JNA_OPTIONS = List.of("-Djna.boot.library.path=$APPDIR/" + JNA_FOLDER, "-Djna.nosys=true");
     /** The one place the Windows AppUserModelID is written in Java (app-icon contract §1), relative to the repository root. */
-    static final String WINDOWS_DESKTOP = "app/src/main/java/com/butterflyatlas/app/window/desktop/windows/WindowsDesktop.java";
+    static final String WINDOWS_DESKTOP = "app/src/main/java/com/butterflyatlas/app/desktop/windows/WindowsDesktop.java";
     /** How {@link #WINDOWS_DESKTOP} writes it, read from the source so the check needs no compiled classes. */
     static final Pattern APP_ID = Pattern.compile("static final String APP_ID = \"([^\"]+)\";");
     /** An Inno Setup {@code [Icons]} line's AppUserModelID parameter. */

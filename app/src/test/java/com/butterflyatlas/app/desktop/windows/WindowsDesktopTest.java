@@ -1,4 +1,4 @@
-package com.butterflyatlas.app.window.desktop.windows;
+package com.butterflyatlas.app.desktop.windows;
 
 import com.butterflyatlas.app.testing.TestClock;
 import com.butterflyatlas.app.window.AtlasLog;

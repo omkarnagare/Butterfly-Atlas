@@ -1,4 +1,4 @@
-package com.butterflyatlas.app.window.desktop;
+package com.butterflyatlas.app.desktop;
 
 import com.butterflyatlas.app.testing.TestClock;
 import com.butterflyatlas.app.window.AtlasLog;
@@ -45,11 +45,11 @@ class DesktopIntegrationsTest {
     @Test
     void windowsGetsItsTaskbarPieceAndFindsTheProfilesBrowserFromCommandLines() {
         assertThat(forOs("Windows 11", false, false))
-                .isInstanceOf(com.butterflyatlas.app.window.desktop.windows.WindowsDesktop.class);
+                .isInstanceOf(com.butterflyatlas.app.desktop.windows.WindowsDesktop.class);
         assertThat(forOs("Windows Server 2022", false, false))
-                .isInstanceOf(com.butterflyatlas.app.window.desktop.windows.WindowsDesktop.class);
+                .isInstanceOf(com.butterflyatlas.app.desktop.windows.WindowsDesktop.class);
         assertThat(DesktopIntegrations.profileHolder("Windows 10", log))
-                .isInstanceOf(com.butterflyatlas.app.window.desktop.windows.WindowsNative.class);
+                .isInstanceOf(com.butterflyatlas.app.desktop.windows.WindowsNative.class);
     }
 
     @Test

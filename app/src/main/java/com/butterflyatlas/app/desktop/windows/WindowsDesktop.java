@@ -1,10 +1,10 @@
-package com.butterflyatlas.app.window.desktop.windows;
+package com.butterflyatlas.app.desktop.windows;
 
 import com.butterflyatlas.app.window.AtlasLog;
 import com.butterflyatlas.app.window.WindowLauncher;
-import com.butterflyatlas.app.window.desktop.BrowserWindows;
-import com.butterflyatlas.app.window.desktop.DesktopIntegration;
-import com.butterflyatlas.app.window.desktop.OnceLog;
+import com.butterflyatlas.app.desktop.BrowserWindows;
+import com.butterflyatlas.app.desktop.DesktopIntegration;
+import com.butterflyatlas.app.desktop.OnceLog;
 
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;

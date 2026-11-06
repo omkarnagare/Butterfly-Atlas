@@ -1,6 +1,6 @@
-package com.butterflyatlas.app.window.desktop.windows;
+package com.butterflyatlas.app.desktop.windows;
 
-import com.butterflyatlas.app.window.desktop.ProfileHolder;
+import com.butterflyatlas.app.desktop.ProfileHolder;
 import com.sun.jna.Memory;
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;

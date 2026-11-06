@@ -17,8 +17,8 @@ import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
-import com.butterflyatlas.app.window.desktop.DesktopIntegration;
-import com.butterflyatlas.app.window.desktop.NoDesktop;
+import com.butterflyatlas.app.desktop.DesktopIntegration;
+import com.butterflyatlas.app.desktop.NoDesktop;
 
 /**
  * Opens the app window (design §2): the browser found, started with {@code --app=<address>}, its own profile folder in

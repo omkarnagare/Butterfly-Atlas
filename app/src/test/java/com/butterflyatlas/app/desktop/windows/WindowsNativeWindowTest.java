@@ -1,4 +1,4 @@
-package com.butterflyatlas.app.window.desktop.windows;
+package com.butterflyatlas.app.desktop.windows;
 
 import com.butterflyatlas.app.testing.WindowChecks;
 import com.sun.jna.platform.win32.User32;

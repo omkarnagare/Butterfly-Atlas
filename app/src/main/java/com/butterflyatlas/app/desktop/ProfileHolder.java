@@ -1,4 +1,4 @@
-package com.butterflyatlas.app.window.desktop;
+package com.butterflyatlas.app.desktop;
 
 import java.io.IOException;
 import java.nio.file.Files;

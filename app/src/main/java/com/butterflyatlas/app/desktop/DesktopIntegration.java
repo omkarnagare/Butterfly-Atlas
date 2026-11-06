@@ -1,4 +1,4 @@
-package com.butterflyatlas.app.window.desktop;
+package com.butterflyatlas.app.desktop;
 
 import java.time.Duration;
 import java.util.List;
@@ -6,7 +6,7 @@ import java.util.List;
 /**
  * The one interface the rest of the app uses for the app's icon in the Dock, the taskbar or the launcher (spec §3.1,
  * contract §4): a small OS-specific piece behind it per OS, chosen by {@link DesktopIntegrations#forThisOs}. Nothing
- * outside {@code window.desktop} checks which OS it runs on for this, and no method throws: a native call that fails, or
+ * outside {@code desktop} checks which OS it runs on for this, and no method throws: a native call that fails, or
  * JNA that will not load, is logged once and the icon then behaves as it did before (spec §3.4).
  */
 public interface DesktopIntegration {

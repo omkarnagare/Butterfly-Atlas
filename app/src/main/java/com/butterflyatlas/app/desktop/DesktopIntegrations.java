@@ -1,9 +1,9 @@
-package com.butterflyatlas.app.window.desktop;
+package com.butterflyatlas.app.desktop;
 
 import com.butterflyatlas.app.window.AtlasLog;
 import com.butterflyatlas.app.window.WindowLauncher;
-import com.butterflyatlas.app.window.desktop.windows.WindowsDesktop;
-import com.butterflyatlas.app.window.desktop.windows.WindowsNative;
+import com.butterflyatlas.app.desktop.windows.WindowsDesktop;
+import com.butterflyatlas.app.desktop.windows.WindowsNative;
 
 import java.util.Locale;
 import java.util.function.Supplier;

@@ -1,4 +1,4 @@
-package com.butterflyatlas.app.window.desktop;
+package com.butterflyatlas.app.desktop;
 
 import com.butterflyatlas.app.testing.FakeProcess;
 import com.butterflyatlas.app.testing.TestClock;
