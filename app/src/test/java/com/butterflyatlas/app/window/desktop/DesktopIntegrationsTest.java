@@ -43,6 +43,16 @@ class DesktopIntegrationsTest {
     }
 
     @Test
+    void windowsGetsItsTaskbarPieceAndFindsTheProfilesBrowserFromCommandLines() {
+        assertThat(forOs("Windows 11", false, false))
+                .isInstanceOf(com.butterflyatlas.app.window.desktop.windows.WindowsDesktop.class);
+        assertThat(forOs("Windows Server 2022", false, false))
+                .isInstanceOf(com.butterflyatlas.app.window.desktop.windows.WindowsDesktop.class);
+        assertThat(DesktopIntegrations.profileHolder("Windows 10", log))
+                .isInstanceOf(com.butterflyatlas.app.window.desktop.windows.WindowsNative.class);
+    }
+
+    @Test
     void anOsNotListedGetsNothing() {
         assertThat(forOs("FreeBSD", false, false)).isInstanceOf(NoDesktop.class);
         assertThat(forOs("SunOS", false, false)).isInstanceOf(NoDesktop.class);
