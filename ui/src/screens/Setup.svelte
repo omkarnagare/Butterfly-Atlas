@@ -1,6 +1,7 @@
 <script>
   import { onMount, tick } from 'svelte';
   import FolderBrowser from '../lib/FolderBrowser.svelte';
+  import DevicePage from '../lib/DevicePage.svelte';
   import Oakblue from '../lib/Oakblue.svelte';
   import { inspectFolder, retrySetup, setUpLibrary, usePreviousLibrary } from '../lib/api.js';
   import { OPENING_OLD_LIBRARY, USE_THIS_FOLDER, movedCopyLine, usePreviousLabel } from '../lib/messages.js';
@@ -42,6 +43,19 @@
   let previous = $derived((retried ?? status).previousFolder ?? null);
   let movedCopy = $derived((retried ?? status).movedCopy ?? null);
   let goingBack = $state(false);
+  // One device at a time (contract §1): the library is open on another device, hasn't finished syncing, or its unsent
+  // changes were discarded; its page replaces the folder chooser (lib/DevicePage.svelte).
+  let current = $derived(retried ?? status);
+  let elsewhere = $derived(Boolean(current.otherDevice || current.notSynced || current.discarded));
+
+  function deviceStatus(next) {
+    if (next?.configured) {
+      retried = null;
+      onDone();
+    } else {
+      retried = next;
+    }
+  }
 
   async function usePrevious() {
     if (goingBack || retrying) return;
@@ -153,6 +167,9 @@
   }
 </script>
 
+{#if elsewhere}
+  <DevicePage status={current} onStatus={deviceStatus} />
+{:else}
 <main class="wrap setup">
   <div class="setup-scene" aria-hidden="true">
     <Oakblue mode="perch" flower />
@@ -185,6 +202,7 @@
     {#if error}<p class="problem" role="alert">{error}</p>{/if}
   </div>
 </main>
+{/if}
 
 {#if choosing}
   <FolderBrowser setup returnFocus={() => chooseButton} onChoose={useChosen} onClose={back} />

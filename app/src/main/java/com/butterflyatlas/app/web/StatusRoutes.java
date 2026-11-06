@@ -12,6 +12,7 @@ import com.butterflyatlas.app.photos.PhotoStore;
 import com.butterflyatlas.app.photos.Rescan;
 import com.butterflyatlas.app.photos.Thumbnails;
 import com.butterflyatlas.app.placeupdates.PlaceNotes;
+import com.butterflyatlas.app.library.sync.LibrarySync;
 import com.butterflyatlas.app.updates.UpdateViews;
 import com.butterflyatlas.app.updates.Updates;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -38,7 +39,9 @@ import java.util.function.Supplier;
  * with every write that changes photos, so another window reloads them); and the saved look ({@code theme}, Meadow UI
  * contract §4: {@code device}, {@code light} or {@code dark}, from memory, so another window follows a change); and the change of
  * library folder running or waiting to be dismissed ({@code changing}, change-library-folder contract §2, null when
- * none) and, on the first run after a move, where the library is now ({@code libraryMoved}, until dismissed). A poll runs no SQL (design D9).
+ * none) and, on the first run after a move, where the library is now ({@code libraryMoved}, until dismissed); one device at a
+ * time's publishing failing ({@code publish}), the library opened on another device ({@code openedElsewhere}) and Home's
+ * one-time note ({@code syncNote}), one-device contract §2, from memory. A poll runs no SQL (design D9).
  */
 final class StatusRoutes {
 
@@ -47,7 +50,8 @@ final class StatusRoutes {
                   List<Imports.Working> stoppedImports, Exports.Status export, UpdateViews.Status taxonomyUpdate,
                   int splitsToSort, int customMatches, LibraryDrive.Problem library, PlaceNotes.Status placeUpdate,
                   Backups.Status backup, HeicStatus heic, List<Rescan.Left> rescanLeft, long libraryVersion, String theme,
-                  LibraryChange.Changing changing, SetupService.Moved libraryMoved) {
+                  LibraryChange.Changing changing, SetupService.Moved libraryMoved, LibrarySync.Publishing publish,
+                  LibrarySync.OpenedElsewhere openedElsewhere, String syncNote) {
     }
 
     private static final Logger LOG = LoggerFactory.getLogger(StatusRoutes.class);
@@ -65,6 +69,7 @@ final class StatusRoutes {
     private final Supplier<String> theme;
     private final Supplier<LibraryChange.Changing> changing;
     private final Supplier<SetupService.Moved> libraryMoved;
+    private final Supplier<LibrarySync.StatusPart> sync;
     /** The last known Recently deleted count, imports and export: answered while what is in memory is being read. */
     private volatile int lastDeleted;
     private volatile Imports.StatusPart lastImports = new Imports.StatusPart(null, List.of());
@@ -101,6 +106,16 @@ final class StatusRoutes {
                  Exports exports, Updates updates, LibraryDrive drive, PlaceNotes placeNotes, Backups backups,
                  Supplier<String> theme, Supplier<LibraryChange.Changing> changing,
                  Supplier<SetupService.Moved> libraryMoved) {
+        this(rescan, thumbnails, photos, processing, imports, exports, updates, drive, placeNotes, backups, theme, changing,
+                libraryMoved, () -> LibrarySync.StatusPart.NONE);
+    }
+
+    /** As above, with one device at a time's part ({@code sync}: publishing, opened elsewhere, Home's note). */
+    StatusRoutes(Rescan rescan, Thumbnails thumbnails, PhotoStore photos, ConsumerRunner processing, Imports imports,
+                 Exports exports, Updates updates, LibraryDrive drive, PlaceNotes placeNotes, Backups backups,
+                 Supplier<String> theme, Supplier<LibraryChange.Changing> changing,
+                 Supplier<SetupService.Moved> libraryMoved, Supplier<LibrarySync.StatusPart> sync) {
+        this.sync = sync;
         this.changing = changing;
         this.libraryMoved = libraryMoved;
         this.theme = theme;
@@ -145,10 +160,12 @@ final class StatusRoutes {
         exporting.ifPresent(part -> lastExport = part);
         backingUp.ifPresent(part -> lastBackup = part);
         Imports.StatusPart i = lastImports;
+        LibrarySync.StatusPart s = sync.get();
         return new Status(rescan.running(), rescan.progress(), thumbnails.progress(), lastDeleted, processing.progress(),
                 i.working(), i.stopped(), lastExport.export(), updates.status().orElse(null), updates.splitsToSort(),
                 updates.customMatches(), drive.problem(), placeNotes.status(), lastBackup.backup(), HeicStatus.current(),
-                rescan.left(), photos.libraryVersion(), theme.get(), changing.get(), libraryMoved.get());
+                rescan.left(), photos.libraryVersion(), theme.get(), changing.get(), libraryMoved.get(), s.publish(),
+                s.openedElsewhere(), s.syncNote());
     }
 
     /**

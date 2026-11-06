@@ -22,6 +22,11 @@ class DeviceWordingTest {
     private static final Path ROOT = Path.of("src/main/java/com/butterflyatlas/app");
     private static final Pattern BLOCK_COMMENT = Pattern.compile("/\\*.*?\\*/", Pattern.DOTALL);
     private static final Pattern LITERAL = Pattern.compile("\"(?:\\\\.|[^\"\\\\])*\"");
+    /**
+     * Names the operating systems give, which the app reads but never says: macOS's {@code scutil --get ComputerName} and
+     * Windows' {@code COMPUTERNAME} (one-device design §3: this device's name).
+     */
+    private static final java.util.Set<String> SYSTEM_NAMES = java.util.Set.of("\"ComputerName\"", "\"COMPUTERNAME\"");
 
     @Test
     void noStringSaysComputer() throws IOException {
@@ -33,7 +38,7 @@ class DeviceWordingTest {
                     if (line.strip().startsWith("//")) continue;
                     Matcher literal = LITERAL.matcher(line);
                     while (literal.find()) {
-                        if (literal.group().toLowerCase().contains("computer")) {
+                        if (literal.group().toLowerCase().contains("computer") && !SYSTEM_NAMES.contains(literal.group())) {
                             found.add(ROOT.relativize(source) + ": " + literal.group());
                         }
                     }

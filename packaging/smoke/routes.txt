@@ -16,6 +16,8 @@ POST /api/setup | setup
 GET /api/setup/inspect | setup
 POST /api/setup/retry | setup
 POST /api/setup/previous | setup
+POST /api/setup/open-anyway | setup
+POST /api/setup/discarded/continue | setup
 
 GET /api/appearance | appearance
 PUT /api/appearance | appearance
@@ -138,3 +140,7 @@ POST /api/library/change/cancel | library change
 POST /api/library/change/dismiss | library change
 POST /api/library/moved-note/dismiss | library change
 DELETE /api/library/old-copy | library change
+
+POST /api/library/publish | one device
+POST /api/library/sync-note/dismiss | one device
+POST /api/library/opened-elsewhere/quit | one device

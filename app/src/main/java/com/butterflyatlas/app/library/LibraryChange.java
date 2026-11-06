@@ -176,7 +176,7 @@ public final class LibraryChange {
     /** What a library is made of: all that Delete old copy removes (spec §9). */
     private static final List<String> LIBRARY_PARTS = List.of(Database.FILE_NAME, Database.FILE_NAME + "-wal",
             Database.FILE_NAME + "-shm", Database.FILE_NAME + "-journal", "images", ".thumbs", ".deleted", Library.INCOMING,
-            InstanceLock.FILE);
+            InstanceLock.FILE, "atlas-device.json");
 
     /**
      * {@code GET /api/library/change/inspect} (contract §3): the setup screen's check of the folder shown, the refusal of
@@ -213,6 +213,9 @@ public final class LibraryChange {
     private final ToLongFunction<Path> usableSpace;
     private final Background background;
     private final Switcher switcher;
+    /** One device at a time (one-device design §9): a move publishes first; once switched, the library is closed here. */
+    private volatile Runnable publishFirst = () -> { };
+    private volatile Runnable closeCurrent = () -> { };
     private final Object lock = new Object();
     /** One Delete old copy at a time. */
     private final Object deleting = new Object();
@@ -258,6 +261,16 @@ public final class LibraryChange {
         this.usableSpace = usableSpace;
         this.background = background;
         this.switcher = switcher;
+    }
+
+    /**
+     * One device at a time (one-device design §9): {@code publishFirst} publishes what is unsent before a move copies the
+     * library; {@code closeCurrent} publishes and marks the library closed once a change has switched to the new folder,
+     * before the app reopens.
+     */
+    public void syncWith(Runnable publishFirst, Runnable closeCurrent) {
+        this.publishFirst = publishFirst;
+        this.closeCurrent = closeCurrent;
     }
 
     /** The change running or waiting to be dismissed, else empty (from memory). */
@@ -699,6 +712,7 @@ public final class LibraryChange {
             }
             step(COPYING_DATABASE);
             stopIfCancelled();
+            closeQuietly(publishFirst, "publish the library before copying it");
             try {
                 steps.copyDatabase(library.get().database(), to.resolve(Database.FILE_NAME));
             } catch (IOException | RuntimeException e) {
@@ -721,6 +735,7 @@ public final class LibraryChange {
                         + " its settings folder can be written, then try again.", e);
             }
             LOG.info("Your library was copied to {} and checked; Butterfly Atlas switches to it", to);
+            closeQuietly(closeCurrent, "mark the old library closed");
             reopen(to);
         } catch (Cancelled c) {
             LOG.info("The move of the library to {} was cancelled", to);
@@ -809,6 +824,7 @@ public final class LibraryChange {
                         + " that its settings folder can be written, then try again.", e);
             }
             LOG.info("Butterfly Atlas switches to the library at {}", to);
+            closeQuietly(closeCurrent, "mark the library closed");
             reopen(to);
         } catch (Cancelled c) {
             LOG.info("The switch to the library at {} was cancelled", to);
@@ -831,6 +847,15 @@ public final class LibraryChange {
                         "Butterfly Atlas couldn't switch to the library at " + to + ". " + SetupService.UNEXPECTED, null,
                         null);
             }
+        }
+    }
+
+    /** Runs a one-device step whose failure is logged only (the working copy keeps what wasn't sent). */
+    private static void closeQuietly(Runnable step, String what) {
+        try {
+            step.run();
+        } catch (RuntimeException e) {
+            LOG.warn("Could not {}", what, e);
         }
     }
 
@@ -965,7 +990,8 @@ public final class LibraryChange {
         if (name.toLowerCase(Locale.ROOT).endsWith(Library.PART)) {
             return false;
         }
-        return relative.getNameCount() > 1 || !NOT_COPIED.contains(name);
+        // the device marker (and a sync app's copies of it) is the old folder's own: the new folder gets its own at its claim
+        return relative.getNameCount() > 1 || !NOT_COPIED.contains(name) && !name.startsWith("atlas-device");
     }
 
     /**

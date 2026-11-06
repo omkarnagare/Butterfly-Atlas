@@ -458,7 +458,7 @@ class ImportApiTest {
         assertThat(fields(get("api/status"))).containsExactly("rescanning", "rescan", "previews", "deletedCount",
                 "processing", "import", "stoppedImports", "export", "taxonomyUpdate", "splitsToSort", "customMatches",
                 "library", "placeUpdate", "backup", "heic", "rescanLeft", "libraryVersion", "theme", "changing",
-                "libraryMoved");
+                "libraryMoved", "publish", "openedElsewhere", "syncNote");
     }
 
     @Test

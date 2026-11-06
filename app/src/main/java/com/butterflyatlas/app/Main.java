@@ -37,6 +37,10 @@ import com.butterflyatlas.app.places.PlaceBundles;
 import com.butterflyatlas.app.places.PlaceSearch;
 import com.butterflyatlas.app.places.UserPlaces;
 import com.butterflyatlas.app.search.SearchService;
+import com.butterflyatlas.app.library.sync.Device;
+import com.butterflyatlas.app.library.sync.LibrarySync;
+import com.butterflyatlas.app.library.sync.MarkerFile;
+import com.butterflyatlas.app.library.sync.Ticker;
 import com.butterflyatlas.app.taxa.SearchWordService;
 import com.butterflyatlas.app.taxa.TaxonService;
 import com.butterflyatlas.app.taxonomy.TaxonomyBundles;
@@ -112,7 +116,8 @@ public final class Main {
      * its record so the next start reports the import as stopped (they need the library and the thumbnails, which a
      * filing batch adopts previews into); then the export's copy closes, waiting at most {@code ExportJobs.CLOSE_WAIT}
      * for the photo it is copying, whose progress is saved (the export stays running, so the next start pauses it as
-     * closing); then the thumbnails stop. The library's database stays open for the JVM's exit.
+     * closing); then the thumbnails stop; then (one device at a time) what is unsent is published and the library's marker
+ * closed. The library's database stays open for the JVM's exit.
      */
     static void shutdown(AtlasServer server, AtlasServices services) {
         // A taxonomy update's moves, import work and the export's copy are asked to stop first, so a long walk or copy
@@ -151,7 +156,14 @@ public final class Main {
                         try {
                             services.thumbnails().close();
                         } finally {
-                            services.placeNotes().close(); // its count under way ends before the library goes
+                            try {
+                                services.placeNotes().close(); // its count under way ends before the library goes
+                            } finally {
+                                if (services.sync() != null) {
+                                    // last, once nothing writes: what is unsent is published, and the marker closed
+                                    services.sync().close();
+                                }
+                            }
                         }
                     }
                 }
@@ -169,6 +181,11 @@ public final class Main {
                 .orElseGet(TaxonomyBundles::fromClasspath);
         PlaceBundles places = options.placesDir().map(PlaceBundles::fromDirectory).orElseGet(PlaceBundles::fromClasspath);
         LibraryHolder holder = new LibraryHolder();
+        // One device at a time (one-device design): each library is claimed for this device before it opens, and its live
+        // database is this device's working copy in the config folder, published to the library's atlas.db.
+        LibrarySync sync = new LibrarySync(options.configDir(), Device::systemName, clock, MarkerFile.Pause.REAL,
+                Ticker.real());
+        holder.whenOpened(sync::start);
         // The computer's HEIC decoder (Phase 7b): its working folder is the open library's .thumbs/.decode/.
         HeicDecoders heic = new HeicDecoders(() -> holder.current()
                 .map(library -> library.folder().resolve(Thumbnails.FOLDER).resolve(".decode")).orElse(null));
@@ -200,6 +217,9 @@ public final class Main {
         Updates updates = new Updates(holder::library, bundles, imports, exports, backups, clock);
         // a backup of Everything holds the photos while it copies them; it neither starts nor resumes while an import files
         backups.importFiling(imports::filing);
+        imports.onWorkEnded(sync::workEnded); // the library is published when an import's filing ends,
+        backups.onWorkEnded(sync::workEnded); // when a backup ends,
+        updates.whenFinished(sync::workEnded); // and when a taxonomy update ends (a place update runs as it opens)
         holder.whenOpened(library -> {
             library.photoHold().heldBy(backups::photoRefusal);
             library.openImports().filing(imports::filing); // a tag, place or species an import files with stays
@@ -237,7 +257,7 @@ public final class Main {
             Api.readStatus(photos, imports, exports, backups); // a status poll never reads the database
         }));
         SetupService setup = new SetupService(new ConfigStore(options.configDir()), holder, bundles, places, home, clock,
-                locks);
+                locks, sync);
         setup.startup(options.dataDir());
         PlaceSearch placeSearch = new PlaceSearch(() -> holder.library().database(), places);
         TaxonService taxa = new TaxonService(holder);
@@ -251,13 +271,16 @@ public final class Main {
         LibraryChange change = new LibraryChange(holder::library, setup, ChangeSteps.REAL, LibraryDrive::usableSpace,
                 LibraryChange.Background.of(holder::library), setup::rememberChange,
                 RunningWork.of(exports, backups, imports, updates, processing, startupWork::running));
-        return new AtlasServices(setup, taxa, new SearchWordService(holder, clock),
+        AtlasServices services = new AtlasServices(setup, taxa, new SearchWordService(holder, clock),
                 search, photos, photoQueries, new TagService(holder::library),
                 thumbnails, rescan, processing, new FolderBrowser(holder::current, imports.store(), home), imports,
                 placeSearch, new UserPlaces(() -> holder.library().database(), clock, placeSearch,
                         new ImportPlaceChoices(holder::library)),
                 photoPlaces, filters, exports, custom, updates, splits, new LibraryDrive(holder), placeNotes, backups, heic,
-                change);
+                change, sync);
+        sync.stopWorkWith(() -> beginClose(services)); // the library was opened on another device: work stops
+        change.syncWith(sync::publishNow, sync::close); // a move publishes first; a change closes the library here
+        return services;
     }
 
     /**

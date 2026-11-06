@@ -330,8 +330,9 @@ app's window quits it (wait ten seconds).
 
 Your **library** (photos and `atlas.db`) is the folder you chose on first run (suggested `Documents/Butterfly_Atlas`). The
 **config folder** (named by the system's standard location, so on Windows and macOS it is `Butterfly Atlas`, with a space, and
-on Linux `butterfly-atlas`) holds `config.json` (which library), `logs/atlas.log`, `browser_profile/` (the app window's own browser
-profile) and, while the app runs, `instance.json`:
+on Linux `butterfly-atlas`) holds `config.json` (which library), `device-id` (this device's random ID, see "Using one library
+on several devices" below), `libraries/` (this device's working copy of each library's database), `logs/atlas.log`,
+`browser_profile/` (the app window's own browser profile) and, while the app runs, `instance.json`:
 
 | | Config folder |
 |---|---|
@@ -342,6 +343,30 @@ profile) and, while the app runs, `instance.json`:
 Settings → About shows the version and all three folders. Uninstalling never touches any of them; to remove them by hand,
 quit the app and delete the config folder (and the library folder, only if you no longer want your photos).
 
+## Using one library on several devices
+
+You can keep your library folder inside a folder that Google Drive, OneDrive, Dropbox or a similar service keeps in step
+between your devices. That service's own app does the syncing; Butterfly Atlas never goes online. **Only one device uses a
+library at a time.**
+
+- **Put the library folder in the synced folder**: choose a folder there on first run, or use Settings → Library folder →
+  Move to move an existing library into it.
+- **Quit Butterfly Atlas before you switch devices**, and let your sync app finish, then open it on the other device. The
+  app sends its last changes to the library folder when it quits.
+- **Keep the folder available offline** so every photo is on the device: in Google Drive choose "Mirror files", in
+  OneDrive "Always keep on this device", in Dropbox "Available offline". A photo the sync app hasn't downloaded yet shows
+  as a photo that can't be read.
+
+How it works: the library holds a small file, `atlas-device.json`, naming the device that has it open. A library open on
+another device is refused, with the device's name and when it was last seen; if that device is off or asleep, **Open here
+anyway** is offered once it hasn't been seen for 15 minutes (changes it didn't send are then lost, and the app warns you
+first). While the app runs, it works on a copy of the database in this device's config folder (`libraries/`) and sends it
+to the library's `atlas.db` within a minute of each change, at once when an import or update ends, and when you quit, so
+the file the sync app sees is always complete. Every change is saved on this device straight away. If it can't
+(the drive is full, the sync app's drive is missing), a bar says so and it tries again once a minute; don't open the library
+on another device until the bar goes away. If changes made on a device couldn't be sent before another device changed the
+library, they are discarded at its next start, and it says so.
+
 ## Backing up and restoring
 
 Settings → **Back up now** (or the link on Home) copies the database (**Database and settings only**) or the database and
@@ -350,9 +375,9 @@ automatically. A backup is a plain folder: `atlas.db` (a complete, stand-alone c
 files come with it) and, for **Everything**, the species folders with the photos. Photos in Recently deleted are not in a
 backup.
 
-**To restore, quit Butterfly Atlas first.** The app keeps two helper files next to `atlas.db` while it works
-(`atlas.db-wal` and `atlas.db-shm`), and a copy of an older `atlas.db` laid over an old library folder can leave them
-behind: SQLite would then replay them onto the restored file. So restore into a **new, empty folder**:
+**To restore, quit Butterfly Atlas first.** While it runs, the app works on a copy of the database in this device's config
+folder (`libraries/`, see above), not on the library's `atlas.db`, and a restored library is opened as a library of its own
+(it gets a new working copy). Restore into a **new, empty folder**:
 
 1. Create a new empty folder, for example `Documents/Butterfly_Atlas_restored`, and copy the whole contents of the backup
    folder into it.
@@ -364,9 +389,9 @@ behind: SQLite would then replay them onto the restored file. So restore into a 
    saying so).
 3. Once everything looks right, you can delete the old library folder yourself; the app never does.
 
-If you would rather restore over the **same** library folder, first delete `atlas.db-wal` and `atlas.db-shm` in it (if they
-are there), then copy the backup's contents over it. The app opens it on the next start with no setup step, because the
-folder is the one it already remembers.
+If you would rather restore over the **same** library folder, copy the backup's contents over it (a library last opened by a
+version older than this one may still have `atlas.db-wal` and `atlas.db-shm` beside `atlas.db`: delete them first). The app
+opens it on the next start with no setup step, because the folder is the one it already remembers.
 
 If the app cannot find the remembered library folder at all (a lost drive, a deleted folder), it shows the same setup
 screen on start: choose the restored folder there.

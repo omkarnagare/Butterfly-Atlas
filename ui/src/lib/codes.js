@@ -31,6 +31,20 @@ export const LIBRARY_IN_USE = 'library_in_use';
 export const EXISTING_LIBRARY = 'existing_library';
 export const INSIDE_LIBRARY = 'inside_library';
 export const CURRENT_LIBRARY = 'current_library';
+/**
+ * One device at a time (one-device-library contract §1–§4): the setup status's two refusals (never sent as errors);
+ * Open here anyway too early or with no other device; Continue with nothing discarded; Try again of a publish that
+ * hasn't stopped; Quit with nothing opened elsewhere; and the gate's refusal of every request once the library was
+ * opened on another device while this one ran.
+ */
+export const LIBRARY_ON_OTHER_DEVICE = 'library_on_other_device';
+export const LIBRARY_NOT_SYNCED = 'library_not_synced';
+export const TOO_SOON = 'too_soon';
+export const NOT_ON_OTHER_DEVICE = 'not_on_other_device';
+export const NOTHING_DISCARDED = 'nothing_discarded';
+export const NOT_STOPPED = 'not_stopped';
+export const NOT_OPENED_ELSEWHERE = 'not_opened_elsewhere';
+export const LIBRARY_OPENED_ELSEWHERE = 'library_opened_elsewhere';
 /** The service could not be reached. */
 export const OFFLINE = 'offline';
 /** The service's answer could not be read. */

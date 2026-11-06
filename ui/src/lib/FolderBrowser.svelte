@@ -197,8 +197,9 @@
 <svelte:window onkeydown={onKey} />
 
 {#snippet icon(kind)}
-  <svg class="fb-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <svg class="fb-ic" data-kind={kind} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     {#if kind === 'home'}<path d="M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z" />
+    {:else if kind === 'cloud'}<path d="M7 18h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.2 9.1 4.5 4.5 0 0 0 7 18z" />
     {:else if kind === 'drive'}<rect x="3" y="13" width="18" height="7" rx="2" /><path d="M5 13 7.5 5h9L19 13M17 16.5h.01" />
     {:else}<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />{/if}
   </svg>

@@ -34,6 +34,7 @@
   import RescanLeftNote from '../lib/RescanLeftNote.svelte';
   import TagNamesNote from '../lib/TagNamesNote.svelte';
   import LibraryMovedNote from '../lib/LibraryMovedNote.svelte';
+  import SyncNote from '../lib/SyncNote.svelte';
   import { thumbRetry } from '../lib/thumbRetry.js';
   import { PAUSED, PENDING, RUNNING, WAITING } from '../lib/states.js';
   import { IMPORTS_THAT_STOPPED, PAUSED_EXPORT } from '../lib/messages.js';
@@ -155,6 +156,7 @@
   <LoadError message={error} onRetry={load} />
 {:else if summary}
   <LibraryMovedNote />
+  <SyncNote />
   {#if status.stoppedImports.length}
     <section class="stop-card" aria-label={IMPORTS_THAT_STOPPED}><StoppedImports stops={status.stoppedImports} label="" /></section>
   {/if}

@@ -457,6 +457,10 @@ public final class SmokeTest {
             Resp done = http.call("POST /api/setup", "/api/setup", "{\"dataFolder\":" + Json.quote(library.toString()) + "}", 200);
             expect(Json.parse(done.text()).bool("configured"), "setup did not configure the library: " + done.text());
             http.call("POST /api/setup/retry", "/api/setup/retry", "{}", null);
+            Resp anyway = http.call("POST /api/setup/open-anyway", "/api/setup/open-anyway", "{}", 409);
+            expect(anyway.text().contains("not_on_other_device"), "Open here anyway with no other device: " + anyway.text());
+            Resp discarded = http.call("POST /api/setup/discarded/continue", "/api/setup/discarded/continue", "{}", 409);
+            expect(discarded.text().contains("nothing_discarded"), "Continue with nothing discarded: " + discarded.text());
             Json session = Json.parse(http.call("GET /api/session", "/api/session", null, 200).text());
             expect(version.equals(session.str("version")), "the app says it is version " + session.str("version") + ", not " + version);
             expect("window".equals(session.str("mode")), "the session mode is " + session.str("mode"));
@@ -678,6 +682,13 @@ public final class SmokeTest {
             expect(previous.text().contains("no_previous"), "the old library without a change: " + previous.text());
             Json status = Json.parse(http.call("GET /api/status", "/api/status", null, 200).text());
             expect(status.isNull("changing") && status.isNull("libraryMoved"), "the status names a change: " + status);
+            expect(status.isNull("publish") && status.isNull("openedElsewhere"), "the status says publishing failed or the"
+                    + " library was opened elsewhere: " + status);
+            Resp publish = http.call("POST /api/library/publish", "/api/library/publish", "{}", 409);
+            expect(publish.text().contains("not_stopped"), "Try again while publishing works: " + publish.text());
+            Resp quit = http.call("POST /api/library/opened-elsewhere/quit", "/api/library/opened-elsewhere/quit", "{}", 409);
+            expect(quit.text().contains("not_opened_elsewhere"), "Quit while the library is open only here: " + quit.text());
+            http.call("POST /api/library/sync-note/dismiss", "/api/library/sync-note/dismiss", "{}", 204);
         }
 
         void export() throws Exception {
@@ -1243,9 +1254,9 @@ public final class SmokeTest {
                         expect(r.next() && "ok".equals(r.getString(1)), "the copied " + db + " fails integrity_check");
                     }
                     try (ResultSet r = s.executeQuery("SELECT MAX(CAST(version AS INTEGER)) FROM flyway_schema_history WHERE success = 1")) {
-                        // The newest migration (V15, tag names): raise this with every new migration.
-                        expect(r.next() && r.getInt(1) == 15, "the copied database is at schema version "
-                                + (r.getInt(1)) + ", not 15");
+                        // The newest migration (V16, sync state): raise this with every new migration.
+                        expect(r.next() && r.getInt(1) == 16, "the copied database is at schema version "
+                                + (r.getInt(1)) + ", not 16");
                     }
                     try (ResultSet r = s.executeQuery("SELECT COUNT(*) FROM image")) {
                         expect(r.next() && r.getInt(1) == 4, "the copied database has " + r.getInt(1) + " photos, not 4");

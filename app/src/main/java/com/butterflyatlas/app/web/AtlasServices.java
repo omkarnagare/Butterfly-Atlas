@@ -21,17 +21,34 @@ import com.butterflyatlas.app.placeupdates.PlaceNotes;
 import com.butterflyatlas.app.places.PlaceSearch;
 import com.butterflyatlas.app.places.UserPlaces;
 import com.butterflyatlas.app.search.SearchService;
+import com.butterflyatlas.app.library.sync.LibrarySync;
 import com.butterflyatlas.app.taxa.SearchWordService;
 import com.butterflyatlas.app.taxa.TaxonService;
 import com.butterflyatlas.app.updates.SplitSorter;
 import com.butterflyatlas.app.updates.Updates;
 
-/** Everything the HTTP layer calls. Built once in {@code Main}; tests build their own. */
+/**
+ * Everything the HTTP layer calls. Built once in {@code Main}; tests build their own. {@code sync} is one device at a
+ * time (null in tests whose libraries open in place).
+ */
 public record AtlasServices(SetupService setup, TaxonService taxa, SearchWordService searchWords, SearchService search,
                             PhotoStore photos, PhotoQueries photoQueries, TagService tags, Thumbnails thumbnails,
                             Rescan rescan, ConsumerRunner processing, FolderBrowser folders,
                             Imports imports, PlaceSearch placeSearch, UserPlaces places, PhotoPlaces photoPlaces,
                             FilterQuery filters, Exports exports, CustomSpecies custom, Updates updates,
                             SplitSorter splits, LibraryDrive drive, PlaceNotes placeNotes, Backups backups,
-                            HeicDecoders heic, LibraryChange change) {
+                            HeicDecoders heic, LibraryChange change, LibrarySync sync) {
+
+    /** Without one device at a time: libraries open in place (tests of other features). */
+    public AtlasServices(SetupService setup, TaxonService taxa, SearchWordService searchWords, SearchService search,
+                         PhotoStore photos, PhotoQueries photoQueries, TagService tags, Thumbnails thumbnails,
+                         Rescan rescan, ConsumerRunner processing, FolderBrowser folders,
+                         Imports imports, PlaceSearch placeSearch, UserPlaces places, PhotoPlaces photoPlaces,
+                         FilterQuery filters, Exports exports, CustomSpecies custom, Updates updates,
+                         SplitSorter splits, LibraryDrive drive, PlaceNotes placeNotes, Backups backups,
+                         HeicDecoders heic, LibraryChange change) {
+        this(setup, taxa, searchWords, search, photos, photoQueries, tags, thumbnails, rescan, processing, folders, imports,
+                placeSearch, places, photoPlaces, filters, exports, custom, updates, splits, drive, placeNotes, backups, heic,
+                change, null);
+    }
 }

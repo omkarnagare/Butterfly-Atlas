@@ -14,6 +14,7 @@ import {
   cancelBackup, checkBackup, clearBackups, deleteBackup, getBackup, getBackups, pauseBackup, resumeBackup, setBackupPreference, startBackup,
   getAppearance, setAppearance,
   cancelChange, deleteOldCopy, dismissChange, dismissMovedNote, getLibraryChange, inspectChange, moveLibrary, switchLibrary, usePreviousLibrary,
+  continueDiscarded, dismissSyncNote, openHereAnyway, publishAgain, quitOpenedElsewhere,
 } from './api.js';
 
 afterEach(() => {
@@ -755,5 +756,39 @@ test('a request refused because the library folder is changing tells the page, s
   await expect(getUpdate()).rejects.toMatchObject({ code: 'library_changing', status: 409 });
   expect(heard).toHaveBeenCalledTimes(1);
   expect(heard.mock.calls[0][0].detail.code).toBe('library_changing');
+  window.removeEventListener('atlas:library-problem', heard);
+});
+
+// One device at a time (contract §1–§2): every route, its method, address and body.
+test('the one-device routes', async () => {
+  const fetchMock = vi.fn(async (url) => (/sync-note/.test(url)
+    ? { ok: true, status: 204, json: async () => null }
+    : { ok: true, status: /publish|quit/.test(url) ? 202 : 200, json: async () => ({ answer: url }) }));
+  vi.stubGlobal('fetch', fetchMock);
+
+  await expect(openHereAnyway()).resolves.toEqual({ answer: './api/setup/open-anyway' });
+  await continueDiscarded();
+  await expect(publishAgain()).resolves.toEqual({ answer: './api/library/publish' });
+  await expect(dismissSyncNote()).resolves.toBeNull();
+  await quitOpenedElsewhere();
+
+  expect(fetchMock.mock.calls.map(([url, init]) => [init.method, url.replace('./api/', ''), init.body ?? null])).toEqual([
+    ['POST', 'setup/open-anyway', '{}'],
+    ['POST', 'setup/discarded/continue', '{}'],
+    ['POST', 'library/publish', '{}'],
+    ['POST', 'library/sync-note/dismiss', '{}'],
+    ['POST', 'library/opened-elsewhere/quit', '{}'],
+  ]);
+});
+
+test('a request refused because the library was opened on another device tells the page, so its page shows at once', async () => {
+  const heard = vi.fn();
+  window.addEventListener('atlas:library-problem', heard);
+  vi.stubGlobal('fetch', vi.fn(async () => ({
+    ok: false, status: 409, json: async () => ({ error: { code: 'library_opened_elsewhere', message: 'This device has stopped saving to your library.' } }),
+  })));
+  await expect(getUpdate()).rejects.toMatchObject({ code: 'library_opened_elsewhere', status: 409, message: 'This device has stopped saving to your library.' });
+  expect(heard).toHaveBeenCalledTimes(1);
+  expect(heard.mock.calls[0][0].detail.code).toBe('library_opened_elsewhere');
   window.removeEventListener('atlas:library-problem', heard);
 });

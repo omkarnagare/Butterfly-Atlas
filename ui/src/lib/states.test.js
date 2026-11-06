@@ -21,5 +21,9 @@ test('the states keep their wire words', () => {
     ITEM_UNSUPPORTED: 'unsupported',
     ITEM_FAILED: 'failed',
     ITEM_MISSING: 'missing',
+    PUBLISH_RETRYING: 'retrying',
+    PUBLISH_STOPPED: 'stopped',
+    SYNC_SENT_LAST_SESSION: 'sent_last_session',
+    SYNC_BEFORE_OTHER_DEVICE: 'before_other_device',
   });
 });

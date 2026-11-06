@@ -33,6 +33,8 @@ public final class ExportJobs implements AutoCloseable {
     private final String threadName;
     /** Records that a copy stopped on an error (the facade pauses it), so it is never left running with no worker. */
     private final LongConsumer failed;
+    /** Told each time a copy ends, however it ended (a backup's end publishes the library: one-device design §5). */
+    private volatile Runnable ended = () -> { };
     private final Object lock = new Object();
     /** The export asked for and not begun yet (guarded by lock). */
     private Long wanted;
@@ -54,6 +56,11 @@ public final class ExportJobs implements AutoCloseable {
         this.work = work;
         this.failed = failed;
         this.threadName = threadName;
+    }
+
+    /** {@code listener} is told on the copying thread each time a copy ends, however it ended. */
+    public void onEnded(Runnable listener) {
+        this.ended = listener;
     }
 
     /** Copies the export in the background (once the startup releases a hold); a no-op if it is already being copied. */
@@ -245,6 +252,11 @@ public final class ExportJobs implements AutoCloseable {
                     running = null;
                     stop = Stop.NONE;
                     lock.notifyAll();
+                }
+                try {
+                    ended.run();
+                } catch (RuntimeException e) {
+                    LOG.warn("A listener of the end of a copy ({}) failed", threadName, e);
                 }
             }
         }

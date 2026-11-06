@@ -72,6 +72,8 @@ public final class ImportJobs implements AutoCloseable {
     private boolean closed;
     /** Phases that ended with an error (guarded by lock). */
     private int failures;
+    /** Told each time an import's work ends (its filing among it): one-device design §5 publishes then. */
+    private volatile Runnable ended = () -> { };
     /**
      * While true no filing starts (the startup's rescan and other photo-file steps are still running; guarded by lock).
      * Walking and reading go on: they never touch the library's photos.
@@ -103,6 +105,11 @@ public final class ImportJobs implements AutoCloseable {
             wanted.clear();
             lock.notifyAll();
         }
+    }
+
+    /** {@code listener} is told on the import's thread each time an import's work (walking, reading, filing) ends. */
+    public void onEnded(Runnable listener) {
+        this.ended = listener;
     }
 
     /** Lets held filing start. */
@@ -318,6 +325,11 @@ public final class ImportJobs implements AutoCloseable {
                     paused.remove(runId);
                     cancelled.remove(runId);
                     lock.notifyAll();
+                }
+                try {
+                    ended.run();
+                } catch (RuntimeException e) {
+                    LOG.warn("A listener of the end of an import's work failed", e);
                 }
             }
         }

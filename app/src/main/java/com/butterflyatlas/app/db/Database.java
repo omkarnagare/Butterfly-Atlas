@@ -14,6 +14,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.OptionalInt;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.UnaryOperator;
 
 /**
@@ -33,12 +34,20 @@ public final class Database {
 
     private final Path file;
     private final SQLiteDataSource dataSource;
+    /** Whether the schema has {@code sync_state} (V16): every write transaction then marks the database dirty. */
+    private final boolean tracked;
+    /** The tracked write transactions begun since it opened, and those of them that have ended (committed or not). */
+    private final AtomicLong writes = new AtomicLong();
+    private final AtomicLong ended = new AtomicLong();
+    /** Told after each tracked write that changed a row commits (the publisher's debounce); keep it quick. */
+    private volatile Runnable onWrite = () -> { };
     /** Wraps each connection: as it is in the app; tests make one fail in ways SQLite never does on demand. */
     private volatile UnaryOperator<Connection> connections = UnaryOperator.identity();
 
-    private Database(Path file, SQLiteDataSource dataSource) {
+    private Database(Path file, SQLiteDataSource dataSource, boolean tracked) {
         this.file = file;
         this.dataSource = dataSource;
+        this.tracked = tracked;
     }
 
     /**
@@ -74,7 +83,14 @@ public final class Database {
         } catch (RuntimeException e) {
             throw new DatabaseException("Could not prepare the database " + file, e);
         }
-        return new Database(file, dataSource);
+        boolean tracked;
+        try (Connection c = dataSource.getConnection(); Statement st = c.createStatement();
+             ResultSet rs = st.executeQuery("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sync_state'")) {
+            tracked = rs.next();
+        } catch (SQLException e) {
+            throw new DatabaseException("Could not prepare the database " + file, e);
+        }
+        return new Database(file, dataSource, tracked);
     }
 
     /** The newest schema version this app ships a migration for. */
@@ -182,9 +198,39 @@ public final class Database {
         }
     }
 
-    /** Runs work in one transaction: committed if it returns, rolled back if it throws. */
+    /**
+     * Runs work in one transaction: committed if it returns, rolled back if it throws. When it changed a row, the same
+     * transaction marks the database dirty (one-device design §5: it has changes the library folder hasn't had yet).
+     */
     public <T> T write(Work<T> work) {
         return write(work, () -> { });
+    }
+
+    /**
+     * A write of the sync state itself (publishing, claiming): it does not mark the database dirty, is not counted and is
+     * not heard.
+     */
+    public <T> T writeUntracked(Work<T> work) {
+        return write(work, () -> { }, false);
+    }
+
+    /** The tracked write transactions begun since the database opened (a write during a publish shows here). */
+    public long writes() {
+        return writes.get();
+    }
+
+    /**
+     * Whether a tracked write transaction may be under way now (begun and not ended): a copy made now may or may not hold
+     * it.
+     */
+    public boolean writing() {
+        long done = ended.get();
+        return writes.get() != done;
+    }
+
+    /** {@code listener} is told after each tracked write commits, on the writing thread; keep it quick. */
+    public void onWrite(Runnable listener) {
+        this.onWrite = listener;
     }
 
     /**
@@ -194,15 +240,47 @@ public final class Database {
      * even if something fails afterwards, so a caller can put back files it moved inside the work.
      */
     public <T> T write(Work<T> work, Runnable undo) {
+        return write(work, undo, true);
+    }
+
+    private <T> T write(Work<T> work, Runnable undo, boolean track) {
+        if (track) {
+            writes.incrementAndGet(); // before the transaction: a publish that reads the count later sees this write
+        }
+        try {
+            return transaction(work, undo, track);
+        } finally {
+            if (track) {
+                ended.incrementAndGet();
+            }
+        }
+    }
+
+    private <T> T transaction(Work<T> work, Runnable undo, boolean track) {
         boolean committed = false;
+        boolean changed = false;
+        T done;
         boolean undone = false;
         try (Connection connection = connection()) {
             connection.setAutoCommit(false);
             try {
                 T result = work.apply(connection);
+                if (track && tracked) {
+                    // a transaction that changed no row leaves nothing to publish (opening a library re-syncs its place
+                    // list, which usually changes nothing)
+                    try (Statement st = connection.createStatement();
+                         ResultSet rs = st.executeQuery("SELECT total_changes()")) {
+                        changed = rs.next() && rs.getLong(1) > 0;
+                    }
+                    if (changed) {
+                        try (Statement st = connection.createStatement()) {
+                            st.executeUpdate("UPDATE sync_state SET value = '1' WHERE key = 'dirty' AND value IS NOT '1'");
+                        }
+                    }
+                }
                 connection.commit();
                 committed = true;
-                return result;
+                done = result;
             } catch (SQLException | RuntimeException | Error e) {
                 if (!committed) {
                     undone = true;
@@ -226,5 +304,13 @@ public final class Database {
                 undo.run(); // failed before the work began (no connection): nothing was moved, harmless
             }
         }
+        if (changed) {
+            try {
+                onWrite.run();
+            } catch (RuntimeException e) {
+                org.slf4j.LoggerFactory.getLogger(Database.class).warn("A listener of the database's writes failed", e);
+            }
+        }
+        return done;
     }
 }
