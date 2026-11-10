@@ -118,3 +118,23 @@ test('Esc in the box with text clears it and keeps the dialog; in the empty box 
   await fireEvent.keyDown(box, { key: 'Escape' });
   expect(onClose).toHaveBeenCalledOnce();
 });
+
+test('while a tag is being created, Apply waits: it is aria-disabled and sends nothing', async () => {
+  let finish;
+  createTag.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+  const onApply = vi.fn(async () => {});
+  render(BulkTagDialog, { photos, tags, onApply, onClose: vi.fn() });
+  await fireEvent.click(screen.getByRole('checkbox', { name: 'female' }));
+  await fireEvent.input(screen.getByRole('searchbox'), { target: { value: 'roosting' } });
+  await fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Enter' });
+
+  const apply = screen.getByRole('button', { name: 'Apply' });
+  expect(apply.getAttribute('aria-disabled')).toBe('true');
+  await fireEvent.click(apply);
+  expect(onApply).not.toHaveBeenCalled();
+
+  finish({ id: 22, key: 'roosting', label: 'roosting', source: 'user', photoCount: 0 });
+  await vi.waitFor(() => expect(apply.getAttribute('aria-disabled')).toBe('false'));
+  await fireEvent.click(apply);
+  expect(onApply).toHaveBeenCalledOnce();
+});

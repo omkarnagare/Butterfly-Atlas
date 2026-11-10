@@ -17,7 +17,8 @@
    * In `mode` 'tag' a name no tag has can be created: `createTag`, then `await onCreated(tag)` (the screen reads its
    * tags again), then `onToggle(tag.key)`; a refusal shows under the box and `onCreated(null)` still re-reads (another
    * window may have made the same tag a moment ago). In 'filter' mode (the Tags filter) there is no Create.
-   * While `disabled` (the screen is busy) chips, matches and Create are aria-disabled and do nothing.
+   * While `disabled` (the screen is busy) chips, matches and Create are aria-disabled and do nothing. `creating` (bindable)
+   * is true while a Create runs, so the screen can hold its own Add or Apply until the new tag is known.
    *
    * Keys in the box: Enter chooses the tag named exactly what is typed, else the first match, else Create; Esc with text
    * clears it and goes no further. Esc in an empty box is left to the dialog or popover behind, except with
@@ -26,13 +27,12 @@
    */
   let {
     tags = [], stateOf, onToggle, mode = 'tag', onCreated = async () => {}, disabled = false, scope = null, label = 'Tags',
-    tristate = false, blurOnEmptyEscape = false,
+    tristate = false, blurOnEmptyEscape = false, creating = $bindable(false),
   } = $props();
 
   const uid = $props.id();
   let box = $state(null);
   let query = $state('');
-  let creating = $state(false);
   let refusal = $state('');
   let gone = false;
   onDestroy(() => {

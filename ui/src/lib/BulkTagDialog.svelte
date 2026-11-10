@@ -21,6 +21,7 @@
   const initial = untrack(() => Object.fromEntries(tags.map((tag) => [tag.key, stateOf(tag.key)])));
   let states = $state({ ...initial });
   let busy = $state(false);
+  let creating = $state(false);
   let error = $state('');
 
   let add = $derived(tags.map((t) => t.key).filter((key) => states[key] === 'all' && initial[key] !== 'all'));
@@ -35,7 +36,8 @@
   }
 
   async function apply() {
-    if (busy) return;
+    // A tag being created is marked once it is known: Apply waits for it.
+    if (busy || creating) return;
     busy = true;
     error = '';
     try {
@@ -50,10 +52,10 @@
 <Dialog title="Tag {photos.length === 1 ? '1 photo' : `${photos.length} photos`}" {onClose}>
   <p class="muted">A dash means some of these photos have the tag. Press a tag to put it on all of them; press again to take it off.</p>
   <TagPicker {tags} tristate stateOf={(key) => PICKER[states[key] ?? 'none']} onToggle={toggle} onCreated={onTagsChanged}
-             disabled={busy} />
+             disabled={busy} bind:creating />
   {#if error}<p class="problem" role="alert">{error}</p>{/if}
   {#snippet actions()}
     <button class="btn ghost" type="button" onclick={onClose}>Cancel</button>
-    <button class="btn" type="button" disabled={!add.length && !remove.length} aria-disabled={busy} onclick={apply}>Apply</button>
+    <button class="btn" type="button" disabled={!add.length && !remove.length} aria-disabled={busy || creating} onclick={apply}>Apply</button>
   {/snippet}
 </Dialog>

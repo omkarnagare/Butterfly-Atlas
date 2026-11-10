@@ -39,6 +39,7 @@
   let chooseButton = $state(null);
   let picked = $state([]);
   let chosen = $state([]);
+  let creatingTag = $state(false);
   let items = $state(null);
   let summary = $state(null);
   let over = $state(false);
@@ -103,6 +104,8 @@
   }
 
   async function send() {
+    // A tag being created may be one of the chosen: Add waits for it.
+    if (creatingTag) return;
     const batch = picked.map((p) => p.file);
     const keys = tags.filter((t) => chosen.includes(t.key)).map((t) => t.key);
     items = batch.map((file) => ({ file, state: 'waiting', result: null, message: '' }));
@@ -219,7 +222,7 @@
         <div>
           <div class="lbl2">Tag these photos <span class="muted">(optional, you can tag later)</span></div>
           <TagPicker {tags} label="Tags for these photos" stateOf={(key) => (chosen.includes(key) ? 'on' : 'off')} onToggle={toggleTag}
-                     onCreated={onTagsChanged} disabled={sending} />
+                     onCreated={onTagsChanged} disabled={sending} bind:creating={creatingTag} />
         </div>
       {:else}
         <div class="progress">
@@ -273,7 +276,7 @@
     <div class="sh-f">
       {#if items === null}
         <button class="btn ghost" type="button" onclick={close}>Cancel</button>
-        <button class="btn" type="button" disabled={!picked.length} onclick={send}>
+        <button class="btn" type="button" disabled={!picked.length} aria-disabled={creatingTag} onclick={send}>
           {picked.length ? `Add ${picked.length} ${picked.length === 1 ? 'photo' : 'photos'}` : 'Add photos'}
         </button>
       {:else if sending}

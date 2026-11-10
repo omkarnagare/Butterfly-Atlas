@@ -411,3 +411,25 @@ test('Esc in the tag box with text clears it and keeps the sheet; in the empty b
   await fireEvent.keyDown(box, { key: 'Escape' });
   expect(onClose).toHaveBeenCalledOnce();
 });
+
+test('while a tag is being created, Add waits: it is aria-disabled and sends nothing', async () => {
+  let finish;
+  createTag.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+  uploadPhoto.mockImplementation(async () => added(1));
+  const onClose = vi.fn();
+  render(AddPhotosSheet, { taxon, tags, onClose });
+  await choose(jpeg('a.jpg'));
+  const box = screen.getByRole('searchbox');
+  await fireEvent.input(box, { target: { value: 'roosting' } });
+  await fireEvent.keyDown(box, { key: 'Enter' });
+
+  const add = screen.getByRole('button', { name: 'Add 1 photo' });
+  expect(add.getAttribute('aria-disabled')).toBe('true');
+  await fireEvent.click(add);
+  expect(uploadPhoto).not.toHaveBeenCalled();
+
+  finish({ id: 21, key: 'roosting', label: 'roosting', source: 'user', photoCount: 0 });
+  await vi.waitFor(() => expect(add.getAttribute('aria-disabled')).toBe('false'));
+  await fireEvent.click(add);
+  await vi.waitFor(() => expect(uploadPhoto).toHaveBeenCalledOnce());
+});
