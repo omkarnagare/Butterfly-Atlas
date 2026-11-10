@@ -66,7 +66,7 @@ class TagNamesMigrationTest {
     }
 
     private Database migrate() {
-        return Database.open(dir.resolve(Database.FILE_NAME));
+        return Database.open(dir.resolve(Database.FILE_NAME), "15");
     }
 
     private static List<String> rows(Database db, String sql) {

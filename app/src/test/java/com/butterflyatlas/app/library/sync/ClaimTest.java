@@ -114,7 +114,7 @@ class ClaimTest {
         assertThat(snapshot(folderA).generation()).isEqualTo(1);
         assertThat(marker(folderA).generation()).isEqualTo(1);
         assertThat(a.has("old")).isTrue();
-        assertThat(Database.newestSchemaVersion(folderA.resolve(Database.FILE_NAME))).hasValue(16); // a V15 app refuses it
+        assertThat(Database.newestSchemaVersion(folderA.resolve(Database.FILE_NAME))).hasValue(17); // a V16 app refuses it
     }
 
     @Test
