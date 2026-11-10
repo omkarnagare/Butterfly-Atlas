@@ -27,8 +27,9 @@ import java.util.stream.Stream;
  *   java packaging/scripts/PackageApp.java installers --work DIR --root REPO --version 1.0.0 --dist DIR [--linux-types deb,rpm]
  * </pre>
  *
- * {@code DIR} is packaging/target/work: {@code in/} (the app's own jar), {@code libs/} (the libraries, untouched),
- * and what this makes: {@code runtime/} (the trimmed Java runtime), {@code app/} (the jars jpackage takes), {@code image/}
+ * {@code DIR} is packaging/target/work.noindex (the .noindex keeps Spotlight from listing the build copies of the .app,
+ * jpackage's temp folders included, since they are made inside it): {@code in/} (the app's own jar), {@code libs/} (the
+ * libraries, untouched), and what this makes: {@code runtime/} (the trimmed Java runtime), {@code app/} (the jars jpackage takes), {@code image/}
  * (the application image, which the smoke test runs) and the installers, moved to {@code --dist} under one naming scheme.
  * On Windows the installer is made by Inno Setup from the same application image. Any failing step ends the build and
  * says which one.

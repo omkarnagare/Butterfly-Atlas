@@ -26,6 +26,11 @@
     <properties>
         <!-- Linux only: which installers to build (-Dpackaging.linuxTypes=rpm on a machine without dpkg). -->
         <packaging.linuxTypes>deb,rpm</packaging.linuxTypes>
+        <!-- The packaging work folder. Its name ends in .noindex so Spotlight never indexes it: the build copies of the
+             .app in it (image/ and jpackage's own temp folders, which PackageApp keeps inside it) then never appear in
+             Spotlight next to the installed app, where opening one by mistake would run a build against the real
+             library. -->
+        <packaging.work>${project.build.directory}/work.noindex</packaging.work>
     </properties>
 
     <profiles>
@@ -48,7 +53,7 @@
                                 <configuration>
                                     <includeArtifactIds>butterfly-atlas-app</includeArtifactIds>
                                     <stripVersion>true</stripVersion>
-                                    <outputDirectory>${project.build.directory}/work/in</outputDirectory>
+                                    <outputDirectory>${packaging.work}/in</outputDirectory>
                                 </configuration>
                             </execution>
                             <execution>
@@ -60,7 +65,7 @@
                                 <configuration>
                                     <excludeArtifactIds>butterfly-atlas-app</excludeArtifactIds>
                                     <includeScope>runtime</includeScope>
-                                    <outputDirectory>${project.build.directory}/work/libs</outputDirectory>
+                                    <outputDirectory>${packaging.work}/libs</outputDirectory>
                                 </configuration>
                             </execution>
                         </executions>
@@ -119,7 +124,7 @@
                                         <argument>${project.basedir}/scripts/PackageApp.java</argument>
                                         <argument>runtime</argument>
                                         <argument>--work</argument>
-                                        <argument>${project.build.directory}/work</argument>
+                                        <argument>${packaging.work}</argument>
                                     </arguments>
                                 </configuration>
                             </execution>
@@ -134,7 +139,7 @@
                                         <argument>${project.basedir}/scripts/PackageApp.java</argument>
                                         <argument>image</argument>
                                         <argument>--work</argument>
-                                        <argument>${project.build.directory}/work</argument>
+                                        <argument>${packaging.work}</argument>
                                         <argument>--root</argument>
                                         <argument>${project.basedir}/..</argument>
                                         <argument>--version</argument>
@@ -154,7 +159,7 @@
                                         <argument>${project.basedir}/scripts/PackageApp.java</argument>
                                         <argument>check-mac-image</argument>
                                         <argument>--work</argument>
-                                        <argument>${project.build.directory}/work</argument>
+                                        <argument>${packaging.work}</argument>
                                     </arguments>
                                 </configuration>
                             </execution>
@@ -169,7 +174,7 @@
                                         <argument>${project.basedir}/scripts/PackageApp.java</argument>
                                         <argument>smoke</argument>
                                         <argument>--work</argument>
-                                        <argument>${project.build.directory}/work</argument>
+                                        <argument>${packaging.work}</argument>
                                         <argument>--root</argument>
                                         <argument>${project.basedir}/..</argument>
                                         <argument>--version</argument>
@@ -188,7 +193,7 @@
                                         <argument>${project.basedir}/scripts/PackageApp.java</argument>
                                         <argument>installers</argument>
                                         <argument>--work</argument>
-                                        <argument>${project.build.directory}/work</argument>
+                                        <argument>${packaging.work}</argument>
                                         <argument>--root</argument>
                                         <argument>${project.basedir}/..</argument>
                                         <argument>--version</argument>
