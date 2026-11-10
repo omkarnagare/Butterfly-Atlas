@@ -23,8 +23,9 @@
    * "Checking for a HEIC decoder…" and the line is decided once the check is over: shown (the sheet waits for Done), or
    * the sheet closes by itself as after any clean add (review fix U11). While a backup holds the photos
    * (`status.backup.holdsPhotos`, several-windows A5) Add sends nothing and says why, as the server would.
-   * The batch's tags are a TagPicker (behaviour tags §4): a tag created there has the screen read its tags again
-   * (`onTagsChanged`) before it is chosen, since only keys found in `tags` are sent.
+   * The batch's tags are a TagPicker (behaviour tags §4): a tag created there is given to the screen
+   * (`onTagsChanged(tag)`), which keeps it and reads its tags again, before it is chosen, since only keys found in `tags`
+   * are sent.
    */
   let { taxon, tags = [], files = [], onAdded = () => {}, onTagsChanged = async () => {}, onClose } = $props();
 
@@ -218,7 +219,7 @@
         <div>
           <div class="lbl2">Tag these photos <span class="muted">(optional, you can tag later)</span></div>
           <TagPicker {tags} label="Tags for these photos" stateOf={(key) => (chosen.includes(key) ? 'on' : 'off')} onToggle={toggleTag}
-                     onCreated={() => onTagsChanged()} disabled={sending} />
+                     onCreated={onTagsChanged} disabled={sending} />
         </div>
       {:else}
         <div class="progress">

@@ -72,7 +72,7 @@ test('a tag created here: the screen reads its tags again, then the new tag is m
   const group = within(screen.getByRole('group', { name: 'Tags' }));
   await vi.waitFor(() => expect(group.getByRole('checkbox', { name: 'roosting' }).getAttribute('aria-checked')).toBe('true'));
   const chip = group.getByRole('checkbox', { name: 'roosting' });
-  expect(onTagsChanged).toHaveBeenCalledOnce();
+  expect(onTagsChanged).toHaveBeenCalledWith(roosting);
   await fireEvent.click(chip);
   expect(chip.getAttribute('aria-checked')).toBe('false');
   // on none of them before, none now: nothing to send

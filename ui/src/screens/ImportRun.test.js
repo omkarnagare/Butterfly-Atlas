@@ -186,6 +186,28 @@ test('a tag created in Tag photos: the tags are read again, the new one is marke
   expect(tagItems).toHaveBeenCalledWith(3, [4], ['roosting'], []);
 });
 
+test('Tag photos in Import applies a tag just created even when the tags can\'t be read again, and says why', async () => {
+  const roosting = { id: 30, key: 'roosting', label: 'roosting', source: 'user', photoCount: 0 };
+  createTag.mockResolvedValue(roosting);
+  tagItems.mockResolvedValue(page([item(4, { taxonId: 'A6', tags: ['roosting'] })]));
+  await open();
+  getTags.mockRejectedValue(new Error('Butterfly Atlas could not reach its service.'));
+
+  await fireEvent.click(tile(4));
+  await fireEvent.keyDown(window, { key: 't' });
+  const dialog = screen.getByRole('dialog', { name: 'Tag 1 photo' });
+  const box = within(dialog).getByRole('searchbox');
+  await fireEvent.input(box, { target: { value: 'roosting' } });
+  await fireEvent.keyDown(box, { key: 'Enter' });
+
+  const tags = within(within(dialog).getByRole('group', { name: 'Tags' }));
+  await vi.waitFor(() => expect(tags.getByRole('checkbox', { name: 'roosting' }).getAttribute('aria-checked')).toBe('true'));
+  expect(tags.getByRole('checkbox', { name: 'male' })).toBeTruthy();
+  expect(await screen.findByText('Butterfly Atlas could not reach its service.')).toBeTruthy();
+  await fireEvent.click(within(dialog).getByRole('button', { name: 'Apply' }));
+  expect(tagItems).toHaveBeenCalledWith(3, [4], ['roosting'], []);
+});
+
 test('accepts a folder\'s suggestions, and skips the photos already in the library in one go', async () => {
   acceptSuggestions.mockResolvedValue(page([item(2, { taxonId: 'A5', suggestedTaxonId: 'A5' }), item(3, { taxonId: 'A5', suggestedTaxonId: 'A5' })]));
   skipItems.mockResolvedValue(page([item(5, { libraryTaxonId: 'A5', skipped: true })]));

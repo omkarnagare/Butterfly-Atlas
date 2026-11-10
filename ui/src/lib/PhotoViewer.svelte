@@ -22,13 +22,14 @@
    * Full-screen photo viewer over the species page (prototype openLB), always dark. It opens by growing
    * out of the clicked thumbnail; ← → keys, swipes and the strip move between photos; + − 0 zoom. The
    * side panel (lib/PhotoEdits) edits the photo's tags and place, sets it as the species cover, moves it to another
-   * species or deletes it. After a change the page reads the photos again (`onChanged`).
+   * species or deletes it. After a change the page reads the photos again (`onChanged`); a tag created there is given
+   * to the page with `onTagsChanged(tag)` (by default `onChanged`).
    *
    * `tag` and `place` are the gallery filters from the address (?tag=, ?place=<id|unknown>): paging stays within the
    * photos matching both, and `type` (?type=, a file type, Phase 7a) to photos of that type. A filter the photo no
    * longer matches (a stale link, a tag or place just changed) is dropped.
    */
-  let { taxon, photos, photoId, tag = null, place = null, type = null, tags = [], onChanged = async () => {}, onClose } = $props();
+  let { taxon, photos, photoId, tag = null, place = null, type = null, tags = [], onChanged = async () => {}, onTagsChanged = onChanged, onClose } = $props();
 
   let root = $state(null);
   let closeButton = $state(null);
@@ -139,7 +140,7 @@
       {#if list.length > 1}<button class="lb-nav n" type="button" aria-label={NEXT_PHOTO} onclick={() => go(1)}>›</button>{/if}
     </div>
     <aside class="lb-side" aria-label={ABOUT_THIS_PHOTO}>
-      <PhotoEdits {photo} species={taxon} {tags} {onChanged} onTagsChanged={onChanged} onLeft={leave} />
+      <PhotoEdits {photo} species={taxon} {tags} {onChanged} {onTagsChanged} onLeft={leave} />
       <p class="muted keys">← → photos · + − zoom · 0 fit · Esc close</p>
     </aside>
     <div class="lb-strip" bind:this={strip}>

@@ -7,7 +7,7 @@
    * Tag many photos at once. Each tag shows whether all, some or none of the chosen photos carry it;
    * pressing it puts it on all of them, pressing again takes it off all. Only changes are sent.
    * The tags are a tristate TagPicker (behaviour tags §4): built-in tags, the user tags some or all of the photos carry,
-   * and the search box. A tag created there has the screen read its tags again (`onTagsChanged`), then is marked "all"
+   * and the search box. A tag created there is given to the screen (`onTagsChanged(tag)`), which keeps it and reads its tags again, then is marked "all"
    * (it starts as "none": no photo carries it).
    */
   let { photos, tags = [], onApply, onClose, onTagsChanged = async () => {} } = $props();
@@ -49,7 +49,7 @@
 
 <Dialog title="Tag {photos.length === 1 ? '1 photo' : `${photos.length} photos`}" {onClose}>
   <p class="muted">A dash means some of these photos have the tag. Press a tag to put it on all of them; press again to take it off.</p>
-  <TagPicker {tags} tristate stateOf={(key) => PICKER[states[key] ?? 'none']} onToggle={toggle} onCreated={() => onTagsChanged()}
+  <TagPicker {tags} tristate stateOf={(key) => PICKER[states[key] ?? 'none']} onToggle={toggle} onCreated={onTagsChanged}
              disabled={busy} />
   {#if error}<p class="problem" role="alert">{error}</p>{/if}
   {#snippet actions()}

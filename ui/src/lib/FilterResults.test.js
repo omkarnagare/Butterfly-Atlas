@@ -13,7 +13,11 @@ vi.mock('./api.js', () => ({
   displayUrl: (id) => `./api/photos/${id}/display`,
 }));
 
-vi.mock('./toast.svelte.js', () => ({ showToast: vi.fn() }));
+// showProblem says a problem through showToast (its links are checked in Toast.test.js)
+vi.mock('./toast.svelte.js', () => {
+  const showToast = vi.fn();
+  return { showToast, showProblem: (e) => showToast(e.message) };
+});
 
 const count = (query) => ({ photos: 2, species: 1, photographedSpecies: 1, bytes: 1000, manualSpecies: false, filter: { ...EMPTY, query } });
 const photo = (id) => ({
@@ -137,4 +141,23 @@ test('a tag created in Explore\'s viewer: the screen reads its tags again (tags 
   expect(getTags.mock.invocationCallOrder[1]).toBeLessThan(setPhotoTags.mock.invocationCallOrder[0]);
   // the new tag is known to the screen: once the results are read again its chip shows on the photo, pressed
   await vi.waitFor(() => expect(screen.getByRole('button', { name: 'roosting' }).getAttribute('aria-pressed')).toBe('true'));
+});
+
+test('a tag created in Explore\'s viewer while the tags can\'t be read again is kept, goes on the photo, and the screen says why', async () => {
+  const roosting = { id: 21, key: 'roosting', label: 'roosting', source: 'user', photoCount: 0 };
+  createTag.mockResolvedValue(roosting);
+  setPhotoTags.mockResolvedValue({});
+  openEditable();
+  await screen.findByRole('button', { name: 'female' });
+  await vi.waitFor(() => expect(getTags).toHaveBeenCalledOnce());
+  getTags.mockRejectedValue(new Error('Butterfly Atlas could not reach its service.'));
+  filterPhotos.mockResolvedValue({ photos: [photo(1), { ...photo(2), tags: ['female', 'roosting'] }, photo(3)], next: null });
+
+  await fireEvent.input(screen.getByRole('searchbox', { name: 'Find or add a tag' }), { target: { value: 'roosting' } });
+  await fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Enter' });
+
+  await vi.waitFor(() => expect(setPhotoTags).toHaveBeenCalledWith(2, ['female', 'roosting']));
+  expect(showToast).toHaveBeenCalledWith('Butterfly Atlas could not reach its service.');
+  await vi.waitFor(() => expect(screen.getByRole('button', { name: 'roosting' }).getAttribute('aria-pressed')).toBe('true'));
+  expect(screen.getByRole('button', { name: 'female' })).toBeTruthy();
 });

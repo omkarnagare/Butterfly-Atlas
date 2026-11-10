@@ -48,6 +48,18 @@ export function tagNamed(tags, query) {
   return (tags ?? []).find((tag) => searchForm(tag.label) === wanted) ?? null;
 }
 
+/**
+ * `tags` with `tag` in its place in tag order (TagService.ORDER: built-in tags first as they are, then the user's by
+ * name without case), for a tag just created; the list as it is when it already has the key.
+ */
+export function withTag(tags, tag) {
+  const list = tags ?? [];
+  if (list.some((each) => each.key === tag.key)) return list;
+  const name = tag.label.toLowerCase();
+  const at = list.findIndex((each) => each.source !== 'builtin' && (tag.source === 'builtin' || each.label.toLowerCase() > name));
+  return at === -1 ? [...list, tag] : [...list.slice(0, at), tag, ...list.slice(at)];
+}
+
 /** How many words a formed name has. */
 export const tagWords = (name) => (name ? name.split('_').length : 0);
 

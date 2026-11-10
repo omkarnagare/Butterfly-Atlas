@@ -14,7 +14,8 @@
    * `species`, moving it to another species or deleting it. After a change the viewer reads the photos again
    * (`onChanged`); moving or deleting takes the photo out, and `onLeft()` lets the viewer move on before it does.
    * A refusal shows in the panel's alert. The tags are a TagPicker (behaviour tags §4) over this photo: a tag created
-   * there has the screen read its tags again (`onTagsChanged`) before it goes on the photo.
+   * there is given to the screen (`onTagsChanged(tag)`, null after a refused Create), which keeps it and reads its tags
+   * again, before it goes on the photo.
    */
   let { photo, species, tags = [], onChanged = async () => {}, onTagsChanged = async () => {}, onLeft } = $props();
 
@@ -84,7 +85,7 @@
 
 <h3>Tags</h3>
 <TagPicker {tags} label="Tags on this photo" stateOf={(key) => (photo.tags.includes(key) ? 'on' : 'off')} onToggle={toggleTag}
-           onCreated={() => onTagsChanged()} disabled={busy} scope={photo.id} blurOnEmptyEscape />
+           onCreated={onTagsChanged} disabled={busy} scope={photo.id} blurOnEmptyEscape />
 {#if !photo.tags.length}<p class="muted">Untagged</p>{/if}
 <h3>Place</h3>
 {#if photo.place}

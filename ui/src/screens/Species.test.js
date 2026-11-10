@@ -746,3 +746,69 @@ test('a species not photographed yet: its outline over a small meadow', async ()
   expect(container.querySelector('.emptyp > svg.bf-out')).not.toBeNull();
   expect(container.querySelector('.emptyp > svg.meadow').getAttribute('aria-hidden')).toBe('true');
 });
+
+test('a tag created while its tags can\'t be read again is kept and still goes on the photo; the page says why', async () => {
+  const roosting = { id: 21, key: 'roosting', label: 'roosting', source: 'user', photoCount: 0 };
+  getTaxon.mockResolvedValue(plainTiger({ species: { got: 1, total: 1 }, photoCount: 1 }));
+  getPhotos.mockResolvedValue([photo(1, ['larva'])]);
+  createTag.mockResolvedValue(roosting);
+  setPhotoTags.mockResolvedValue({});
+  render(Species, { id: 'A5', photoId: 1 });
+  render(Toast);
+  const box = await screen.findByRole('searchbox', { name: 'Find or add a tag' });
+  getTags.mockRejectedValue(new Error('Butterfly Atlas could not reach its service.'));
+  // read again after Create (not on the photo yet), then after the photo's tags changed
+  getPhotos.mockResolvedValueOnce([photo(1, ['larva'])]).mockResolvedValue([photo(1, ['larva', 'roosting'])]);
+
+  await fireEvent.input(box, { target: { value: 'roosting' } });
+  await fireEvent.keyDown(box, { key: 'Enter' });
+
+  await vi.waitFor(() => expect(setPhotoTags).toHaveBeenCalledWith(1, ['larva', 'roosting']));
+  expect(await screen.findByText('Butterfly Atlas could not reach its service.')).toBeTruthy();
+  // the list is not emptied: the built-in tags and the new one are still there
+  const group = within(screen.getByRole('group', { name: 'Tags on this photo' }));
+  expect(group.getByRole('button', { name: 'egg' })).toBeTruthy();
+  await vi.waitFor(() => expect(group.getByRole('button', { name: 'roosting' }).getAttribute('aria-pressed')).toBe('true'));
+});
+
+test('Add photos sends a tag just created even when the tags can\'t be read again', async () => {
+  const roosting = { id: 21, key: 'roosting', label: 'roosting', source: 'user', photoCount: 0 };
+  getTaxon.mockResolvedValue(plainTiger({ species: { got: 1, total: 2 }, photoCount: 1 }));
+  getPhotos.mockResolvedValue([photo(1, [])]);
+  createTag.mockResolvedValue(roosting);
+  uploadPhoto.mockResolvedValue({ status: 'added', photo: photo(2, ['roosting']), otherTaxon: null, firstForSpecies: false, milestone: null, speciesCount: 1 });
+  render(Species, { id: 'A5' });
+
+  await fireEvent.click(await screen.findByRole('button', { name: '+ Add photos' }));
+  getTags.mockRejectedValue(new Error('Butterfly Atlas could not reach its service.'));
+  const box = screen.getByRole('searchbox', { name: 'Find or add a tag' });
+  await fireEvent.input(box, { target: { value: 'roosting' } });
+  await fireEvent.keyDown(box, { key: 'Enter' });
+  const group = within(screen.getByRole('group', { name: 'Tags for these photos' }));
+  await vi.waitFor(() => expect(group.getByRole('button', { name: 'roosting' }).getAttribute('aria-pressed')).toBe('true'));
+  expect(group.getByRole('button', { name: 'larva' })).toBeTruthy();
+
+  await fireEvent.change(screen.getByLabelText('Choose photos'), { target: { files: [jpeg('a.jpg')] } });
+  await fireEvent.click(screen.getByRole('button', { name: 'Add 1 photo' }));
+  await vi.waitFor(() => expect(uploadPhoto).toHaveBeenCalledWith('A5', expect.anything(), expect.objectContaining({ tags: ['roosting'] })));
+});
+
+test('Tag photos applies a tag just created even when the tags can\'t be read again', async () => {
+  const roosting = { id: 21, key: 'roosting', label: 'roosting', source: 'user', photoCount: 0 };
+  createTag.mockResolvedValue(roosting);
+  editTags.mockResolvedValue({});
+  await selectTwo();
+  getTags.mockRejectedValue(new Error('Butterfly Atlas could not reach its service.'));
+
+  await fireEvent.click(screen.getByRole('button', { name: 'Tag' }));
+  const dialog = screen.getByRole('dialog', { name: 'Tag 2 photos' });
+  const box = within(dialog).getByRole('searchbox');
+  await fireEvent.input(box, { target: { value: 'roosting' } });
+  await fireEvent.keyDown(box, { key: 'Enter' });
+  const tags = within(within(dialog).getByRole('group', { name: 'Tags' }));
+  await vi.waitFor(() => expect(tags.getByRole('checkbox', { name: 'roosting' }).getAttribute('aria-checked')).toBe('true'));
+  expect(tags.getByRole('checkbox', { name: 'larva' })).toBeTruthy();
+  await fireEvent.click(within(dialog).getByRole('button', { name: 'Apply' }));
+  await vi.waitFor(() => expect(editTags).toHaveBeenCalled());
+  expect(editTags.mock.calls[0]).toEqual(expect.arrayContaining([['roosting']]));
+});

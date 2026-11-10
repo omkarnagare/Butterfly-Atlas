@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { ADULT_KEYS, checkTagName, formTagName, labeller, matchTags, tagNamed, tagWords } from './tags.js';
+import { ADULT_KEYS, checkTagName, formTagName, labeller, matchTags, tagNamed, tagWords, withTag } from './tags.js';
 import {
   FIND_A_TAG, FIND_OR_ADD_A_TAG, TAG_NAME_EMPTY, TAG_NAME_TOO_LONG, TAG_NAME_TOO_MANY_WORDS, createTag, moreTags, noTagCalled, tagNameTaken,
 } from './messages.js';
@@ -98,4 +98,14 @@ test('the tag named exactly what is typed, after its one form and without case',
   expect(tagNamed(ALL, 'dsf')?.key).toBe('dsf');
   expect(tagNamed(ALL, 'lantana')).toBeNull();
   expect(tagNamed(ALL, '')).toBeNull();
+});
+
+test('a tag just created goes into a list in tag order: built-in tags as they are, then the user\'s A–Z without case', () => {
+  const list = [tag('egg', 'egg', 'builtin'), tag('dsf', 'DSF', 'builtin'), tag('Basking'), tag('wet_sand')];
+  expect(keys(withTag(list, tag('roosting')))).toEqual(['egg', 'dsf', 'Basking', 'roosting', 'wet_sand']);
+  expect(keys(withTag(list, tag('apple', 'Apple')))).toEqual(['egg', 'dsf', 'apple', 'Basking', 'wet_sand']);
+  expect(keys(withTag(list, tag('zebra')))).toEqual(['egg', 'dsf', 'Basking', 'wet_sand', 'zebra']);
+  expect(keys(withTag([tag('egg', 'egg', 'builtin')], tag('a')))).toEqual(['egg', 'a']);
+  expect(withTag(list, tag('wet_sand'))).toBe(list); // already there: the list as it is
+  expect(keys(withTag(null, tag('a')))).toEqual(['a']);
 });

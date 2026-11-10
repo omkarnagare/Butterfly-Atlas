@@ -68,6 +68,8 @@ test('a tag created in the viewer: the screen reads its tags again (onTagsChange
 
   await vi.waitFor(() => expect(order).toEqual(['re-read', 'set male,roosting']));
   expect(createTag).toHaveBeenCalledWith('roosting');
+  // the screen is given the new tag, so it can keep it even if reading its tags again fails
+  expect(onTagsChanged).toHaveBeenCalledWith(expect.objectContaining({ key: 'roosting' }));
 });
 
 test('while a change is being saved the picker does nothing', async () => {

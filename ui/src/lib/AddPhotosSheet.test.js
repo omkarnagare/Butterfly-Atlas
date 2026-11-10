@@ -392,7 +392,7 @@ test('the tags are a picker: a user tag is found by typing, and a new one is cre
   await fireEvent.input(box, { target: { value: 'roosting' } });
   await fireEvent.keyDown(box, { key: 'Enter' });
   await vi.waitFor(() => expect(screen.getByRole('button', { name: 'roosting' }).getAttribute('aria-pressed')).toBe('true'));
-  expect(onTagsChanged).toHaveBeenCalledOnce();
+  expect(onTagsChanged).toHaveBeenCalledWith(roosting);
 
   await choose(jpeg('a.jpg'));
   await fireEvent.click(screen.getByRole('button', { name: 'Add 1 photo' }));
