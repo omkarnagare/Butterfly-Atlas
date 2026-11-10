@@ -99,6 +99,7 @@ final class SessionRoutes {
                 throw new ApiException(503, "closing", "Butterfly Atlas is closing.");
             }
             ctx.json(new Launch(keys.newKey()));
+            session.windowComing().run(); // the second launch's browser hands its window to ours
         });
         app.get("/api/session", ctx -> {
             SetupService.Status status = setup.status();
@@ -122,6 +123,7 @@ final class SessionRoutes {
     private void stream(SseClient client) {
         client.keepAlive();
         session.quit().opened();
+        session.windowConnected().run();
         AtomicBoolean ended = new AtomicBoolean();
         ScheduledFuture<?>[] ping = new ScheduledFuture<?>[1];
         StatusEvents.Stream told = () -> {

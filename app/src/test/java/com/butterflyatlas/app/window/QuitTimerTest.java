@@ -46,6 +46,53 @@ class QuitTimerTest {
     }
 
     @Test
+    void whenTheBrowserHasNoWindowLeftItQuitsAtTheNextTick() {
+        QuitTimer timer = timer(10, 60, true);
+        timer.windowsGone(() -> true);
+        timer.opened();
+        timer.closed();
+
+        ticks(timer, 1);
+
+        assertThat(quits).singleElement().asString().contains("closed");
+        ticks(timer, 5);
+        assertThat(quits).hasSize(1);
+    }
+
+    @Test
+    void aWindowStillThereKeepsTheWholeWaitAndItIsAskedAgainEachSecond() {
+        // a reload, waking from sleep or a minimised window: the stream dropped but the window is there
+        QuitTimer timer = timer(10, 60, true);
+        List<Boolean> answers = new ArrayList<>(List.of(false, false, true));
+        timer.windowsGone(() -> answers.isEmpty() ? false : answers.remove(0));
+        timer.opened();
+        timer.closed();
+
+        ticks(timer, 2);
+        assertThat(quits).isEmpty();
+        ticks(timer, 1);
+
+        assertThat(quits).hasSize(1);
+    }
+
+    @Test
+    void theWindowsAreNotAskedAboutWhileOneIsConnectedOrBeforeAnyHasBeen() {
+        QuitTimer timer = timer(10, 60, true);
+        List<String> asked = new ArrayList<>();
+        timer.windowsGone(() -> {
+            asked.add("asked");
+            return true;
+        });
+
+        ticks(timer, 3); // none connected yet: the start wait, not the windows
+        timer.opened();
+        ticks(timer, 3);
+
+        assertThat(asked).isEmpty();
+        assertThat(quits).isEmpty();
+    }
+
+    @Test
     void aNewStreamCancelsTheCount() {
         QuitTimer timer = timer(10, 60, true);
         timer.opened();

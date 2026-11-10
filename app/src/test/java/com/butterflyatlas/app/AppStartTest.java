@@ -11,6 +11,8 @@ import com.butterflyatlas.app.window.InstancePointer;
 import com.butterflyatlas.app.window.SecondLaunch;
 import com.butterflyatlas.app.window.StartupFailure;
 import com.butterflyatlas.app.window.WindowLauncher;
+import com.butterflyatlas.app.desktop.DesktopIntegration;
+import com.butterflyatlas.app.desktop.NoDesktop;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -92,7 +94,218 @@ class AppStartTest {
                 throw new java.io.IOException("cannot start " + command);
             }
             return new FakeProcess();
-        }, SecondLaunch::system, lockWait, defaultPort, console::add, () -> appPath);
+        }, SecondLaunch::system, lockWait, defaultPort, console::add, () -> appPath, (noBrowser, windows, l, mode, path) -> {
+            desktopMade.add(noBrowser);
+            return desktop;
+        });
+    }
+
+    /** The desktop piece the start is given: it says what it is asked, in order. */
+    private final class FakeDesktop extends NoDesktop {
+        final List<String> calls = new CopyOnWriteArrayList<>();
+        volatile DesktopIntegration.Events events;
+        volatile boolean closes = true;
+        volatile boolean forwards = true;
+        volatile boolean clickAtStart;
+
+        @Override
+        public List<String> browserArguments() {
+            return List.of("--fake-desktop");
+        }
+
+        @Override
+        public void start(DesktopIntegration.Events events) {
+            this.events = events;
+            calls.add("start, pointer " + (new InstancePointer(config).read().isPresent() ? "written" : "not written"));
+            if (clickAtStart) {
+                events.iconClicked().run();
+            }
+        }
+
+        @Override
+        public boolean bringForward() {
+            calls.add("forward");
+            return forwards;
+        }
+
+        @Override
+        public void windowComing() {
+            calls.add("coming");
+        }
+
+        @Override
+        public void windowConnected() {
+            calls.add("connected");
+        }
+
+        @Override
+        public boolean closeWindows(Duration wait) {
+            calls.add("close " + wait.toSeconds() + "s, exits " + exits);
+            return closes;
+        }
+    }
+
+    private final FakeDesktop desktop = new FakeDesktop();
+    private final List<Boolean> desktopMade = new CopyOnWriteArrayList<>();
+
+    private void awaitExit() throws InterruptedException {
+        long deadline = System.nanoTime() + 5_000_000_000L;
+        while (exits.isEmpty() && System.nanoTime() < deadline) {
+            Thread.sleep(10);
+        }
+    }
+
+    @Test
+    void theDesktopStartsBeforeTheServerAndItsArgumentsReachTheBrowserWhichItHearsIsComing() throws Exception {
+        AppStart.Running app = start(options(false, 0, Optional.empty()));
+
+        assertThat(app).isNotNull();
+        assertThat(desktopMade).containsExactly(false);
+        assertThat(desktop.calls).startsWith("start, pointer not written");
+        assertThat(desktop.events).isNotNull();
+        assertThat(started).hasSize(1);
+        assertThat(started.get(0)).endsWith("--fake-desktop");
+        assertThat(desktop.calls).contains("coming");
+    }
+
+    @Test
+    void aWindowsStreamTellsTheDesktopItConnected() throws Exception {
+        AppStart.Running app = start(options(true, 0, Optional.empty()));
+        String cookie = cookie(app);
+
+        try (Socket socket = new Socket(InetAddress.getByName("127.0.0.1"), app.server().port())) {
+            socket.setSoTimeout(5000);
+            socket.getOutputStream().write(("GET /api/session/stream HTTP/1.1\r\nHost: 127.0.0.1:" + app.server().port()
+                    + "\r\nAccept: text/event-stream\r\nCookie: " + cookie + "\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+            String line;
+            do {
+                line = in.readLine();
+            } while (line != null && !line.equals(": open"));
+            assertThat(line).isEqualTo(": open");
+            assertThat(desktop.calls).contains("connected");
+        }
+        assertThat(desktop.calls).as("the second launch's key").contains("coming");
+    }
+
+    @Test
+    void aQuitFromTheOsClosesTheWindowsFirstThenQuitsWithoutAsking() throws Exception {
+        AppStart.Running app = start(options(false, 0, Optional.empty()));
+
+        desktop.events.quit().run();
+        awaitExit();
+
+        assertThat(desktop.calls).contains("close 5s, exits []");
+        assertThat(exits).containsExactly(0);
+        assertThat(Files.readString(log.file())).contains("Quit from the Dock or the OS.");
+        assertThat(app).isNotNull();
+    }
+
+    @Test
+    void aQuitFromTheOsStillQuitsWhenTheWindowsDoNotClose() throws Exception {
+        desktop.closes = false;
+        start(options(false, 0, Optional.empty()));
+
+        desktop.events.quit().run();
+        awaitExit();
+
+        assertThat(exits).containsExactly(0);
+    }
+
+    @Test
+    void newWindowFromTheOsOpensOneMoreWindowAsTheNewWindowButtonDoes() throws Exception {
+        start(options(false, 0, Optional.empty()));
+        assertThat(started).hasSize(1);
+
+        desktop.events.newWindow().run();
+
+        assertThat(started).hasSize(2);
+        assertThat(started.get(1)).endsWith("--fake-desktop");
+    }
+
+    private void awaitCall(String call) throws InterruptedException {
+        long deadline = System.nanoTime() + 5_000_000_000L;
+        while (!desktop.calls.contains(call) && System.nanoTime() < deadline) {
+            Thread.sleep(10);
+        }
+    }
+
+    @Test
+    void aClickWhileTheFirstWindowIsOnItsWayBringsItForwardAndOpensNoOther() {
+        start(options(false, 0, Optional.empty()));
+
+        desktop.events.iconClicked().run();
+
+        assertThat(desktop.calls).contains("forward");
+        assertThat(started).hasSize(1);
+    }
+
+    @Test
+    void aClickWhileTheFirstWindowIsComingOpensNoSecondOneEvenWhenItCannotBeBroughtForward() {
+        // right after the start the browser process is not known yet (hand check, step 9: two windows opened)
+        desktop.forwards = false;
+        start(options(false, 0, Optional.empty()));
+
+        desktop.events.iconClicked().run();
+
+        assertThat(desktop.calls).contains("forward");
+        assertThat(started).hasSize(1);
+    }
+
+    @Test
+    void aClickWhileTheAppStartsIsHeldAndActedOnOnceItIsReadyWithOneWindow() throws Exception {
+        desktop.clickAtStart = true;
+        start(options(false, 0, Optional.empty()));
+
+        awaitCall("forward");
+
+        assertThat(desktop.calls).containsSubsequence("start, pointer not written", "coming", "forward");
+        assertThat(started).hasSize(1);
+    }
+
+    @Test
+    void aClickWhileTheAppQuitsStartsTheInstalledAppAgainAfterTheQuit() throws Exception {
+        Path program = Files.createFile(home.resolve("Butterfly Atlas"));
+        appPath = program.toString();
+        start(options(false, 0, Optional.empty()));
+
+        desktop.events.quit().run();
+        desktop.events.iconClicked().run();
+        awaitExit();
+        long deadline = System.nanoTime() + 5_000_000_000L;
+        while (!started.contains(List.of(program.toString())) && System.nanoTime() < deadline) {
+            Thread.sleep(10);
+        }
+
+        assertThat(exits).containsExactly(0);
+        assertThat(started).containsOnlyOnce(List.of(program.toString()));
+        assertThat(Files.readString(log.file())).contains("it started again");
+    }
+
+    @Test
+    void aClickWhileADevelopmentRunQuitsStartsNothingAndSaysWhy() throws Exception {
+        appPath = null;
+        start(options(false, 0, Optional.empty()));
+
+        desktop.events.quit().run();
+        desktop.events.iconClicked().run();
+        awaitExit();
+        Thread.sleep(100);
+
+        assertThat(started).hasSize(1);
+        assertThat(Files.readString(log.file())).contains("it does not start again");
+    }
+
+    @Test
+    void aSecondLaunchStartsNoDesktop() throws Exception {
+        start(options(true, 0, Optional.empty()));
+        desktopMade.clear();
+
+        AppStart second = new AppStart(options(false, 0, Optional.empty()), log, world());
+        second.browserWait = Duration.ofMillis(200);
+        assertThat(second.run()).isNull();
+
+        assertThat(desktopMade).isEmpty();
     }
 
     private AppStart.Running start(AppOptions options) {
@@ -709,6 +922,8 @@ class AppStartTest {
         assertThat(closing.status()).isEqualTo(503);
         assertThat(closing.body()).contains("\"code\":\"closing\"");
         assertThat(Files.readString(log.file())).contains("The last window was closed. Butterfly Atlas is quitting.");
+        // the browser on our profile quits too (macOS keeps an app running with no window: its Dock tile stayed)
+        assertThat(desktop.calls).as("asked before the exit").contains("close 5s, exits []");
     }
 
     @Test

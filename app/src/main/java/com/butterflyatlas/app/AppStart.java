@@ -19,6 +19,11 @@ import com.butterflyatlas.app.window.SecondLaunch;
 import com.butterflyatlas.app.window.SessionKeys;
 import com.butterflyatlas.app.window.StartupFailure;
 import com.butterflyatlas.app.window.WindowLauncher;
+import com.butterflyatlas.app.desktop.BrowserWindows;
+import com.butterflyatlas.app.desktop.DesktopIntegration;
+import com.butterflyatlas.app.desktop.DesktopIntegrations;
+import com.butterflyatlas.app.desktop.IconClicks;
+import com.butterflyatlas.app.desktop.NoDesktop;
 
 import java.awt.Desktop;
 import java.awt.GraphicsEnvironment;
@@ -36,6 +41,7 @@ import java.util.function.IntConsumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -48,16 +54,41 @@ import java.util.concurrent.atomic.AtomicReference;
 final class AppStart {
 
     /**
+     * Makes the desktop piece for the app's icon (app-icon contract §4): with {@code -Datlas.noBrowser} or not, which
+     * browser process shows the windows, the log, whether they are app windows or tabs, and the installed app's program.
+     */
+    @FunctionalInterface
+    interface Desktops {
+        DesktopIntegration create(boolean noBrowser, BrowserWindows windows, AtlasLog log, Supplier<WindowLauncher.Mode> mode,
+                                  Supplier<String> appPath);
+
+        /** This OS's piece ({@link DesktopIntegrations#forThisOs}); none when AWT is headless. */
+        Desktops SYSTEM = (noBrowser, windows, log, mode, appPath) -> DesktopIntegrations.forThisOs(
+                System.getProperty("os.name"), noBrowser, GraphicsEnvironment.isHeadless(), windows, log, mode, appPath);
+        /** None: the icon behaves as it did before (the tests that do not test it). */
+        Desktops NONE = (noBrowser, windows, log, mode, appPath) -> new NoDesktop();
+    }
+
+    /**
      * The outside world of the start; {@link #system()} is the real one. {@code starter} starts the browser, and the
      * installed app again when a library change reopens it ({@code appPath}: the program the packaged launcher names in
-     * {@code jpackage.app-path}, null in a development run).
+     * {@code jpackage.app-path}, null in a development run). {@code desktop} makes the piece for the app's icon.
      */
     record World(IntConsumer exit, Consumer<Thread> shutdownHook, Predicate<URI> defaultBrowser,
                  Supplier<BrowserFinder.Found> browser, WindowLauncher.Starter starter,
                  Function<InstancePointer, SecondLaunch> secondLaunch, Duration lockWait, int defaultPort,
-                 Consumer<String> console, Supplier<String> appPath) {
+                 Consumer<String> console, Supplier<String> appPath, Desktops desktop) {
 
-        /** As the canonical one, the installed app's program read from the system property. */
+        /** As the canonical one, with no desktop piece. */
+        World(IntConsumer exit, Consumer<Thread> shutdownHook, Predicate<URI> defaultBrowser,
+              Supplier<BrowserFinder.Found> browser, WindowLauncher.Starter starter,
+              Function<InstancePointer, SecondLaunch> secondLaunch, Duration lockWait, int defaultPort,
+              Consumer<String> console, Supplier<String> appPath) {
+            this(exit, shutdownHook, defaultBrowser, browser, starter, secondLaunch, lockWait, defaultPort, console, appPath,
+                    Desktops.NONE);
+        }
+
+        /** With the installed app's program read from the system property, and no desktop piece. */
         World(IntConsumer exit, Consumer<Thread> shutdownHook, Predicate<URI> defaultBrowser,
               Supplier<BrowserFinder.Found> browser, WindowLauncher.Starter starter,
               Function<InstancePointer, SecondLaunch> secondLaunch, Duration lockWait, int defaultPort,
@@ -70,7 +101,8 @@ final class AppStart {
             return new World(System::exit, Runtime.getRuntime()::addShutdownHook, AppStart::browse,
                     BrowserFinder.system()::find, command -> new ProcessBuilder(command).redirectErrorStream(true)
                             .redirectOutput(ProcessBuilder.Redirect.DISCARD).start(),
-                    SecondLaunch::system, Duration.ofSeconds(30), Main.DEFAULT_PORT, System.out::println);
+                    SecondLaunch::system, Duration.ofSeconds(30), Main.DEFAULT_PORT, System.out::println,
+                    () -> System.getProperty(Relaunch.APP_PATH), Desktops.SYSTEM);
         }
     }
 
@@ -149,6 +181,10 @@ final class AppStart {
 
     /** The config folder's lock file (owner-only folder). */
     static final String INSTANCE_LOCK = "instance.lock";
+    /** The browser's profile folder in the config folder (app-icon contract §1). */
+    static final String BROWSER_PROFILE = "browser_profile";
+    /** How long a quit from the Dock or the OS waits for the browser to close our windows (app-icon contract §4). */
+    static final Duration CLOSE_WINDOWS_WAIT = Duration.ofSeconds(5);
 
     private final AppOptions options;
     private final AtlasLog log;
@@ -159,6 +195,22 @@ final class AppStart {
     Duration browserWait = Duration.ofSeconds(5);
     /** The config folder's lock, held from the first moment of the start until the quit starts (null: none held). */
     private InstanceLock instanceLock;
+    /** The piece for the app's icon: none until the first copy's start makes it (a second launch never does). */
+    private DesktopIntegration desktop = new NoDesktop();
+    /** Which browser process shows the windows (null until the first copy's start makes it). */
+    private BrowserWindows browserWindows;
+    /** What a click on the app's icon does (null until the first copy's start makes it). */
+    private IconClicks iconClicks;
+    /** A quit was asked for (the quit timer fired, or Quit from the Dock or the OS): a click starts the app again. */
+    private final AtomicBoolean quitting = new AtomicBoolean();
+    /** When this copy last opened a window that has not connected yet ({@link Long#MIN_VALUE}: none). */
+    private final AtomicLong pendingSince = new AtomicLong(Long.MIN_VALUE);
+    /** Guards {@link #relaunchWanted} and {@link #quitBegun}. */
+    private final Object relaunchLock = new Object();
+    /** A click came while quitting: the installed app starts again once the quit has begun. */
+    private boolean relaunchWanted;
+    /** The quit has begun (the pointer and the instance lock are gone): a new copy can start as a launch of its own. */
+    private boolean quitBegun;
 
     AppStart(AppOptions options, AtlasLog log, World world) {
         this.options = options;
@@ -230,6 +282,13 @@ final class AppStart {
             throw new Failed(StartupFailure.notAnswering(), StartupFailure.EXIT_NOT_ANSWERING);
         }
 
+        // The app's icon answers from the start (app-icon spec §4.1), before the library opens, which can take a while.
+        AtomicBoolean closing = new AtomicBoolean();
+        AtomicReference<WindowLauncher> launcher = new AtomicReference<>();
+        AtomicReference<Running> running = new AtomicReference<>();
+        AtomicReference<Session> sessionNow = new AtomicReference<>();
+        startDesktop(launcher, running, sessionNow, closing);
+
         // a copy that was quitting when this one was opened is waited for, once, while it lets go of the library
         AtomicBoolean first = new AtomicBoolean(true);
         Function<Path, InstanceLock.Result> locks = folder -> first.getAndSet(false)
@@ -248,9 +307,6 @@ final class AppStart {
         keys.onRedeemed(launchFiles::redeemed);
         log.hide(keys.secret());
         log.hide(keys.instanceKey());
-        AtomicBoolean closing = new AtomicBoolean();
-        AtomicReference<WindowLauncher> launcher = new AtomicReference<>();
-        AtomicReference<Running> running = new AtomicReference<>();
         AtomicReference<AtlasServer> serving = new AtomicReference<>();
         QuitTimer timer = new QuitTimer(options.quitSeconds(), options.startSeconds(), !options.noBrowser(), System::nanoTime, System::currentTimeMillis,
                 why -> {
@@ -258,11 +314,19 @@ final class AppStart {
                     if (l != null) {
                         l.fallBack(why);
                     }
-                }, why -> quit(why, running, 0));
+                }, why -> quit(why, running, 0, true));
+        timer.windowsGone(() -> desktop.windowsGone()); // quits at once when the browser has no window left
         Session session = new Session(keys, timer, () -> launcher.get() == null ? WindowLauncher.Mode.WINDOW
                 : launcher.get().mode(), closing::get, options.configDir(), log.folder(), Session.PING,
                 () -> newWindow(() -> serving.get().baseUri().resolve(SessionKeys.LAUNCH_QUERY + keys.newKey()), launchFiles,
-                        timer::streams));
+                        timer::streams), () -> {
+                    pendingSince.set(Long.MIN_VALUE);
+                    desktop.windowConnected();
+                }, () -> {
+                    pendingSince.set(System.nanoTime());
+                    desktop.windowComing();
+                });
+        sessionNow.set(session);
         AtlasServer server;
         try {
             server = startServer(services, session);
@@ -315,20 +379,120 @@ final class AppStart {
             window.open();
         }
         timer.start();
+        iconClicks.ready(); // a click held while the app started is acted on now
         return app;
+    }
+
+    /**
+     * Makes the piece for the app's icon and hooks up the OS's events (app-icon contract §4): New window opens one as
+     * {@code POST /api/window} does (nothing before the server runs); Quit asks the browser to close our windows, waiting
+     * up to {@link #CLOSE_WINDOWS_WAIT}, then quits as the quit timer does, never asking; a click on the icon goes to
+     * {@link IconClicks}, which holds it until the server runs and the first window has been launched.
+     */
+    private void startDesktop(AtomicReference<WindowLauncher> launcher, AtomicReference<Running> running,
+                              AtomicReference<Session> session, AtomicBoolean closing) {
+        Path profile = options.configDir().resolve(BROWSER_PROFILE);
+        String os = System.getProperty("os.name");
+        browserWindows = new BrowserWindows(() -> world.browser().get().browser(), profile,
+                DesktopIntegrations.profileHolder(os, log), BrowserWindows.Processes.SYSTEM, System::nanoTime, log);
+        Supplier<WindowLauncher.Mode> mode = () -> launcher.get() == null ? WindowLauncher.Mode.WINDOW : launcher.get().mode();
+        desktop = world.desktop().create(options.noBrowser(), browserWindows, log, mode, world.appPath());
+        Runnable newWindow = () -> {
+            Session now = session.get();
+            if (now == null) {
+                log.info("New window from the Dock or the OS came before Butterfly Atlas was ready; not opened.");
+                return;
+            }
+            now.newWindow().open();
+        };
+        long startNanos = options.startSeconds() * 1_000_000_000L;
+        iconClicks = new IconClicks(() -> quitting.get() || closing.get(), mode,
+                () -> session.get() == null ? 0 : session.get().quit().streams(), () -> {
+                    long since = pendingSince.get();
+                    return since != Long.MIN_VALUE && System.nanoTime() - since < startNanos;
+                }, () -> desktop.bringForward(), newWindow, this::relaunchAfterQuit, System::nanoTime,
+                task -> new Thread(task, "atlas-icon-click").start(), log);
+        desktop.start(new DesktopIntegration.Events(iconClicks::clicked, newWindow, () -> {
+            quitting.set(true);
+            try {
+                desktop.closeWindows(CLOSE_WINDOWS_WAIT);
+            } catch (RuntimeException e) {
+                log.warn("The windows could not be asked to close", e);
+            } finally {
+                quit("Quit from the Dock or the OS.", running, 0);
+            }
+        }));
     }
 
     /** The last window closed (or none ever opened): the quit starts at once, the exit follows on a thread of its own. */
     private void quit(String why, AtomicReference<Running> running, int code) {
+        quit(why, running, code, false);
+    }
+
+    /**
+     * As {@link #quit(String, AtomicReference, int)}; with {@code closeBrowser} (the last window closed) the browser on our
+     * profile is asked to quit too, once the quit has begun (so a click then starts the app again rather than opening a
+     * window in it): macOS keeps an app running with no window, so its Dock tile stayed after ours went (app-icon spec
+     * §4.1). Never the user's own browser, never in the default-browser fallback, never force-killed.
+     */
+    private void quit(String why, AtomicReference<Running> running, int code, boolean closeBrowser) {
         log.info(why + " Butterfly Atlas is quitting.");
+        quitting.set(true);
         Running app = running.get();
-        Thread quitting = new Thread(() -> {
+        Thread thread = new Thread(() -> {
             if (app != null) {
                 app.beginQuit();
             }
+            if (closeBrowser) {
+                try {
+                    desktop.closeWindows(CLOSE_WINDOWS_WAIT);
+                } catch (RuntimeException e) {
+                    log.warn("The browser could not be asked to quit", e);
+                }
+            }
+            boolean again;
+            synchronized (relaunchLock) {
+                quitBegun = true;
+                again = relaunchWanted;
+            }
+            if (again) {
+                startAgain();
+            }
             world.exit().accept(code);
         }, "atlas-quit");
-        quitting.start();
+        thread.start();
+    }
+
+    /**
+     * A click on the icon while the app quits (app-icon spec §4.1): the installed app starts again once the quit has
+     * begun, so the click is never lost; the new copy waits for this one to let go of the library, as after a library
+     * change.
+     */
+    private void relaunchAfterQuit() {
+        boolean now;
+        synchronized (relaunchLock) {
+            relaunchWanted = true;
+            now = quitBegun;
+        }
+        if (now) {
+            startAgain();
+        }
+    }
+
+    /** Starts the installed app's program again ({@link Relaunch}); only when there is one (not in a development run). */
+    private void startAgain() {
+        Relaunch.Plan plan = Relaunch.plan(world.appPath().get());
+        if (!plan.restarts()) {
+            log.info("The app's icon was clicked while Butterfly Atlas was quitting; it does not start again ("
+                    + plan.why() + ")");
+            return;
+        }
+        try {
+            world.starter().start(plan.command());
+            log.info("The app's icon was clicked while Butterfly Atlas was quitting; it started again.");
+        } catch (IOException | RuntimeException e) {
+            log.error("Could not start Butterfly Atlas again after the app's icon was clicked while it quit", e);
+        }
     }
 
     /**
@@ -426,9 +590,15 @@ final class AppStart {
         if (found.note() != null) {
             log.warn(found.note(), null);
         }
+        BrowserWindows windows = browserWindows;
         return new WindowLauncher(found.browser(), System.getProperty("os.name"),
-                options.configDir().resolve("browser_profile"), address, files, world.starter(), world.defaultBrowser()::test,
-                world.console(), log, System::nanoTime, problem);
+                options.configDir().resolve(BROWSER_PROFILE), address, files, world.starter(), world.defaultBrowser()::test,
+                world.console(), log, System::nanoTime, problem, desktop, process -> {
+                    pendingSince.set(System.nanoTime());
+                    if (windows != null) {
+                        windows.started(process, System.nanoTime());
+                    }
+                });
     }
 
     /** Opens the library and the services; what stops that is told in plain words (never the raw error). */

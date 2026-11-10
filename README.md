@@ -419,7 +419,9 @@ delete them by hand).
   key; a message "Butterfly Atlas hit an unexpected problem" refers to it.
 - **Linux: no menu entry appears, or the install fails over the space in the name "Butterfly Atlas":** this is untested on Linux
   (the installers could only be built and run on macOS here). The fallback is to rebuild with the app's installer name set
-  without the space: change `NAME` in `packaging/scripts/PackageApp.java` to `Butterfly_Atlas` for Linux only, then package again.
+  without the space: change `NAME` in `packaging/scripts/PackageApp.java` to `Butterfly_Atlas` for Linux only, rename
+  `packaging/linux/Butterfly Atlas.desktop` to `Butterfly_Atlas.desktop` (jpackage looks for `<name>.desktop` there, and the
+  package build's check-linux stops when it is missing), then package again.
 - **The window stays blank, or a confined Chromium (a snap) cannot open it:** Butterfly Atlas opens its window from a small
   file in the `launch` folder of the config folder (it holds a one-use key, is readable only by you, and is deleted as soon as
   the window has used it; no key is ever put in a program's arguments, so other people on a shared device cannot read it

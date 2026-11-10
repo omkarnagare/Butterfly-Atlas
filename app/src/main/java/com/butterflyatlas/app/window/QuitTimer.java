@@ -3,6 +3,7 @@ package com.butterflyatlas.app.window;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 
@@ -33,6 +34,7 @@ public final class QuitTimer implements AutoCloseable {
     private long last = Long.MIN_VALUE;
     private long lastWall = Long.MIN_VALUE;
     private boolean quitFired;
+    private volatile BooleanSupplier windowsGone = () -> false;
     private ScheduledExecutorService ticker;
 
     /**
@@ -56,6 +58,16 @@ public final class QuitTimer implements AutoCloseable {
         this.quit = quit;
     }
 
+    /**
+     * Asked each second once the last stream has dropped (never while one is open, nor before any connected): true when
+     * the browser is known to have no window left, which quits at once rather than after the whole count (app-icon spec
+     * §4.1). A reload, waking from sleep or a minimised window leave the window there, so they keep the count. Asked
+     * outside the timer's lock, since it may be a native call.
+     */
+    public void windowsGone(BooleanSupplier gone) {
+        this.windowsGone = gone;
+    }
+
     /** A stream opened: a window is there, and a count in progress is cancelled. */
     public synchronized void opened() {
         streams++;
@@ -77,6 +89,7 @@ public final class QuitTimer implements AutoCloseable {
     public void tick() {
         String say = null;
         String quitWhy = null;
+        boolean ask = false;
         synchronized (this) {
             long now = nanos.getAsLong();
             long wall = wallMillis.getAsLong();
@@ -96,6 +109,8 @@ public final class QuitTimer implements AutoCloseable {
                 if (++idle >= quitTicks) {
                     quitFired = true;
                     quitWhy = "The last window was closed.";
+                } else {
+                    ask = true;
                 }
             } else if (expectWindow) {
                 waited++;
@@ -104,6 +119,14 @@ public final class QuitTimer implements AutoCloseable {
                 } else if (waited >= 2 * startTicks) {
                     quitFired = true;
                     quitWhy = "Quitting: no window opened within " + 2 * startTicks + " seconds.";
+                }
+            }
+        }
+        if (ask && windowsGone.getAsBoolean()) {
+            synchronized (this) {
+                if (streams == 0 && !quitFired) { // no window reconnected while the browser was asked
+                    quitFired = true;
+                    quitWhy = "The last window was closed.";
                 }
             }
         }

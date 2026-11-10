@@ -42,11 +42,25 @@
         <twelvemonkeys.version>3.15.2</twelvemonkeys.version>
         <metadata-extractor.version>2.21.0</metadata-extractor.version>
         <commons-imaging.version>1.0.0-alpha6</commons-imaging.version>
+        <jna.version>5.19.1</jna.version>
 
         <node.version>v22.16.0</node.version>
         <frontend-plugin.version>1.15.1</frontend-plugin.version>
         <skipTests>false</skipTests>
+        <!-- The real-window checks (JUnit tag "window") run only with the profile window-checks. -->
+        <windowChecks.skip>true</windowChecks.skip>
     </properties>
+
+    <profiles>
+        <!-- The real-window checks: a second Surefire run in the app module with only the tests tagged "window", which
+             open real browser windows (CI's build step uses it on every runner; locally: verify -Pwindow-checks). -->
+        <profile>
+            <id>window-checks</id>
+            <properties>
+                <windowChecks.skip>false</windowChecks.skip>
+            </properties>
+        </profile>
+    </profiles>
 
     <dependencyManagement>
         <dependencies>
@@ -99,6 +113,16 @@
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-imaging</artifactId>
                 <version>${commons-imaging.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.java.dev.jna</groupId>
+                <artifactId>jna</artifactId>
+                <version>${jna.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.java.dev.jna</groupId>
+                <artifactId>jna-platform</artifactId>
+                <version>${jna.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.junit</groupId>
