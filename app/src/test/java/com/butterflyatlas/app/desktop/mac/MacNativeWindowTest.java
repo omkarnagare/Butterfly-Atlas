@@ -167,6 +167,12 @@ class MacNativeWindowTest {
                     .get("windowState").asText();
         }
 
+        void restore(int window) throws Exception {
+            ObjectNode params = JSON.createObjectNode().put("windowId", window);
+            params.putObject("bounds").put("windowState", "normal");
+            call("Browser.setWindowBounds", params);
+        }
+
         void minimise(int window) throws Exception {
             ObjectNode params = JSON.createObjectNode().put("windowId", window);
             params.putObject("bounds").put("windowState", "minimized");
@@ -175,7 +181,7 @@ class MacNativeWindowTest {
     }
 
     @Test
-    void theBrowserIsFoundActivatedSeenMinimisedAndQuitsWhenAsked() throws Exception {
+    void theBrowserIsFoundActivatedSeenMinimisedSeenWithNoWindowAndQuitsWhenAsked() throws Exception {
         Path program = WindowChecks.browser();
         Path profile = folder.resolve("browser_profile");
         String address = serve();
@@ -187,6 +193,8 @@ class MacNativeWindowTest {
         assertThat(await(() -> ProfileHolder.singletonLockPid(profile).equals(OptionalLong.of(pid)), 30_000))
                 .as("SingletonLock names the browser process").isTrue();
         assertThat(await(() -> mac.windows(pid).onScreen() >= 1, 30_000)).as("the app window is on screen").isTrue();
+        // exactly one: Chrome's hidden helper windows (33 px strips, never on screen) are not counted
+        assertThat(mac.windows(pid)).as("one app window, counted once").isEqualTo(new MacApps.Windows(1, 1));
 
         assertThat(mac.activate(pid)).as("activated by its process ID").isTrue();
 
@@ -197,8 +205,16 @@ class MacNativeWindowTest {
         int window = devTools.windowOf(pages.get(0));
         devTools.minimise(window);
         assertThat(await(() -> mac.windows(pid).onScreen() == 0, 10_000)).as("minimised: none on screen").isTrue();
-        assertThat(mac.windows(pid).all()).as("minimised windows are still listed").isGreaterThanOrEqualTo(1);
+        assertThat(mac.windows(pid)).as("a minimised window is still listed").isEqualTo(new MacApps.Windows(1, 0));
         assertThat(devTools.state(window)).isEqualTo("minimized");
+
+        // back on screen, then closed (a window is closed from the screen): Chrome keeps running on macOS, and the app
+        // must see that it has no window left
+        devTools.restore(window);
+        assertThat(await(() -> mac.windows(pid).onScreen() == 1, 10_000)).as("restored: on screen again").isTrue();
+        devTools.call("Target.closeTarget", JSON.createObjectNode().put("targetId", pages.get(0)));
+        assertThat(await(() -> mac.windows(pid).all() == 0, 10_000)).as("no window left once it closed").isTrue();
+        assertThat(browser.isAlive()).as("Chrome still runs with no window").isTrue();
 
         socket.abort();
         socket = null;

@@ -4,6 +4,7 @@ import com.sun.jna.Library;
 import com.sun.jna.Native;
 import com.sun.jna.NativeLibrary;
 import com.sun.jna.Pointer;
+import com.sun.jna.ptr.DoubleByReference;
 import com.sun.jna.ptr.LongByReference;
 
 /**
@@ -37,6 +38,13 @@ public final class MacNative implements MacApps {
     static final int NULL_WINDOW = 0;
     /** {@code kCFNumberSInt64Type}. */
     static final long CF_SINT64 = 4L;
+    /** {@code kCFNumberFloat64Type} (a window's bounds are CGFloat numbers). */
+    static final long CF_FLOAT64 = 6L;
+    /**
+     * Smaller than this either way is not a window of ours: Chrome keeps hidden helper windows (strips 33 px tall, never on
+     * screen) in the list, which would count as minimised windows that never close. Its app windows are never this small.
+     */
+    static final double MIN_SIDE = 100;
     /** {@code kCFStringEncodingUTF8}. */
     static final int CF_UTF8 = 0x08000100;
 
@@ -65,6 +73,8 @@ public final class MacNative implements MacApps {
         Pointer CFDictionaryGetValue(Pointer dictionary, Pointer key);
 
         byte CFNumberGetValue(Pointer number, long type, LongByReference value);
+
+        byte CFNumberGetValue(Pointer number, long type, DoubleByReference value);
 
         Pointer CFStringCreateWithCString(Pointer allocator, String text, int encoding);
 
@@ -109,7 +119,10 @@ public final class MacNative implements MacApps {
         return inPool(objc -> new Windows(count(pid, LIST_ALL), count(pid, LIST_ON_SCREEN)));
     }
 
-    /** The process's ordinary windows (layer 0) in the window list made with {@code option}. */
+    /**
+     * The process's ordinary windows (layer 0, at least {@link #MIN_SIDE} each way) in the window list made with
+     * {@code option}.
+     */
     private static int count(long pid, int option) {
         CoreFoundation cf = Libraries.CF;
         Pointer list = Libraries.CG.CGWindowListCopyWindowInfo(option, NULL_WINDOW);
@@ -118,6 +131,9 @@ public final class MacNative implements MacApps {
         }
         Pointer ownerKey = cf.CFStringCreateWithCString(null, "kCGWindowOwnerPID", CF_UTF8);
         Pointer layerKey = cf.CFStringCreateWithCString(null, "kCGWindowLayer", CF_UTF8);
+        Pointer boundsKey = cf.CFStringCreateWithCString(null, "kCGWindowBounds", CF_UTF8);
+        Pointer widthKey = cf.CFStringCreateWithCString(null, "Width", CF_UTF8);
+        Pointer heightKey = cf.CFStringCreateWithCString(null, "Height", CF_UTF8);
         try {
             int found = 0;
             long size = cf.CFArrayGetCount(list);
@@ -125,7 +141,11 @@ public final class MacNative implements MacApps {
                 Pointer window = cf.CFArrayGetValueAtIndex(list, i);
                 if (number(cf, cf.CFDictionaryGetValue(window, ownerKey)) == pid
                         && number(cf, cf.CFDictionaryGetValue(window, layerKey)) == 0) {
-                    found++;
+                    Pointer bounds = cf.CFDictionaryGetValue(window, boundsKey);
+                    if (bounds != null && side(cf, cf.CFDictionaryGetValue(bounds, widthKey)) >= MIN_SIDE
+                            && side(cf, cf.CFDictionaryGetValue(bounds, heightKey)) >= MIN_SIDE) {
+                        found++;
+                    }
                 }
             }
             return found;
@@ -134,8 +154,10 @@ public final class MacNative implements MacApps {
             if (ownerKey != null) {
                 cf.CFRelease(ownerKey);
             }
-            if (layerKey != null) {
-                cf.CFRelease(layerKey);
+            for (Pointer key : new Pointer[] {layerKey, boundsKey, widthKey, heightKey}) {
+                if (key != null) {
+                    cf.CFRelease(key);
+                }
             }
         }
     }
@@ -146,6 +168,15 @@ public final class MacNative implements MacApps {
         }
         LongByReference value = new LongByReference();
         return cf.CFNumberGetValue(number, CF_SINT64, value) != 0 ? value.getValue() : Long.MIN_VALUE;
+    }
+
+    /** A window side from its bounds (a CGFloat number); 0 when it cannot be read. */
+    private static double side(CoreFoundation cf, Pointer number) {
+        if (number == null) {
+            return 0;
+        }
+        DoubleByReference value = new DoubleByReference();
+        return cf.CFNumberGetValue(number, CF_FLOAT64, value) != 0 ? value.getValue() : 0;
     }
 
     /** The {@code NSRunningApplication} of the process; throws when there is none (it is not running, or not an app). */
