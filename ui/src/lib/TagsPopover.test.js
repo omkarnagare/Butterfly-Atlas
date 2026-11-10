@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { beforeEach, expect, test, vi } from 'vitest';
 import TagsPopover from './TagsPopover.svelte';
 import { getTags } from './api.js';
@@ -14,23 +14,52 @@ beforeEach(() => {
   getTags.mockResolvedValue(TAGS);
 });
 
-test('every tag as a toggle, built-in first; toggling sets the tags and passes their labels on', async () => {
+test('the built-in tags as toggles, the user\'s found with "Find a tag"; toggling sets the tags and passes every label on', async () => {
   const onChange = vi.fn();
   const { rerender } = render(TagsPopover, { filter: EMPTY, onChange, onClose: vi.fn() });
   expect(screen.getByRole('dialog', { name: 'Tags' })).toBeTruthy();
   const group = await screen.findByRole('group', { name: 'Tags' });
-  await vi.waitFor(() => expect(group.querySelectorAll('button')).toHaveLength(4));
-  expect([...group.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['egg', 'larva', 'pupa', 'mud-puddling']);
+  await vi.waitFor(() => expect(group.querySelectorAll('button')).toHaveLength(3));
+  expect([...group.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['egg', 'larva', 'pupa']);
   const labels = [TAGS[1], TAGS[2], TAGS[3], TAGS[0]].map(({ key, label }) => ({ key, label }));
 
   await fireEvent.click(screen.getByRole('button', { name: 'larva' }));
   expect(onChange).toHaveBeenCalledWith({ ...EMPTY, tags: ['larva'] }, { tags: labels });
   await rerender({ filter: { ...EMPTY, tags: ['larva'] } });
   expect(screen.getByRole('button', { name: 'larva' }).getAttribute('aria-pressed')).toBe('true');
-  await fireEvent.click(screen.getByRole('button', { name: 'mud-puddling' }));
+  const box = screen.getByRole('searchbox', { name: 'Find a tag' });
+  await fireEvent.input(box, { target: { value: 'mud' } });
+  await fireEvent.click(within(screen.getByRole('group', { name: 'Matching tags' })).getByRole('button', { name: 'mud-puddling' }));
   expect(onChange).toHaveBeenLastCalledWith({ ...EMPTY, tags: ['larva', 'mud'] }, { tags: labels });
+  await rerender({ filter: { ...EMPTY, tags: ['larva', 'mud'] } });
+  expect([...group.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['egg', 'larva', 'pupa', 'mud-puddling']);
   await fireEvent.click(screen.getByRole('button', { name: 'larva' }));
-  expect(onChange).toHaveBeenLastCalledWith(EMPTY, { tags: labels });
+  expect(onChange).toHaveBeenLastCalledWith({ ...EMPTY, tags: ['mud'] }, { tags: labels });
+});
+
+test('no Create in the filter: a name no tag has only says so', async () => {
+  render(TagsPopover, { filter: EMPTY, tags: TAGS, onChange: vi.fn(), onClose: vi.fn() });
+  await fireEvent.input(screen.getByRole('searchbox', { name: 'Find a tag' }), { target: { value: 'roosting' } });
+  expect(screen.getByText('No tag called "roosting".')).toBeTruthy();
+  expect(screen.queryByRole('button', { name: /^Create/ })).toBeNull();
+});
+
+test('a tag in the filter that no longer exists is not shown', () => {
+  render(TagsPopover, { filter: { ...EMPTY, tags: ['gone', 'mud'] }, tags: TAGS, onChange: vi.fn(), onClose: vi.fn() });
+  const group = screen.getByRole('group', { name: 'Tags' });
+  expect([...group.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['egg', 'larva', 'pupa', 'mud-puddling']);
+});
+
+test('Esc in the box with text clears it and keeps the popover; in the empty box it closes the popover', async () => {
+  const onClose = vi.fn();
+  render(TagsPopover, { filter: EMPTY, tags: TAGS, onChange: vi.fn(), onClose });
+  const box = screen.getByRole('searchbox');
+  await fireEvent.input(box, { target: { value: 'egg' } });
+  await fireEvent.keyDown(box, { key: 'Escape' });
+  expect(box.value).toBe('');
+  expect(onClose).not.toHaveBeenCalled();
+  await fireEvent.keyDown(box, { key: 'Escape' });
+  expect(onClose).toHaveBeenCalledOnce();
 });
 
 test('Match any / Match all set the tag mode', async () => {
@@ -67,7 +96,7 @@ test('once the tags have come the loading line goes', async () => {
 });
 
 test('given the tags already read (the Export screen holds them), it shows them at once and asks for none', async () => {
-  render(TagsPopover, { filter: EMPTY, tags: TAGS, onChange: vi.fn(), onClose: vi.fn() });
+  render(TagsPopover, { filter: { ...EMPTY, tags: ['mud'] }, tags: TAGS, onChange: vi.fn(), onClose: vi.fn() });
   const group = screen.getByRole('group', { name: 'Tags' });
   expect([...group.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['egg', 'larva', 'pupa', 'mud-puddling']);
   expect(screen.queryByText('Loading tags…')).toBeNull();
