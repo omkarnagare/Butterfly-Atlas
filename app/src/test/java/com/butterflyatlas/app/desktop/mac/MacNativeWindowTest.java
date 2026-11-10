@@ -213,7 +213,8 @@ class MacNativeWindowTest {
         devTools.restore(window);
         assertThat(await(() -> mac.windows(pid).onScreen() == 1, 10_000)).as("restored: on screen again").isTrue();
         devTools.call("Target.closeTarget", JSON.createObjectNode().put("targetId", pages.get(0)));
-        assertThat(await(() -> mac.windows(pid).all() == 0, 10_000)).as("no window left once it closed").isTrue();
+        assertThat(await(() -> mac.windows(pid).all() == 0, 10_000))
+                .as(() -> "no window left once it closed; the browser's windows: " + mac.describe(pid)).isTrue();
         assertThat(browser.isAlive()).as("Chrome still runs with no window").isTrue();
 
         socket.abort();

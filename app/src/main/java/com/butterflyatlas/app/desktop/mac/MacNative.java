@@ -7,6 +7,9 @@ import com.sun.jna.Pointer;
 import com.sun.jna.ptr.DoubleByReference;
 import com.sun.jna.ptr.LongByReference;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * The macOS calls behind the app's icon, through JNA (spec §4.1, contract §4). Nothing here loads JNA until a method runs,
  * so making one costs nothing. The calls run only on macOS; elsewhere they throw.
@@ -160,6 +163,52 @@ public final class MacNative implements MacApps {
                 }
             }
         }
+    }
+
+    /**
+     * Every window of {@code pid} in both lists, unfiltered, one line each ({@code all|on-screen #id layer=L WxH}): for a
+     * real-window check to say what it saw when a count is not what it expected. Needs no Screen Recording permission.
+     */
+    List<String> describe(long pid) {
+        return inPool(objc -> {
+            List<String> lines = new ArrayList<>();
+            for (int option : new int[] {LIST_ALL, LIST_ON_SCREEN}) {
+                CoreFoundation cf = Libraries.CF;
+                Pointer list = Libraries.CG.CGWindowListCopyWindowInfo(option, NULL_WINDOW);
+                if (list == null) {
+                    lines.add("no window list");
+                    continue;
+                }
+                Pointer[] keys = {cf.CFStringCreateWithCString(null, "kCGWindowOwnerPID", CF_UTF8),
+                        cf.CFStringCreateWithCString(null, "kCGWindowLayer", CF_UTF8),
+                        cf.CFStringCreateWithCString(null, "kCGWindowBounds", CF_UTF8),
+                        cf.CFStringCreateWithCString(null, "Width", CF_UTF8),
+                        cf.CFStringCreateWithCString(null, "Height", CF_UTF8),
+                        cf.CFStringCreateWithCString(null, "kCGWindowNumber", CF_UTF8)};
+                try {
+                    for (long i = 0, size = cf.CFArrayGetCount(list); i < size; i++) {
+                        Pointer window = cf.CFArrayGetValueAtIndex(list, i);
+                        if (number(cf, cf.CFDictionaryGetValue(window, keys[0])) != pid) {
+                            continue;
+                        }
+                        Pointer bounds = cf.CFDictionaryGetValue(window, keys[2]);
+                        lines.add((option == LIST_ALL ? "all" : "on-screen") + " #"
+                                + number(cf, cf.CFDictionaryGetValue(window, keys[5])) + " layer="
+                                + number(cf, cf.CFDictionaryGetValue(window, keys[1])) + " "
+                                + (bounds == null ? "?" : Math.round(side(cf, cf.CFDictionaryGetValue(bounds, keys[3])))
+                                + "x" + Math.round(side(cf, cf.CFDictionaryGetValue(bounds, keys[4])))));
+                    }
+                } finally {
+                    cf.CFRelease(list);
+                    for (Pointer key : keys) {
+                        if (key != null) {
+                            cf.CFRelease(key);
+                        }
+                    }
+                }
+            }
+            return lines;
+        });
     }
 
     private static long number(CoreFoundation cf, Pointer number) {
