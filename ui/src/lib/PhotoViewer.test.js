@@ -119,6 +119,25 @@ test('Escape closes it, and + - 0 zoom the photo', async () => {
   expect(onClose).toHaveBeenCalledOnce();
 });
 
+test('keys typed in the tag box stay in it: Esc with text clears it, Esc in the empty box leaves it, the next Esc closes', async () => {
+  const { container, onClose } = open();
+  const box = screen.getByRole('searchbox', { name: 'Find or add a tag' });
+  box.focus();
+  await fireEvent.input(box, { target: { value: 'la' } });
+  for (const key of ['+', '-', '0', 'ArrowRight']) await fireEvent.keyDown(box, { key });
+  expect(container.querySelector('.zp-photo').dataset.scale).toBe('1');
+  expect(container.querySelector('.c').textContent).toBe('1 / 3');
+
+  await fireEvent.keyDown(box, { key: 'Escape' });
+  expect(box.value).toBe('');
+  expect(onClose).not.toHaveBeenCalled();
+  await fireEvent.keyDown(box, { key: 'Escape' });
+  expect(onClose).not.toHaveBeenCalled();
+  expect(document.activeElement).not.toBe(box);
+  await fireEvent.keyDown(document.activeElement, { key: 'Escape' });
+  expect(onClose).toHaveBeenCalledOnce();
+});
+
 test('edits the tags and the cover', async () => {
   setPhotoTags.mockResolvedValue(photo(3, { tags: ['male', 'larva'] }));
   setCover.mockResolvedValue(3);

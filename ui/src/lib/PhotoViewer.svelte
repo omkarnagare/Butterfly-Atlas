@@ -139,7 +139,7 @@
       {#if list.length > 1}<button class="lb-nav n" type="button" aria-label={NEXT_PHOTO} onclick={() => go(1)}>›</button>{/if}
     </div>
     <aside class="lb-side" aria-label={ABOUT_THIS_PHOTO}>
-      <PhotoEdits {photo} species={taxon} {tags} {onChanged} onLeft={leave} />
+      <PhotoEdits {photo} species={taxon} {tags} {onChanged} onTagsChanged={onChanged} onLeft={leave} />
       <p class="muted keys">← → photos · + − zoom · 0 fit · Esc close</p>
     </aside>
     <div class="lb-strip" bind:this={strip}>

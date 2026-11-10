@@ -341,13 +341,21 @@
 
   /* ---------- the page ---------- */
 
-  onMount(() => {
-    getTags()
+  /**
+   * Reads the tags (their names for the filter row, the Tags popover and the viewer); again after a tag is created in
+   * the viewer (behaviour tags §4.4). A failure keeps what was read before.
+   */
+  function readTags() {
+    return getTags()
       .then((all) => {
         tags = all;
         names = mergeNames(names, { tags: all });
       })
       .catch(() => {});
+  }
+
+  onMount(() => {
+    readTags();
     // The library changed: count again and load the view again; loaded photos are loaded again in place, so the grid
     // and the scroll position stay.
     const onChange = () => {
@@ -426,7 +434,7 @@
 {/if}
 
 {#if viewing}
-  <ExportViewer photos={viewerPhotos} {photoId} {query} {tags} {editable} onEdited={edited} {photoHref} total={count?.photos ?? pages.photos.length} hasMore={pages.next !== null} loading={pages.loading}
+  <ExportViewer photos={viewerPhotos} {photoId} {query} {tags} {editable} onEdited={edited} onTagsChanged={readTags} {photoHref} total={count?.photos ?? pages.photos.length} hasMore={pages.next !== null} loading={pages.loading}
                 error={pages.error} onMore={() => loadPhotos(false)} onRetry={retryViewerPage}
                 returnFocus={(id) => document.querySelector(`.fgrid [data-photo-id="${id}"]`)} onClose={() => closeViewerTo(resultsHref(query, 'photos'))} />
 {/if}

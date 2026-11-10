@@ -21,7 +21,8 @@
    * + − 0 zoom, Escape closes. On Export it only shows: the species (with a link to its page), the tags, the place and
    * the file; changes are made on the species page. `editable` (Explore's filtered photos, filters-in-Explore design §6)
    * gives it the edit panel (lib/PhotoEdits) for the photo's own species: after an edit `onEdited()` reads the results
-   * again, and after a move or a delete `onEdited({ left: true })`, the screen moving on to another photo.
+   * again, and after a move or a delete `onEdited({ left: true })`, the screen moving on to another photo; a tag created
+   * there has the screen read its tags again (`onTagsChanged`). Keys typed in a text box (the tag search) are its own.
    * `photoHref(id, query)` writes a photo's address (by default Export's). Near the end of what is loaded it asks for the next page (`onMore`), once for
    * what is loaded and never while one is `loading` or has failed; a step past the last loaded photo waits for the page
    * and moves on when it comes, and with no more pages it goes round. A failed page (`error`) shows in the viewer with
@@ -30,7 +31,7 @@
    */
   let {
     photos, photoId, query, total = 0, tags = [], hasMore = false, loading = false, error = '', onMore = () => {}, onRetry = () => {}, returnFocus = () => null, onClose,
-    editable = false, onEdited = async () => {}, photoHref = exportPhotoHref,
+    editable = false, onEdited = async () => {}, onTagsChanged = async () => {}, photoHref = exportPhotoHref,
   } = $props();
 
   let root = $state(null);
@@ -106,6 +107,7 @@
 
   function onKey(event) {
     if (!isTopModal(root) || event.isComposing || event.metaKey || event.ctrlKey || event.altKey) return;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(event.target?.tagName ?? '')) return;
     const keys = {
       Escape: () => onClose(),
       ArrowRight: () => go(1),
@@ -149,7 +151,7 @@
       <p><a class="lb-link" href="#/species/{encodeURIComponent(photo.species.id)}">Open the species page</a></p>
       {#if editable}
         <!-- the pressed Move… or Delete leaves the panel: keep keyboard focus inside the viewer -->
-        <PhotoEdits {photo} species={photo.species} {tags} onChanged={() => onEdited()}
+        <PhotoEdits {photo} species={photo.species} {tags} onChanged={() => onEdited()} {onTagsChanged}
                     onLeft={() => { closeButton?.focus(); return onEdited({ left: true }); }} />
       {:else}
         <h3>Tags</h3>

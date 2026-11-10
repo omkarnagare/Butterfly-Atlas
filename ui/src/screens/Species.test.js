@@ -4,11 +4,12 @@ import Species from './Species.svelte';
 import Toast from '../lib/Toast.svelte';
 import {
   addCustomSpecies, getChildren, checkCustomName, deleteCustomSpecies, getDeleted, renameCustomSpecies,
-  deletePhotos, editTags, getMyPlaces, getPhotos, getRecentPlaces, getTags, getTaxon, movePhotos, placePhotos, search, unplacePhotos, uploadPhoto,
+  createTag, deletePhotos, editTags, getMyPlaces, getPhotos, getRecentPlaces, getTags, getTaxon, movePhotos, placePhotos, search, setPhotoTags,
+  unplacePhotos, uploadPhoto,
 } from '../lib/api.js';
 
 vi.mock('../lib/api.js', () => ({
-  getTaxon: vi.fn(), getPhotos: vi.fn(), getTags: vi.fn(), uploadPhoto: vi.fn(),
+  getTaxon: vi.fn(), getPhotos: vi.fn(), getTags: vi.fn(), uploadPhoto: vi.fn(), createTag: vi.fn(), setPhotoTags: vi.fn(),
   deletePhotos: vi.fn(), editTags: vi.fn(), movePhotos: vi.fn(), search: vi.fn(), getStatus: vi.fn(),
   addSearchWord: vi.fn(), removeSearchWord: vi.fn(), PHOTO_ACCEPT: 'image/jpeg',
   isPhotoSequence: (file) => /\.hei[cf]s$/i.test(file.name),
@@ -183,6 +184,25 @@ test('a photo address opens the viewer over the page; an unknown photo shows the
   await rerender({ id: 'A5', photoId: 99 });
   await vi.waitFor(() => expect(window.location.hash).toBe('#/species/A5'));
   expect(screen.queryByRole('dialog')).toBeNull();
+});
+
+test('a tag created in the viewer: the page is read again (its tags too), then the tag goes on the photo', async () => {
+  const roosting = { id: 21, key: 'roosting', label: 'roosting', source: 'user', photoCount: 0 };
+  getTaxon.mockResolvedValue(plainTiger({ species: { got: 1, total: 1 }, photoCount: 1 }));
+  getPhotos.mockResolvedValue([photo(1, ['larva'])]);
+  createTag.mockResolvedValue(roosting);
+  setPhotoTags.mockResolvedValue({});
+  render(Species, { id: 'A5', photoId: 1 });
+  const box = await screen.findByRole('searchbox', { name: 'Find or add a tag' });
+  getTags.mockResolvedValue([...TAGS, roosting]);
+
+  await fireEvent.input(box, { target: { value: 'roosting' } });
+  await fireEvent.keyDown(box, { key: 'Enter' });
+
+  await vi.waitFor(() => expect(setPhotoTags).toHaveBeenCalledWith(1, ['larva', 'roosting']));
+  // loaded, read again after Create, then read again after the photo's tags changed
+  await vi.waitFor(() => expect(getTags).toHaveBeenCalledTimes(3));
+  expect(getTags.mock.invocationCallOrder[1]).toBeLessThan(setPhotoTags.mock.invocationCallOrder[0]);
 });
 
 test('an unknown photo with the gallery chips in its address shows the page with those chips', async () => {
