@@ -15,17 +15,30 @@ const photo = (id, tagKeys) => ({
 });
 const photos = [photo(3, ['larva', 'mud_puddling']), photo(2, ['larva']), photo(1, ['male'])];
 
-test('shows a chip per tag with its count; unused built-in tags are dimmed, unused user tags hidden', () => {
+test('shows a chip, with its count, only for the tags the species\' photos have; built-in or not, an unused tag has none', () => {
   render(Gallery, { photos, tags });
 
   const chip = (name) => screen.getByRole('button', { name });
   expect(chip('All 3').getAttribute('aria-pressed')).toBe('true');
   expect(chip('larva, 2 photos').disabled).toBe(false);
-  expect(chip('egg, 0 photos').getAttribute('aria-disabled')).toBe('true');
-  expect(chip('egg, 0 photos').classList.contains('dim')).toBe(true);
   expect(chip('mud-puddling, 1 photo')).toBeTruthy();
+  const group = screen.getByRole('group', { name: 'Show photos tagged' });
+  expect([...group.querySelectorAll('button')].map((b) => b.getAttribute('aria-label') ?? b.textContent.replace(/\s+/g, ' ').trim()))
+    .toEqual(['All 3', 'larva, 2 photos', 'male, 1 photo', 'mud-puddling, 1 photo']);
+  expect(screen.queryByRole('button', { name: /^egg/ })).toBeNull();
   expect(screen.queryByRole('button', { name: /Sinhagad/ })).toBeNull();
   expect(screen.getAllByRole('link')).toHaveLength(3);
+});
+
+test('a filter whose last photo lost the tag falls back to All, so no chip is left at 0', async () => {
+  const { rerender } = render(Gallery, { photos, tags });
+  await fireEvent.click(screen.getByRole('button', { name: 'male, 1 photo' }));
+  expect(screen.getAllByRole('link')).toHaveLength(1);
+
+  await rerender({ photos: [photo(3, ['larva', 'mud_puddling']), photo(2, ['larva']), photo(1, [])], tags });
+  await vi.waitFor(() => expect(screen.getAllByRole('link')).toHaveLength(3));
+  expect(screen.getByRole('button', { name: 'All 3' }).getAttribute('aria-pressed')).toBe('true');
+  expect(screen.queryByRole('button', { name: /^male/ })).toBeNull();
 });
 
 test('a chip filters the gallery and All brings everything back', async () => {

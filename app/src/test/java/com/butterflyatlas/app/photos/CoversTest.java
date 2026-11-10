@@ -35,7 +35,8 @@ class CoversTest {
             + "(SELECT c.id FROM image c WHERE c.id = t.cover_image_id AND c.taxon_id = t.id AND c.deleted_at IS NULL),"
             + " (SELECT c.id FROM image c WHERE c.taxon_id = t.id AND c.deleted_at IS NULL"
             + " ORDER BY EXISTS (SELECT 1 FROM image_tag ct JOIN tag k ON k.id = ct.tag_id"
-            + " WHERE ct.image_id = c.id AND k.key IN ('dsf', 'female', 'male', 'under_wing', 'upper_wing', 'wsf')) DESC,"
+            + " WHERE ct.image_id = c.id AND k.key IN ('dsf', 'female', 'male', 'mating', 'nectaring', 'puddling',"
+            + " 'under_wing', 'upper_wing', 'wsf')) DESC,"
             + " c.added_at DESC, c.id DESC LIMIT 1)) FROM taxon t WHERE t.id = ?";
 
     @Test

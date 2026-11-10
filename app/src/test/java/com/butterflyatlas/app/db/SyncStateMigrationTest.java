@@ -41,7 +41,7 @@ class SyncStateMigrationTest {
             return null;
         });
 
-        Database db = Database.open(dir.resolve(Database.FILE_NAME));
+        Database db = Database.open(dir.resolve(Database.FILE_NAME), "16");
 
         assertThat(Database.newestSchemaVersion(dir.resolve(Database.FILE_NAME))).hasValue(16);
         List<String> rows = db.read(c -> {

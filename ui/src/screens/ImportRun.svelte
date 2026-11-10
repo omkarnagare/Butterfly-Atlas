@@ -1,6 +1,8 @@
 <script>
   import { tick, untrack } from 'svelte';
   import { getImport, getImportItems, getTags } from '../lib/api.js';
+  import { withTag } from '../lib/tags.js';
+  import { showProblem } from '../lib/toast.svelte.js';
   import ImportResult from '../lib/ImportResult.svelte';
   import ImportFinishDialog from '../lib/ImportFinishDialog.svelte';
   import Celebration from '../lib/Celebration.svelte';
@@ -304,6 +306,19 @@
     regrouped = true;
   });
 
+  /**
+   * A tag created in Tag photos (behaviour tags §4.4; null when Create was refused): known at once, in tag order, then
+   * the tags are read again. A failed read keeps the list (with the new tag) and a toast says why.
+   */
+  async function readTags(tag) {
+    if (tag) tags = withTag(tags, tag);
+    try {
+      tags = await getTags();
+    } catch (e) {
+      showProblem(e);
+    }
+  }
+
   function open(item) {
     focusId = item.id;
     noteViewerOpen();
@@ -374,7 +389,7 @@
   {#if choosing === 'species'}
     <SpeciesPicker title="Assign {photoCount(chosen.length)} to a species" onPick={assignTo} onClose={() => (choosing = null)} />
   {:else if choosing === 'tags'}
-    <BulkTagDialog photos={chosen} {tags} onApply={tagChosen} onClose={() => (choosing = null)} />
+    <BulkTagDialog photos={chosen} {tags} onApply={tagChosen} onTagsChanged={readTags} onClose={() => (choosing = null)} />
   {:else if choosing === 'place'}
     <PlacePicker count={chosen.length} onChoose={placeChosen} onPlacesChanged={() => resync(id)} onClose={() => (choosing = null)} />
   {/if}

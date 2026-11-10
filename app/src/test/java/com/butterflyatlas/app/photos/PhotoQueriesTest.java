@@ -103,6 +103,19 @@ class PhotoQueriesTest {
     }
 
     @Test
+    void aBehaviourOfAnAdultCanBeTheCoverButPredatedCannot() {
+        Photo nectaring = add("A5", "nectaring");
+        Photo predated = add("A5", "predated");
+        assertThat(queries.photo(nectaring.id()).isCover()).as("an older nectaring photo beats a newer predated one").isTrue();
+        assertThat(queries.photo(predated.id()).isCover()).isFalse();
+
+        Photo older = add("A6");
+        Photo predatedNewer = add("A6", "predated");
+        assertThat(queries.photo(predatedNewer.id()).isCover()).as("predated alone is no adult: the newest").isTrue();
+        assertThat(queries.photo(older.id()).isCover()).isFalse();
+    }
+
+    @Test
     void recentlyDeletedShowsSpeciesAndDaysLeft() {
         Photo older = add("A5", "male");
         Photo newer = add("A6");

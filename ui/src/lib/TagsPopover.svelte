@@ -1,10 +1,12 @@
 <script>
   import { onMount, untrack } from 'svelte';
   import Popover from './Popover.svelte';
+  import TagPicker from './TagPicker.svelte';
   import { getTags } from './api.js';
 
   /**
-   * The Tags popover (contract §4): every tag, built-in ones first, as toggles; "Match any" / "Match all" (per photo).
+   * The Tags popover (contract §4): a TagPicker in filter mode (behaviour tags §4.5) — the built-in tags and the chosen
+   * ones as toggles, the user's other tags found with "Find a tag", no Create; "Match any" / "Match all" (per photo).
    * Each change goes straight to `onChange(filter, { tags })`, with every tag's label so the chip can name them.
    * `tags` are the tags already read (the Export screen holds them). Only when none are given does it read them itself:
    * "Loading tags…" until they come; closed before then, the request is aborted and its answer ignored.
@@ -50,12 +52,7 @@
     <button type="button" class:on={filter.tagMode === 'any'} aria-pressed={filter.tagMode === 'any'} onclick={() => mode('any')}>Match any</button>
     <button type="button" class:on={filter.tagMode === 'all'} aria-pressed={filter.tagMode === 'all'} onclick={() => mode('all')}>Match all</button>
   </div>
-  <div class="chips" role="group" aria-label="Tags">
-    {#each tags as tag (tag.key)}
-      <button type="button" class="chip" class:on={filter.tags.includes(tag.key)} aria-pressed={filter.tags.includes(tag.key)}
-              onclick={() => toggle(tag.key)}>{tag.label}</button>
-    {/each}
-  </div>
+  <TagPicker {tags} mode="filter" stateOf={(key) => (filter.tags.includes(key) ? 'on' : 'off')} onToggle={toggle} />
   {#if loading}<p class="muted" role="status">Loading tags…</p>{/if}
   {#if error}<p class="problem" role="alert">{error}</p>{/if}
 </Popover>

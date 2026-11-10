@@ -211,8 +211,8 @@ class PhotoApiTest {
     @Test
     void tagsCanBeListedCreatedRenamedAndDeleted() throws Exception {
         JsonNode list = get("api/tags").get("tags");
-        assertThat(list.size()).isEqualTo(10);
-        assertThat(list.get(9).toString())
+        assertThat(list.size()).isEqualTo(14);
+        assertThat(list.get(13).toString())
                 .isEqualTo("{\"id\":10,\"key\":\"unconfirmed\",\"label\":\"unconfirmed\",\"source\":\"builtin\",\"photoCount\":0}");
         assertThat(list.get(3).toString())
                 .isEqualTo("{\"id\":4,\"key\":\"upper_wing\",\"label\":\"upper_wing\",\"source\":\"builtin\",\"photoCount\":0}");
@@ -220,7 +220,7 @@ class PhotoApiTest {
         JsonNode created = ok(send("POST", "api/tags", "{\"label\":\"Mud-puddling\"}"));
         assertThat(created.get("key").asText()).isEqualTo("mud_puddling");
         long tagId = created.get("id").asLong();
-        assertThat(ok(send("PATCH", "api/tags/" + tagId, "{\"label\":\"Puddling\"}")).get("label").asText()).isEqualTo("puddling");
+        assertThat(ok(send("PATCH", "api/tags/" + tagId, "{\"label\":\"Wet sand\"}")).get("label").asText()).isEqualTo("wet_sand");
 
         long photo = added("A5", TestImages.jpeg(40, 30)).get("id").asLong();
         ok(send("PATCH", "api/photos/" + photo, "{\"tags\":[\"mud_puddling\"]}"));

@@ -13,8 +13,9 @@
 
   /**
    * The species gallery (prototype .tools + .gal): tag chips with counts filter a masonry of photos,
-   * which glide to their new places (FLIP). Built-in tags always show (dimmed when unused); a user tag
-   * shows once a photo of this species carries it. `actions` renders the buttons at the row's end.
+   * which glide to their new places (FLIP). A tag, built-in or not, shows once a photo of this species carries it
+   * (behaviour tags §5); a filter whose last photo lost the tag falls back to All (below), so no chip is at 0. `actions`
+   * renders the buttons at the row's end.
    * Above them, "Where photographed" (contract §3): a chip per place with its count and "N unknown"; a place chip
    * filters too, together with the tag (pressing it again clears it); when no photo has both it says so.
    * `filter` (a tag key or 'all') and `place` (a place id, 'unknown' or null) are bindable so the page can act on what
@@ -34,7 +35,7 @@
   let gal = $state(null);
   let label = $derived(labeller(tags));
   let counts = $derived(tagCounts(photos));
-  let chips = $derived(tags.filter((tag) => tag.source === 'builtin' || counts.get(tag.key)));
+  let chips = $derived(tags.filter((tag) => counts.get(tag.key)));
   let where = $derived(placeChips(photos));
   let widerKey = $state(null);
   let wider = $derived(widerKey ? widerChip(photos, widerKey) : null);
@@ -123,10 +124,9 @@
       All <span class="n">{photos.length}</span>
     </button>
     {#each chips as tag (tag.key)}
-      {@const n = counts.get(tag.key) ?? 0}
-      <button type="button" class="chip" class:on={filter === tag.key} class:dim={!n} aria-disabled={!n ? 'true' : undefined}
-              aria-label="{tag.label}, {n} {n === 1 ? 'photo' : 'photos'}"
-              aria-pressed={filter === tag.key} onclick={() => n && choose(tag.key)}>
+      {@const n = counts.get(tag.key)}
+      <button type="button" class="chip" class:on={filter === tag.key} aria-label="{tag.label}, {n} {n === 1 ? 'photo' : 'photos'}"
+              aria-pressed={filter === tag.key} onclick={() => choose(tag.key)}>
         {tag.label} <span class="n">{n}</span>
       </button>
     {/each}

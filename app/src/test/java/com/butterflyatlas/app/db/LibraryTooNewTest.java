@@ -42,13 +42,13 @@ class LibraryTooNewTest {
 
     @Test
     void theAppKnowsTheNewestMigrationItShips() {
-        assertThat(Database.knownSchemaVersion()).isEqualTo(16);
+        assertThat(Database.knownSchemaVersion()).isEqualTo(17);
     }
 
     @Test
     void aLibraryAboveTheAppsVersionIsRefusedInPlainWordsAndLeftAsItWas() throws Exception {
         Database db = Database.open(file());
-        applied(db, "17");
+        applied(db, "18");
         // closed cleanly into the main file, so a byte comparison says nothing was written
         db.read(c -> {
             try (var st = c.createStatement()) {
@@ -59,11 +59,11 @@ class LibraryTooNewTest {
         String before = sha(file());
 
         assertThatThrownBy(() -> Database.open(file())).isInstanceOf(LibraryTooNewException.class)
-                .hasMessage("This library was made by a newer Butterfly Atlas (database version 17; this one knows 16)."
+                .hasMessage("This library was made by a newer Butterfly Atlas (database version 18; this one knows 17)."
                         + " Install the newer version.")
                 .isInstanceOfSatisfying(LibraryTooNewException.class, e -> {
-                    assertThat(e.found()).isEqualTo(17);
-                    assertThat(e.known()).isEqualTo(16);
+                    assertThat(e.found()).isEqualTo(18);
+                    assertThat(e.known()).isEqualTo(17);
                 });
 
         assertThat(sha(file())).isEqualTo(before);
@@ -72,7 +72,7 @@ class LibraryTooNewTest {
     @Test
     void aLibraryAtOrBelowTheAppsVersionOpensAsBefore() {
         Database.open(file());
-        assertThat(Database.newestSchemaVersion(file())).isEqualTo(OptionalInt.of(16));
+        assertThat(Database.newestSchemaVersion(file())).isEqualTo(OptionalInt.of(17));
 
         Database.open(file()); // again: nothing to refuse
     }
@@ -82,12 +82,12 @@ class LibraryTooNewTest {
         Database db = Database.open(file());
         db.write(c -> {
             try (var st = c.createStatement()) {
-                st.execute("UPDATE flyway_schema_history SET success = 0 WHERE version = '16'");
+                st.execute("UPDATE flyway_schema_history SET success = 0 WHERE version = '17'");
             }
             return null;
         });
 
-        assertThat(Database.newestSchemaVersion(file())).isEqualTo(OptionalInt.of(15));
+        assertThat(Database.newestSchemaVersion(file())).isEqualTo(OptionalInt.of(16));
     }
 
     @Test

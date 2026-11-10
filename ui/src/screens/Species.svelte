@@ -1,5 +1,6 @@
 <script>
   import { PHOTO_ACCEPT, getPhotos, getTags, getTaxon, isPhotoSequence } from '../lib/api.js';
+  import { withTag } from '../lib/tags.js';
   import Breadcrumbs from '../lib/Breadcrumbs.svelte';
   import SpeciesHeader from '../lib/SpeciesHeader.svelte';
   import Outline from '../lib/Outline.svelte';
@@ -60,7 +61,8 @@
   let managingTags = $state(false);
   let managingPlaces = $state(false);
 
-  const load = (wanted) => Promise.all([getTaxon(wanted), getPhotos(wanted), getTags().catch(() => [])]);
+  // The tags failing to load: none on a first load; on a refresh, `tagsFailed` says what to do instead.
+  const load = (wanted, tagsFailed = () => []) => Promise.all([getTaxon(wanted), getPhotos(wanted), getTags().catch(tagsFailed)]);
 
   $effect(() => {
     const wanted = id;
@@ -100,18 +102,26 @@
     };
   });
 
-  /** Reloads the page's data after a change, and the footer's Recently deleted count. */
+  /**
+   * Reloads the page's data after a change, and the footer's Recently deleted count. Tags that can't be read again are
+   * kept as they were (never emptied: a tag just created must not be lost), and a toast says why.
+   */
   async function refresh() {
     const wanted = id;
     refreshStatus();
+    let tagsProblem = null;
     try {
-      const [t, p, g] = await load(wanted);
+      const [t, p, g] = await load(wanted, (e) => {
+        tagsProblem = e;
+        return null;
+      });
       if (wanted !== id) return;
       taxon = t;
       photos = p;
-      tags = g;
+      if (g) tags = g;
       error = '';
       prune();
+      if (tagsProblem) showProblem(tagsProblem);
     } catch (e) {
       // A page that couldn't load says why again (Try again, or the library back); one on screen says it in a toast.
       if (error) error = loadProblem(e);
@@ -125,6 +135,12 @@
     window.addEventListener(LIBRARY_CHANGED, onChange);
     return () => window.removeEventListener(LIBRARY_CHANGED, onChange);
   });
+
+  /** A tag created in the viewer, Tag photos or Add photos: known at once (in tag order), then the page is read again. */
+  async function tagsChanged(tag) {
+    if (tag) tags = withTag(tags, tag);
+    await refresh();
+  }
 
   let title = $derived(taxon ? taxon.common || taxon.name : '');
 
@@ -262,7 +278,7 @@
                       onRemovePlace={unplaceSelected} onDelete={deleteSelected} onCancel={stopSelecting} />
       {/if}
       {#if choosing === 'tags'}
-        <BulkTagDialog photos={chosen} {tags} onApply={tagSelected} onClose={() => (choosing = null)} />
+        <BulkTagDialog photos={chosen} {tags} onApply={tagSelected} onTagsChanged={tagsChanged} onClose={() => (choosing = null)} />
       {:else if choosing === 'species'}
         <SpeciesPicker title="Move {photoCount(chosen.length)} to another species" exclude={taxon.id}
                        onPick={moveSelected} onClose={() => (choosing = null)} />
@@ -279,7 +295,7 @@
       </div>
     {/if}
     {#if adding}
-      <AddPhotosSheet {taxon} {tags} files={dropped} onAdded={added} onClose={sheetClosed} />
+      <AddPhotosSheet {taxon} {tags} files={dropped} onAdded={added} onTagsChanged={tagsChanged} onClose={sheetClosed} />
     {/if}
     {#if managingTags}
       <TagsSheet onChanged={refresh} onClose={() => (managingTags = false)} />
@@ -288,7 +304,7 @@
       <PlacesSheet onChanged={refresh} onClose={() => (managingPlaces = false)} />
     {/if}
     {#if viewing}
-      <PhotoViewer {taxon} {photos} {photoId} {tag} {place} {type} {tags} onChanged={refresh} onClose={() => closeViewer(taxon.id)} />
+      <PhotoViewer {taxon} {photos} {photoId} {tag} {place} {type} {tags} onChanged={refresh} onTagsChanged={tagsChanged} onClose={() => closeViewer(taxon.id)} />
     {/if}
     {#if celebrating}
       <Celebration {taxon} count={celebrating.count} milestone={celebrating.milestone} onClose={() => (celebrating = null)} />

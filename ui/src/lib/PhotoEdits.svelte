@@ -3,6 +3,7 @@
   import { deletePhotos, movePhotos, placePhotos, setCover, setPhotoTags, unplacePhotos } from './api.js';
   import SpeciesPicker, { addedButFailed } from './SpeciesPicker.svelte';
   import PlacePicker from './PlacePicker.svelte';
+  import TagPicker from './TagPicker.svelte';
   import { showToast } from './toast.svelte.js';
   import { REMOVE, UNKNOWN_PLACE } from './messages.js';
 
@@ -12,9 +13,11 @@
    * or was set by the user) with Change (the place picker) and Remove, its file, and setting it as the cover of its
    * `species`, moving it to another species or deleting it. After a change the viewer reads the photos again
    * (`onChanged`); moving or deleting takes the photo out, and `onLeft()` lets the viewer move on before it does.
-   * A refusal shows in the panel's alert.
+   * A refusal shows in the panel's alert. The tags are a TagPicker (behaviour tags §4) over this photo: a tag created
+   * there is given to the screen (`onTagsChanged(tag)`, null after a refused Create), which keeps it and reads its tags
+   * again, before it goes on the photo.
    */
-  let { photo, species, tags = [], onChanged = async () => {}, onLeft } = $props();
+  let { photo, species, tags = [], onChanged = async () => {}, onTagsChanged = async () => {}, onLeft } = $props();
 
   let busy = $state(false);
   let error = $state('');
@@ -81,12 +84,8 @@
 </script>
 
 <h3>Tags</h3>
-<div class="chips" role="group" aria-label="Tags on this photo">
-  {#each tags as tag (tag.key)}
-    <button class="chip" type="button" class:on={photo.tags.includes(tag.key)} aria-pressed={photo.tags.includes(tag.key)}
-            aria-disabled={busy} onclick={() => toggleTag(tag.key)}>{tag.label}</button>
-  {/each}
-</div>
+<TagPicker {tags} label="Tags on this photo" stateOf={(key) => (photo.tags.includes(key) ? 'on' : 'off')} onToggle={toggleTag}
+           onCreated={onTagsChanged} disabled={busy} scope={photo.id} blurOnEmptyEscape />
 {#if !photo.tags.length}<p class="muted">Untagged</p>{/if}
 <h3>Place</h3>
 {#if photo.place}

@@ -1,7 +1,8 @@
 import { TAG_NAME_EMPTY, TAG_NAME_TOO_LONG, TAG_NAME_TOO_MANY_WORDS, tagNameTaken } from './messages.js';
 
 /** Tag helpers shared by the gallery, viewer and sheets. Photos carry tag keys; labels come from GET /api/tags. */
-export const ADULT_KEYS = ['upper_wing', 'under_wing', 'male', 'female', 'dsf', 'wsf'];
+/** The tags that mean "an adult" (behaviour tags §3): the same keys, in the same order, as the server's PhotoRows.ADULT_KEYS. */
+export const ADULT_KEYS = ['upper_wing', 'under_wing', 'male', 'female', 'dsf', 'wsf', 'mating', 'nectaring', 'puddling'];
 
 /** A key → label function for the given tag list; unknown keys read as the key itself. */
 export function labeller(tags) {
@@ -24,6 +25,39 @@ const abbreviation = (word) => {
 export function formTagName(raw) {
   return (raw ?? '').normalize('NFC').replace(NOT_ALPHANUMERIC, '_').split('_').filter(Boolean)
     .map((word) => (abbreviation(word) ? word : word.toLowerCase())).join('_');
+}
+
+/** A name as the picker's search compares it: its one form, without case. */
+const searchForm = (raw) => formTagName(raw).toLowerCase();
+
+/**
+ * The tags whose name contains what is typed (behaviour tags §4.2), in the order given (tag order): without case, with
+ * spaces, `_` and other marks counted as the same, leading and trailing spaces ignored (both sides take formTagName's
+ * form). Nothing is typed (or only spaces or marks): no match.
+ */
+export function matchTags(tags, query) {
+  const wanted = searchForm(query);
+  if (!wanted) return [];
+  return (tags ?? []).filter((tag) => searchForm(tag.label).includes(wanted));
+}
+
+/** The tag whose name is the typed name (after formTagName, without case), or null. */
+export function tagNamed(tags, query) {
+  const wanted = searchForm(query);
+  if (!wanted) return null;
+  return (tags ?? []).find((tag) => searchForm(tag.label) === wanted) ?? null;
+}
+
+/**
+ * `tags` with `tag` in its place in tag order (TagService.ORDER: built-in tags first as they are, then the user's by
+ * name without case), for a tag just created; the list as it is when it already has the key.
+ */
+export function withTag(tags, tag) {
+  const list = tags ?? [];
+  if (list.some((each) => each.key === tag.key)) return list;
+  const name = tag.label.toLowerCase();
+  const at = list.findIndex((each) => each.source !== 'builtin' && (tag.source === 'builtin' || each.label.toLowerCase() > name));
+  return at === -1 ? [...list, tag] : [...list.slice(0, at), tag, ...list.slice(at)];
 }
 
 /** How many words a formed name has. */

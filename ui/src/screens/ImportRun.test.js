@@ -5,7 +5,7 @@ import Toast from '../lib/Toast.svelte';
 import {
   acceptSuggestions, assignItems, discardImport, fileImport, finishImport, getFsRoots, getImportResult, getImport, getImportItems, getStatus, getTags, listFolder, pauseImport, relocateImport, search,
   skipItems, startImport, tagItems, getRecentPlaces, placeItems, unplaceItems, getMyPlaces, deletePlace,
-  addCustomSpecies, checkCustomName, getChildren, putImportPairs, checkHeic,
+  addCustomSpecies, checkCustomName, getChildren, putImportPairs, checkHeic, createTag,
 } from '../lib/api.js';
 import { folderSections } from '../lib/importView.js';
 import { HEIC_CHANGED, resetStatus, status } from '../lib/status.svelte.js';
@@ -21,7 +21,7 @@ vi.mock('../lib/api.js', () => ({
   placeItems: vi.fn(), unplaceItems: vi.fn(), getRecentPlaces: vi.fn(), searchPlaces: vi.fn(), addPlace: vi.fn(), getMyPlaces: vi.fn(),
   renamePlace: vi.fn(), deletePlace: vi.fn(),
   addCustomSpecies: vi.fn(), checkCustomName: vi.fn(), getChildren: vi.fn(), renameCustomSpecies: vi.fn(), putImportPairs: vi.fn(),
-  checkHeic: vi.fn(), getBackup: vi.fn(),
+  checkHeic: vi.fn(), getBackup: vi.fn(), createTag: vi.fn(),
   importPreviewUrl: (importId, item) => (item.v == null ? null : `./api/imports/${importId}/items/${item.id}/preview?v=${item.v}`),
   importDisplayUrl: (importId, item) => `./api/imports/${importId}/items/${item.id}/display?v=${item.v}`,
 }));
@@ -163,6 +163,49 @@ test('T tags the selected photos; X skips them and X again files them after all'
   expect(screen.getByRole('button', { name: /^Don't skip/ })).toBeTruthy();
   await fireEvent.click(screen.getByRole('button', { name: /^Don't skip/ }));
   expect(skipItems).toHaveBeenLastCalledWith(3, [4], false);
+});
+
+test('a tag created in Tag photos: the tags are read again, the new one is marked for every chosen photo and sent on Apply', async () => {
+  const roosting = { id: 30, key: 'roosting', label: 'roosting', source: 'user', photoCount: 0 };
+  createTag.mockResolvedValue(roosting);
+  tagItems.mockResolvedValue(page([item(4, { taxonId: 'A6', tags: ['roosting'] })]));
+  await open();
+  getTags.mockResolvedValue([{ id: 6, key: 'male', label: 'male', source: 'builtin', photoCount: 0 }, roosting]);
+
+  await fireEvent.click(tile(4));
+  await fireEvent.keyDown(window, { key: 't' });
+  const dialog = screen.getByRole('dialog', { name: 'Tag 1 photo' });
+  const box = within(dialog).getByRole('searchbox', { name: 'Find or add a tag' });
+  await fireEvent.input(box, { target: { value: 'roosting' } });
+  await fireEvent.keyDown(box, { key: 'Enter' });
+
+  const tags = within(within(dialog).getByRole('group', { name: 'Tags' }));
+  await vi.waitFor(() => expect(tags.getByRole('checkbox', { name: 'roosting' }).getAttribute('aria-checked')).toBe('true'));
+  expect(getTags).toHaveBeenCalledTimes(2);
+  await fireEvent.click(within(dialog).getByRole('button', { name: 'Apply' }));
+  expect(tagItems).toHaveBeenCalledWith(3, [4], ['roosting'], []);
+});
+
+test('Tag photos in Import applies a tag just created even when the tags can\'t be read again, and says why', async () => {
+  const roosting = { id: 30, key: 'roosting', label: 'roosting', source: 'user', photoCount: 0 };
+  createTag.mockResolvedValue(roosting);
+  tagItems.mockResolvedValue(page([item(4, { taxonId: 'A6', tags: ['roosting'] })]));
+  await open();
+  getTags.mockRejectedValue(new Error('Butterfly Atlas could not reach its service.'));
+
+  await fireEvent.click(tile(4));
+  await fireEvent.keyDown(window, { key: 't' });
+  const dialog = screen.getByRole('dialog', { name: 'Tag 1 photo' });
+  const box = within(dialog).getByRole('searchbox');
+  await fireEvent.input(box, { target: { value: 'roosting' } });
+  await fireEvent.keyDown(box, { key: 'Enter' });
+
+  const tags = within(within(dialog).getByRole('group', { name: 'Tags' }));
+  await vi.waitFor(() => expect(tags.getByRole('checkbox', { name: 'roosting' }).getAttribute('aria-checked')).toBe('true'));
+  expect(tags.getByRole('checkbox', { name: 'male' })).toBeTruthy();
+  expect(await screen.findByText('Butterfly Atlas could not reach its service.')).toBeTruthy();
+  await fireEvent.click(within(dialog).getByRole('button', { name: 'Apply' }));
+  expect(tagItems).toHaveBeenCalledWith(3, [4], ['roosting'], []);
 });
 
 test('accepts a folder\'s suggestions, and skips the photos already in the library in one go', async () => {

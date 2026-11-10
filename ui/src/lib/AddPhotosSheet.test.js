@@ -1,10 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import AddPhotosSheet from './AddPhotosSheet.svelte';
-import { uploadPhoto } from './api.js';
+import { createTag, uploadPhoto } from './api.js';
 import { resetStatus, status } from './status.svelte.js';
 
-vi.mock('./api.js', () => ({ uploadPhoto: vi.fn(), PHOTO_ACCEPT: 'image/jpeg,.jpg', getStatus: vi.fn(), checkHeic: vi.fn(), getBackup: vi.fn() }));
+vi.mock('./api.js', () => ({ createTag: vi.fn(), uploadPhoto: vi.fn(), PHOTO_ACCEPT: 'image/jpeg,.jpg', getStatus: vi.fn(), checkHeic: vi.fn(), getBackup: vi.fn() }));
 
 const taxon = {
   id: 'A5', name: 'Danaus chrysippus', common: 'Plain Tiger', family: 'Nymphalidae',
@@ -372,4 +372,64 @@ test('a backup that does not hold the photos (a database only) lets them go', as
   await fireEvent.click(screen.getByRole('button', { name: 'Add 1 photo' }));
   await vi.waitFor(() => expect(onClose).toHaveBeenCalled());
   expect(uploadPhoto).toHaveBeenCalledTimes(1);
+});
+
+test('the tags are a picker: a user tag is found by typing, and a new one is created, read again and sent with the photos', async () => {
+  const basking = { id: 20, key: 'basking', label: 'basking', source: 'user', photoCount: 3 };
+  const roosting = { id: 21, key: 'roosting', label: 'roosting', source: 'user', photoCount: 0 };
+  createTag.mockResolvedValue(roosting);
+  uploadPhoto.mockImplementation(async () => added(1));
+  const onClose = vi.fn();
+  const view = render(AddPhotosSheet, { taxon, tags: [...tags, basking], onClose });
+  const onTagsChanged = vi.fn(async () => view.rerender({ tags: [...tags, basking, roosting] }));
+  await view.rerender({ onTagsChanged });
+
+  const group = screen.getByRole('group', { name: 'Tags for these photos' });
+  expect([...group.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['larva', 'male']);
+  const box = screen.getByRole('searchbox', { name: 'Find or add a tag' });
+  await fireEvent.input(box, { target: { value: 'bask' } });
+  await fireEvent.keyDown(box, { key: 'Enter' });
+  await fireEvent.input(box, { target: { value: 'roosting' } });
+  await fireEvent.keyDown(box, { key: 'Enter' });
+  await vi.waitFor(() => expect(screen.getByRole('button', { name: 'roosting' }).getAttribute('aria-pressed')).toBe('true'));
+  expect(onTagsChanged).toHaveBeenCalledWith(roosting);
+
+  await choose(jpeg('a.jpg'));
+  await fireEvent.click(screen.getByRole('button', { name: 'Add 1 photo' }));
+  await vi.waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+  expect(uploadPhoto).toHaveBeenCalledWith('A5', expect.anything(), expect.objectContaining({ tags: ['basking', 'roosting'] }));
+});
+
+test('Esc in the tag box with text clears it and keeps the sheet; in the empty box it closes the sheet', async () => {
+  const onClose = vi.fn();
+  render(AddPhotosSheet, { taxon, tags, onClose });
+  const box = screen.getByRole('searchbox');
+  await fireEvent.input(box, { target: { value: 'lar' } });
+  await fireEvent.keyDown(box, { key: 'Escape' });
+  expect(box.value).toBe('');
+  expect(onClose).not.toHaveBeenCalled();
+  await fireEvent.keyDown(box, { key: 'Escape' });
+  expect(onClose).toHaveBeenCalledOnce();
+});
+
+test('while a tag is being created, Add waits: it is aria-disabled and sends nothing', async () => {
+  let finish;
+  createTag.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+  uploadPhoto.mockImplementation(async () => added(1));
+  const onClose = vi.fn();
+  render(AddPhotosSheet, { taxon, tags, onClose });
+  await choose(jpeg('a.jpg'));
+  const box = screen.getByRole('searchbox');
+  await fireEvent.input(box, { target: { value: 'roosting' } });
+  await fireEvent.keyDown(box, { key: 'Enter' });
+
+  const add = screen.getByRole('button', { name: 'Add 1 photo' });
+  expect(add.getAttribute('aria-disabled')).toBe('true');
+  await fireEvent.click(add);
+  expect(uploadPhoto).not.toHaveBeenCalled();
+
+  finish({ id: 21, key: 'roosting', label: 'roosting', source: 'user', photoCount: 0 });
+  await vi.waitFor(() => expect(add.getAttribute('aria-disabled')).toBe('false'));
+  await fireEvent.click(add);
+  await vi.waitFor(() => expect(uploadPhoto).toHaveBeenCalledOnce());
 });

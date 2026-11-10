@@ -1,8 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { beforeEach, expect, test, vi } from 'vitest';
 import ExportViewer from './ExportViewer.svelte';
+import { createTag, setPhotoTags } from './api.js';
 
 vi.mock('./api.js', () => ({
+  createTag: vi.fn(), setPhotoTags: vi.fn(), deletePhotos: vi.fn(), movePhotos: vi.fn(), setCover: vi.fn(), placePhotos: vi.fn(), unplacePhotos: vi.fn(),
   displayUrl: (id) => `./api/photos/${id}/display`,
   photoThumb: (photo) => `./api/photos/${photo.id}/thumb?v=1`,
 }));
@@ -13,9 +15,10 @@ const photo = (id, over = {}) => ({
   species: { id: 'A5', name: 'Danaus chrysippus', common: 'Plain Tiger' }, ...over,
 });
 const photos = [photo(3, { tags: ['larva'] }), photo(2, { place: null }), photo(1, { taxonId: 'A9', species: { id: 'A9', name: 'Danaus genutia', common: null } })];
-const tags = [{ key: 'larva', label: 'larva' }];
+const tags = [{ key: 'larva', label: 'larva', source: 'builtin' }];
 
 beforeEach(() => {
+  vi.resetAllMocks();
   window.location.hash = '#/export/photo/3?places=P20';
 });
 
@@ -162,4 +165,43 @@ test('the title always links to the photo\'s species, replacing the viewer\'s ad
   await fireEvent.click(link);
 
   expect(window.location.hash).toBe('#/species/A9');
+});
+
+const editableTags = [{ id: 2, key: 'larva', label: 'larva', source: 'builtin', photoCount: 1 }];
+
+test('keys typed in the edit panel\'s tag box neither zoom, move nor close (as in the species viewer)', async () => {
+  const { onClose, container } = open({ editable: true, tags: editableTags });
+  const box = screen.getByRole('searchbox', { name: 'Find or add a tag' });
+  box.focus();
+  await fireEvent.input(box, { target: { value: 'la' } });
+  for (const key of ['-', '+', '=', '0', 'ArrowRight', 'ArrowLeft']) await fireEvent.keyDown(box, { key });
+  expect(container.querySelector('.zp-photo').dataset.scale).toBe('1');
+  expect(window.location.hash).toBe('#/export/photo/3?places=P20');
+
+  await fireEvent.keyDown(box, { key: 'Escape' });
+  expect(box.value).toBe('');
+  expect(onClose).not.toHaveBeenCalled();
+  await fireEvent.keyDown(box, { key: 'Escape' });
+  expect(onClose).not.toHaveBeenCalled();
+  expect(document.activeElement).not.toBe(box);
+  await fireEvent.keyDown(document.activeElement, { key: 'Escape' });
+  expect(onClose).toHaveBeenCalledOnce();
+});
+
+test('outside a text box the keys still work in the editable viewer', async () => {
+  const { container } = open({ editable: true, tags: editableTags });
+  await fireEvent.keyDown(window, { key: '+' });
+  expect(container.querySelector('.zp-photo').dataset.scale).toBe('1.25');
+});
+
+test('a tag created in the editable viewer has the screen read its tags again before it goes on the photo', async () => {
+  const order = [];
+  createTag.mockResolvedValue({ id: 21, key: 'roosting', label: 'roosting', source: 'user', photoCount: 0 });
+  setPhotoTags.mockImplementation(async (id, keys) => order.push(`set ${id} ${keys.join(',')}`));
+  const onTagsChanged = vi.fn(async () => order.push('re-read'));
+  open({ editable: true, tags: editableTags, onTagsChanged });
+
+  await fireEvent.input(screen.getByRole('searchbox'), { target: { value: 'roosting' } });
+  await fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Enter' });
+  await vi.waitFor(() => expect(order).toEqual(['re-read', 'set 3 larva,roosting']));
 });

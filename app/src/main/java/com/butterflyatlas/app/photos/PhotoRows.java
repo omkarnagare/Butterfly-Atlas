@@ -22,8 +22,12 @@ import java.util.stream.Collectors;
 /** Reading photos, their tags and the cover rule, inside a caller's connection. */
 final class PhotoRows {
 
-    /** Tags that mean "an adult": they count for the life cycle and win the automatic cover. */
-    static final Set<String> ADULT_KEYS = Set.of("upper_wing", "under_wing", "male", "female", "dsf", "wsf");
+    /**
+     * Tags that mean "an adult": they count for the life cycle and win the automatic cover. Mating, nectaring and
+     * puddling are done only by adults; predated is not here (any stage can be), so a photo's other tags decide.
+     */
+    static final Set<String> ADULT_KEYS = Set.of("upper_wing", "under_wing", "male", "female", "dsf", "wsf",
+            "mating", "nectaring", "puddling");
 
     private static final String ADULT_LIST = ADULT_KEYS.stream().sorted().map(k -> "'" + k + "'")
             .collect(Collectors.joining(", "));

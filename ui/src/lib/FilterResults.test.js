@@ -2,18 +2,22 @@ import { fireEvent, render, screen } from '@testing-library/svelte';
 import { createRawSnippet } from 'svelte';
 import { beforeEach, expect, test, vi } from 'vitest';
 import FilterResults from './FilterResults.svelte';
-import { deletePhotos, filterCount, filterPhotos, filterPlaces, filterSpecies, getTags, setPhotoTags } from './api.js';
+import { createTag, deletePhotos, filterCount, filterPhotos, filterPlaces, filterSpecies, getTags, setPhotoTags } from './api.js';
 import { showToast } from './toast.svelte.js';
 import { EMPTY } from './filter.js';
 
 vi.mock('./api.js', () => ({
   filterCount: vi.fn(), filterSpecies: vi.fn(), filterPhotos: vi.fn(), filterPlaces: vi.fn(), getTags: vi.fn(), search: vi.fn(), searchPlaces: vi.fn(),
-  setPhotoTags: vi.fn(), deletePhotos: vi.fn(), movePhotos: vi.fn(), setCover: vi.fn(), placePhotos: vi.fn(), unplacePhotos: vi.fn(),
+  createTag: vi.fn(), setPhotoTags: vi.fn(), deletePhotos: vi.fn(), movePhotos: vi.fn(), setCover: vi.fn(), placePhotos: vi.fn(), unplacePhotos: vi.fn(),
   photoThumb: (photo) => `./api/photos/${photo.id}/thumb?v=1`,
   displayUrl: (id) => `./api/photos/${id}/display`,
 }));
 
-vi.mock('./toast.svelte.js', () => ({ showToast: vi.fn() }));
+// showProblem says a problem through showToast (its links are checked in Toast.test.js)
+vi.mock('./toast.svelte.js', () => {
+  const showToast = vi.fn();
+  return { showToast, showProblem: (e) => showToast(e.message) };
+});
 
 const count = (query) => ({ photos: 2, species: 1, photographedSpecies: 1, bytes: 1000, manualSpecies: false, filter: { ...EMPTY, query } });
 const photo = (id) => ({
@@ -117,4 +121,43 @@ test('the results viewer is read-only unless the screen makes it editable', asyn
 
   await screen.findByRole('dialog');
   expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
+});
+
+test('a tag created in Explore\'s viewer: the screen reads its tags again (tags and names), then the tag goes on the photo', async () => {
+  const roosting = { id: 21, key: 'roosting', label: 'roosting', source: 'user', photoCount: 0 };
+  createTag.mockResolvedValue(roosting);
+  setPhotoTags.mockResolvedValue({});
+  openEditable();
+  await screen.findByRole('button', { name: 'female' });
+  await vi.waitFor(() => expect(getTags).toHaveBeenCalledOnce());
+  getTags.mockResolvedValue([female, roosting]);
+  filterPhotos.mockResolvedValue({ photos: [photo(1), { ...photo(2), tags: ['female', 'roosting'] }, photo(3)], next: null });
+
+  await fireEvent.input(screen.getByRole('searchbox', { name: 'Find or add a tag' }), { target: { value: 'roosting' } });
+  await fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Enter' });
+
+  await vi.waitFor(() => expect(setPhotoTags).toHaveBeenCalledWith(2, ['female', 'roosting']));
+  expect(getTags).toHaveBeenCalledTimes(2);
+  expect(getTags.mock.invocationCallOrder[1]).toBeLessThan(setPhotoTags.mock.invocationCallOrder[0]);
+  // the new tag is known to the screen: once the results are read again its chip shows on the photo, pressed
+  await vi.waitFor(() => expect(screen.getByRole('button', { name: 'roosting' }).getAttribute('aria-pressed')).toBe('true'));
+});
+
+test('a tag created in Explore\'s viewer while the tags can\'t be read again is kept, goes on the photo, and the screen says why', async () => {
+  const roosting = { id: 21, key: 'roosting', label: 'roosting', source: 'user', photoCount: 0 };
+  createTag.mockResolvedValue(roosting);
+  setPhotoTags.mockResolvedValue({});
+  openEditable();
+  await screen.findByRole('button', { name: 'female' });
+  await vi.waitFor(() => expect(getTags).toHaveBeenCalledOnce());
+  getTags.mockRejectedValue(new Error('Butterfly Atlas could not reach its service.'));
+  filterPhotos.mockResolvedValue({ photos: [photo(1), { ...photo(2), tags: ['female', 'roosting'] }, photo(3)], next: null });
+
+  await fireEvent.input(screen.getByRole('searchbox', { name: 'Find or add a tag' }), { target: { value: 'roosting' } });
+  await fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Enter' });
+
+  await vi.waitFor(() => expect(setPhotoTags).toHaveBeenCalledWith(2, ['female', 'roosting']));
+  expect(showToast).toHaveBeenCalledWith('Butterfly Atlas could not reach its service.');
+  await vi.waitFor(() => expect(screen.getByRole('button', { name: 'roosting' }).getAttribute('aria-pressed')).toBe('true'));
+  expect(screen.getByRole('button', { name: 'female' })).toBeTruthy();
 });

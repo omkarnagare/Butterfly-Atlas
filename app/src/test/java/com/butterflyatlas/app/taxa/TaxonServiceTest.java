@@ -248,6 +248,28 @@ class TaxonServiceTest {
     }
 
     @Test
+    void matingNectaringAndPuddlingMeanAnAdultButPredatedLeavesItToTheOtherTags() {
+        long nectaring = TestBundles.addImage(db, "A5");
+        TestBundles.tagImage(db, nectaring, "nectaring");
+        TestBundles.tagImage(db, TestBundles.addImage(db, "A5"), "larva"); // newer (same time, higher id)
+        long predated = TestBundles.addImage(db, "A6");
+        TestBundles.tagImage(db, predated, "predated");
+        long predatedLarva = TestBundles.addImage(db, "A12");
+        TestBundles.tagImage(db, predatedLarva, "predated", "larva");
+        long puddling = TestBundles.addImage(db, "A13");
+        TestBundles.tagImage(db, puddling, "puddling");
+        long mating = TestBundles.addImage(db, "A14");
+        TestBundles.tagImage(db, mating, "mating");
+
+        assertThat(taxa.taxon("A5").stages()).isEqualTo(new Stages(false, true, false, true));
+        assertThat(taxa.taxon("A5").cover().id()).as("the nectaring photo is the adult").isEqualTo(nectaring);
+        assertThat(taxa.taxon("A6").stages()).as("predated alone is no stage").isEqualTo(Stages.NONE);
+        assertThat(taxa.taxon("A12").stages()).as("predated with larva is a larva").isEqualTo(new Stages(false, true, false, false));
+        assertThat(taxa.taxon("A13").stages()).isEqualTo(new Stages(false, false, false, true));
+        assertThat(taxa.taxon("A14").stages()).isEqualTo(new Stages(false, false, false, true));
+    }
+
+    @Test
     void higherRanksCountThePhotosBelowThem() {
         TestBundles.addImage(db, "A5");
         TestBundles.addImage(db, "A6");
@@ -322,5 +344,21 @@ class TaxonServiceTest {
         assertThat(taxa.taxon("A5").stages().full()).isTrue();
         TestBundles.markDeleted(db, pupa);
         assertThat(taxa.summary().fullLifeCycles()).isEmpty();
+    }
+
+    @Test
+    void aMatingPhotoIsTheAdultOfAFullLifeCycle() {
+        for (String stage : new String[] {"egg", "larva", "pupa"}) {
+            TestBundles.tagImage(db, TestBundles.addImage(db, "A5"), stage);
+        }
+        long predated = TestBundles.addImage(db, "A5");
+        TestBundles.tagImage(db, predated, "predated");
+        assertThat(taxa.summary().fullLifeCycles()).as("predated is no adult").isEmpty();
+
+        long mating = TestBundles.addImage(db, "A5");
+        TestBundles.tagImage(db, mating, "mating");
+
+        assertThat(taxa.summary().fullLifeCycles()).extracting(TaxonCard::id).containsExactly("A5");
+        assertThat(taxa.taxon("A5").stages().full()).isTrue();
     }
 }

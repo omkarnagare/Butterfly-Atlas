@@ -39,9 +39,11 @@ class TagServiceTest {
     @Test
     void listsTheBuiltInTagsInOrder() {
         assertThat(tags.list()).extracting(Tag::key).containsExactly(
-                "egg", "larva", "pupa", "upper_wing", "under_wing", "male", "female", "dsf", "wsf", "unconfirmed");
+                "egg", "larva", "pupa", "upper_wing", "under_wing", "male", "female", "dsf", "wsf", "mating", "nectaring",
+                "puddling", "predated", "unconfirmed");
         assertThat(tags.list()).extracting(Tag::label).containsExactly(
-                "egg", "larva", "pupa", "upper_wing", "under_wing", "male", "female", "DSF", "WSF", "unconfirmed");
+                "egg", "larva", "pupa", "upper_wing", "under_wing", "male", "female", "DSF", "WSF", "mating", "nectaring",
+                "puddling", "predated", "unconfirmed");
         assertThat(tags.list()).allSatisfy(t -> {
             assertThat(t.source()).isEqualTo("builtin");
             assertThat(t.photoCount()).isZero();
@@ -68,20 +70,21 @@ class TagServiceTest {
         assertThat(created.key()).isEqualTo("mud_puddling");
         assertThat(created.label()).isEqualTo("mud_puddling");
         assertThat(created.source()).isEqualTo("user");
-        assertThat(tags.list()).extracting(Tag::key).endsWith("wsf", "unconfirmed", "basking", "mud_puddling");
+        assertThat(tags.list()).extracting(Tag::key)
+                .endsWith("wsf", "mating", "nectaring", "puddling", "predated", "unconfirmed", "basking", "mud_puddling");
     }
 
     @Test
     void keysStayUniqueAndLabelsMustBeNew() {
         Tag mud = tags.create("Mud-puddling");
-        tags.rename(mud.id(), "puddling");
+        tags.rename(mud.id(), "wet_sand");
 
         assertThat(tags.create("mud puddling").key()).isEqualTo("mud_puddling-2");
-        assertThatThrownBy(() -> tags.create("PUDDLING")).isInstanceOfSatisfying(AtlasException.class, e -> {
+        assertThatThrownBy(() -> tags.create("WET SAND")).isInstanceOfSatisfying(AtlasException.class, e -> {
             assertThat(e.kind()).isEqualTo(AtlasException.Kind.INVALID);
-            assertThat(e.getMessage()).isEqualTo("There is already a tag called \"puddling\".");
+            assertThat(e.getMessage()).isEqualTo("There is already a tag called \"wet_sand\".");
         });
-        assertThatThrownBy(() -> tags.create("Puddling!")).isInstanceOf(AtlasException.class);
+        assertThatThrownBy(() -> tags.create("Wet-sand!")).isInstanceOf(AtlasException.class);
         assertThatThrownBy(() -> tags.create("Male")).isInstanceOf(AtlasException.class);
     }
 

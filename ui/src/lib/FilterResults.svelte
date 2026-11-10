@@ -1,6 +1,7 @@
 <script>
   import { onDestroy, onMount, tick, untrack } from 'svelte';
   import { filterCount, filterPlaces, filterSpecies, getTags } from './api.js';
+  import { withTag } from './tags.js';
   import FilterRow from './FilterRow.svelte';
   import Presets from './Presets.svelte';
   import CountLine from './CountLine.svelte';
@@ -19,7 +20,7 @@
   import { LIBRARY_CHANGED } from './status.svelte.js';
   import { loadProblem } from './problems.js';
   import { closeViewerTo } from './viewer.js';
-  import { showToast } from './toast.svelte.js';
+  import { showProblem, showToast } from './toast.svelte.js';
   import { LIFE_STAGES, NOT_PHOTOGRAPHED, PHOTOGRAPHED, PHOTO_STATUS, removedForLifeStages } from './messages.js';
 
   /**
@@ -341,13 +342,28 @@
 
   /* ---------- the page ---------- */
 
+  const knowTags = (all) => {
+    tags = all;
+    names = mergeNames(names, { tags: all });
+  };
+
+  /**
+   * A tag created in the viewer (behaviour tags §4.4; null when Create was refused): known at once, in tag order, then
+   * the tags are read again (their names for the filter row, the Tags popover and the viewer). A failed read keeps the
+   * list (with the new tag) and a toast says why.
+   */
+  async function tagsChanged(tag) {
+    if (tag) knowTags(withTag(tags, tag));
+    try {
+      knowTags(await getTags());
+    } catch (e) {
+      showProblem(e);
+    }
+  }
+
   onMount(() => {
-    getTags()
-      .then((all) => {
-        tags = all;
-        names = mergeNames(names, { tags: all });
-      })
-      .catch(() => {});
+    // Read once; without them the filter row shows tag keys (as it always has).
+    getTags().then(knowTags).catch(() => {});
     // The library changed: count again and load the view again; loaded photos are loaded again in place, so the grid
     // and the scroll position stay.
     const onChange = () => {
@@ -426,7 +442,7 @@
 {/if}
 
 {#if viewing}
-  <ExportViewer photos={viewerPhotos} {photoId} {query} {tags} {editable} onEdited={edited} {photoHref} total={count?.photos ?? pages.photos.length} hasMore={pages.next !== null} loading={pages.loading}
+  <ExportViewer photos={viewerPhotos} {photoId} {query} {tags} {editable} onEdited={edited} onTagsChanged={tagsChanged} {photoHref} total={count?.photos ?? pages.photos.length} hasMore={pages.next !== null} loading={pages.loading}
                 error={pages.error} onMore={() => loadPhotos(false)} onRetry={retryViewerPage}
                 returnFocus={(id) => document.querySelector(`.fgrid [data-photo-id="${id}"]`)} onClose={() => closeViewerTo(resultsHref(query, 'photos'))} />
 {/if}
