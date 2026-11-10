@@ -314,7 +314,7 @@ final class AppStart {
                     if (l != null) {
                         l.fallBack(why);
                     }
-                }, why -> quit(why, running, 0));
+                }, why -> quit(why, running, 0, true));
         Session session = new Session(keys, timer, () -> launcher.get() == null ? WindowLauncher.Mode.WINDOW
                 : launcher.get().mode(), closing::get, options.configDir(), log.folder(), Session.PING,
                 () -> newWindow(() -> serving.get().baseUri().resolve(SessionKeys.LAUNCH_QUERY + keys.newKey()), launchFiles,
@@ -425,12 +425,29 @@ final class AppStart {
 
     /** The last window closed (or none ever opened): the quit starts at once, the exit follows on a thread of its own. */
     private void quit(String why, AtomicReference<Running> running, int code) {
+        quit(why, running, code, false);
+    }
+
+    /**
+     * As {@link #quit(String, AtomicReference, int)}; with {@code closeBrowser} (the last window closed) the browser on our
+     * profile is asked to quit too, once the quit has begun (so a click then starts the app again rather than opening a
+     * window in it): macOS keeps an app running with no window, so its Dock tile stayed after ours went (app-icon spec
+     * §4.1). Never the user's own browser, never in the default-browser fallback, never force-killed.
+     */
+    private void quit(String why, AtomicReference<Running> running, int code, boolean closeBrowser) {
         log.info(why + " Butterfly Atlas is quitting.");
         quitting.set(true);
         Running app = running.get();
         Thread thread = new Thread(() -> {
             if (app != null) {
                 app.beginQuit();
+            }
+            if (closeBrowser) {
+                try {
+                    desktop.closeWindows(CLOSE_WINDOWS_WAIT);
+                } catch (RuntimeException e) {
+                    log.warn("The browser could not be asked to quit", e);
+                }
             }
             boolean again;
             synchronized (relaunchLock) {

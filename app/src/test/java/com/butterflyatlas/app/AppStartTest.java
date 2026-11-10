@@ -922,6 +922,8 @@ class AppStartTest {
         assertThat(closing.status()).isEqualTo(503);
         assertThat(closing.body()).contains("\"code\":\"closing\"");
         assertThat(Files.readString(log.file())).contains("The last window was closed. Butterfly Atlas is quitting.");
+        // the browser on our profile quits too (macOS keeps an app running with no window: its Dock tile stayed)
+        assertThat(desktop.calls).as("asked before the exit").contains("close 5s, exits []");
     }
 
     @Test
