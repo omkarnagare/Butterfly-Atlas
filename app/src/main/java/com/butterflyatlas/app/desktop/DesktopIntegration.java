@@ -30,6 +30,14 @@ public interface DesktopIntegration {
     /** A window's page has connected (its stream opened). */
     void windowConnected();
 
+    /**
+     * Whether the browser showing our windows has none left, as the OS tells it: true only when that is known (a browser
+     * process of ours, in window mode, whose window list says none); false when it is not, or cannot be told. The quit
+     * timer asks it once the last window's stream has dropped, to quit at once rather than after the whole wait, which
+     * stays for a reload, waking from sleep or a minimised window (the window is still there).
+     */
+    boolean windowsGone();
+
     /** Brings our windows to the front; false when it could not (no browser process known, a native failure). */
     boolean bringForward();
 

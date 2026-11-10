@@ -77,6 +77,43 @@ class WindowsDesktopTest {
         return Files.readString(log.file());
     }
 
+    /** A desktop whose browser process has {@code count} windows (-1: the calls failed). */
+    private WindowsDesktop withWindows(int count) {
+        return new WindowsDesktop(new TaskbarWindows() {
+            @Override
+            public int adopt(long processId, Path path) {
+                return 0;
+            }
+
+            @Override
+            public int windowCount(long processId) {
+                if (count < 0) {
+                    throw new IllegalStateException("EnumWindows failed");
+                }
+                return count;
+            }
+        }, () -> pid, mode::get, () -> appPath, (task, delayMillis) -> scheduled.add(new Task(delayMillis, task)), log);
+    }
+
+    @Test
+    void theWindowsAreGoneOnlyWhenTheBrowserHasNone() {
+        assertThat(withWindows(0).windowsGone()).isTrue();
+        assertThat(withWindows(1).windowsGone()).isFalse();
+        appPath = null; // a development run: the same answer
+        assertThat(withWindows(0).windowsGone()).isTrue();
+    }
+
+    @Test
+    void whenItCannotTellTheWindowsAreNotGone() {
+        assertThat(withWindows(-1).windowsGone()).as("a native failure").isFalse();
+        pid = OptionalLong.empty();
+        assertThat(withWindows(0).windowsGone()).as("no browser process known").isFalse();
+        pid = OptionalLong.of(4321);
+        mode.set(WindowLauncher.Mode.TAB);
+        assertThat(withWindows(0).windowsGone()).as("the user's own browser").isFalse();
+        assertThat(desktop.windowsGone()).as("a taskbar piece that cannot count").isFalse();
+    }
+
     @Test
     void theAppUserModelIdIsTheOneTheShortcutsCarry() {
         assertThat(WindowsDesktop.APP_ID).isEqualTo("WeAreNaturalists.ButterflyAtlas");

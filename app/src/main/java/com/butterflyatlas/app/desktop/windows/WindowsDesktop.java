@@ -104,6 +104,29 @@ public final class WindowsDesktop implements DesktopIntegration {
         }
     }
 
+    /**
+     * True when the browser process has no window left. Unlike the taskbar properties this needs no installed app: a
+     * development run quits at once too. Chrome can keep running with no window ("continue running background apps"), so
+     * the windows are counted rather than the process watched.
+     */
+    @Override
+    public boolean windowsGone() {
+        if (unavailable || mode.get() != WindowLauncher.Mode.WINDOW) {
+            return false;
+        }
+        try {
+            OptionalLong browser = pid.get();
+            return browser.isPresent() && taskbar.windowCount(browser.getAsLong()) == 0;
+        } catch (LinkageError e) {
+            unavailable = true;
+            log.warn("jna", "Butterfly Atlas could not load its native calls (JNA); the windows keep the browser's own"
+                    + " taskbar button.", e);
+        } catch (RuntimeException e) {
+            log.warn("gone", "Butterfly Atlas could not tell whether the browser still has its windows.", e);
+        }
+        return false;
+    }
+
     @Override
     public boolean bringForward() {
         return false; // the taskbar does it

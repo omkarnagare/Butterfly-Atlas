@@ -15,4 +15,12 @@ public interface TaskbarWindows {
      * the calls fail (an {@link Error} when JNA will not load).
      */
     int adopt(long pid, Path appPath);
+
+    /**
+     * How many visible top-level windows {@code pid} has with Chrome's and Edge's window class; -1 when this piece cannot
+     * count them. Throws when the calls fail.
+     */
+    default int windowCount(long pid) {
+        return -1;
+    }
 }

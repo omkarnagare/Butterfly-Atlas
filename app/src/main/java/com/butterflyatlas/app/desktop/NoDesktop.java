@@ -31,6 +31,11 @@ public class NoDesktop implements DesktopIntegration {
     }
 
     @Override
+    public boolean windowsGone() {
+        return false;
+    }
+
+    @Override
     public boolean bringForward() {
         return false;
     }

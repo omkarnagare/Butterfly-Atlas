@@ -102,6 +102,11 @@ public final class WindowsNative implements TaskbarWindows, ProfileHolder {
         return set;
     }
 
+    @Override
+    public int windowCount(long pid) {
+        return windowsOf(pid).size();
+    }
+
     /** The visible top-level windows of {@code pid} with Chrome's and Edge's window class. */
     List<HWND> windowsOf(long pid) {
         List<HWND> found = new ArrayList<>();

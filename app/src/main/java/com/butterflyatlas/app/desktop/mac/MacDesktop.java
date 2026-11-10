@@ -202,6 +202,22 @@ public final class MacDesktop implements DesktopIntegration {
     }
 
     @Override
+    public boolean windowsGone() {
+        OptionalLong browser = browser("gone");
+        if (browser.isEmpty()) {
+            return false;
+        }
+        try {
+            return apps.windows(browser.getAsLong()).all() == 0;
+        } catch (LinkageError e) {
+            jnaFailed(e);
+        } catch (RuntimeException e) {
+            log.warn("gone", "Butterfly Atlas could not tell whether the browser still has its windows.", e);
+        }
+        return false;
+    }
+
+    @Override
     public boolean bringForward() {
         OptionalLong browser = browser("forward");
         if (browser.isEmpty()) {

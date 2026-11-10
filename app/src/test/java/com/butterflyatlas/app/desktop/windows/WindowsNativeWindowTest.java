@@ -126,6 +126,7 @@ class WindowsNativeWindowTest {
                 .as("the app window of " + browser + " appeared").isTrue();
         await(() -> favicons.get() > 0, 15_000); // the page and its icon have loaded
 
+        assertThat(windows.windowCount(first.pid())).as("the app window, counted for the quit").isEqualTo(1);
         int set = windows.adopt(first.pid(), app);
         assertThat(set).isGreaterThanOrEqualTo(1);
         Thread.sleep(5_000);

@@ -132,6 +132,32 @@ class MacDesktopTest {
     }
 
     @Test
+    void theWindowsAreGoneOnlyWhenTheBrowserListsNone() {
+        windows = new MacApps.Windows(0, 0);
+        assertThat(desktop.windowsGone()).isTrue();
+
+        windows = new MacApps.Windows(1, 0); // minimised, or on another Space
+        assertThat(desktop.windowsGone()).isFalse();
+        windows = new MacApps.Windows(2, 2);
+        assertThat(desktop.windowsGone()).isFalse();
+    }
+
+    @Test
+    void whenItCannotTellTheWindowsAreNotGone() {
+        windows = new MacApps.Windows(0, 0);
+        pid = OptionalLong.empty();
+        assertThat(desktop.windowsGone()).as("no browser process known").isFalse();
+
+        pid = OptionalLong.of(777);
+        mode.set(WindowLauncher.Mode.TAB);
+        assertThat(desktop.windowsGone()).as("the user's own browser").isFalse();
+
+        mode.set(WindowLauncher.Mode.WINDOW);
+        fails = new IllegalStateException("no window list");
+        assertThat(desktop.windowsGone()).as("a native failure").isFalse();
+    }
+
+    @Test
     void bringingForwardActivatesTheBrowserProcess() {
         assertThat(desktop.bringForward()).isTrue();
 

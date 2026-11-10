@@ -315,6 +315,7 @@ final class AppStart {
                         l.fallBack(why);
                     }
                 }, why -> quit(why, running, 0, true));
+        timer.windowsGone(() -> desktop.windowsGone()); // quits at once when the browser has no window left
         Session session = new Session(keys, timer, () -> launcher.get() == null ? WindowLauncher.Mode.WINDOW
                 : launcher.get().mode(), closing::get, options.configDir(), log.folder(), Session.PING,
                 () -> newWindow(() -> serving.get().baseUri().resolve(SessionKeys.LAUNCH_QUERY + keys.newKey()), launchFiles,

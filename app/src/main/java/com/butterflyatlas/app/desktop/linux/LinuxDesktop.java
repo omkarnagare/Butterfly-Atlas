@@ -14,6 +14,12 @@ import java.util.List;
  */
 public final class LinuxDesktop implements DesktopIntegration {
 
+    /** Not told on Linux (no window list is read): the quit waits as it always did. */
+    @Override
+    public boolean windowsGone() {
+        return false;
+    }
+
     /** The window class; {@code StartupWMClass} in {@code packaging/linux/Butterfly Atlas.desktop} carries it. */
     static final String WINDOW_CLASS = "butterfly-atlas";
 
