@@ -9,6 +9,7 @@
   import { status as appStatus } from './status.svelte.js';
   import { DECODER_CHECKING } from './states.js';
   import { BACKUP_COPYING } from './codes.js';
+  import TagPicker from './TagPicker.svelte';
 
   const PREVIEWS = 30;
 
@@ -22,8 +23,10 @@
    * "Checking for a HEIC decoder…" and the line is decided once the check is over: shown (the sheet waits for Done), or
    * the sheet closes by itself as after any clean add (review fix U11). While a backup holds the photos
    * (`status.backup.holdsPhotos`, several-windows A5) Add sends nothing and says why, as the server would.
+   * The batch's tags are a TagPicker (behaviour tags §4): a tag created there has the screen read its tags again
+   * (`onTagsChanged`) before it is chosen, since only keys found in `tags` are sent.
    */
-  let { taxon, tags = [], files = [], onAdded = () => {}, onClose } = $props();
+  let { taxon, tags = [], files = [], onAdded = () => {}, onTagsChanged = async () => {}, onClose } = $props();
 
   const LABELS = {
     waiting: 'Waiting', sending: 'Adding…', added: 'Added', addedElsewhereToo: 'Added', skipped: 'Already here',
@@ -214,12 +217,8 @@
         </div>
         <div>
           <div class="lbl2">Tag these photos <span class="muted">(optional, you can tag later)</span></div>
-          <div class="chips" role="group" aria-label="Tags for these photos">
-            {#each tags as tag (tag.key)}
-              <button class="chip" type="button" class:on={chosen.includes(tag.key)} aria-pressed={chosen.includes(tag.key)}
-                      onclick={() => toggleTag(tag.key)}>{tag.label}</button>
-            {/each}
-          </div>
+          <TagPicker {tags} label="Tags for these photos" stateOf={(key) => (chosen.includes(key) ? 'on' : 'off')} onToggle={toggleTag}
+                     onCreated={() => onTagsChanged()} disabled={sending} />
         </div>
       {:else}
         <div class="progress">

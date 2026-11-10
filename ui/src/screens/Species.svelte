@@ -279,7 +279,7 @@
       </div>
     {/if}
     {#if adding}
-      <AddPhotosSheet {taxon} {tags} files={dropped} onAdded={added} onClose={sheetClosed} />
+      <AddPhotosSheet {taxon} {tags} files={dropped} onAdded={added} onTagsChanged={refresh} onClose={sheetClosed} />
     {/if}
     {#if managingTags}
       <TagsSheet onChanged={refresh} onClose={() => (managingTags = false)} />

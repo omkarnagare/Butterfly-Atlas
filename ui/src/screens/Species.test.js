@@ -143,6 +143,28 @@ test('closing the sheet with Escape while a photo is still being sent still repo
   expect(screen.getAllByRole('status').map((el) => el.textContent)).toContain('1 photo added to Plain Tiger.');
 });
 
+test('a tag created in Add photos: the page is read again, and the new tag goes with the photos', async () => {
+  const roosting = { id: 21, key: 'roosting', label: 'roosting', source: 'user', photoCount: 0 };
+  getTaxon.mockResolvedValue(plainTiger({ species: { got: 1, total: 2 }, photoCount: 1 }));
+  getPhotos.mockResolvedValue([photo(1, [])]);
+  createTag.mockResolvedValue(roosting);
+  uploadPhoto.mockResolvedValue({ status: 'added', photo: photo(2, ['roosting']), otherTaxon: null, firstForSpecies: false, milestone: null, speciesCount: 1 });
+  render(Species, { id: 'A5' });
+
+  await fireEvent.click(await screen.findByRole('button', { name: '+ Add photos' }));
+  getTags.mockResolvedValue([...TAGS, roosting]);
+  const box = screen.getByRole('searchbox', { name: 'Find or add a tag' });
+  await fireEvent.input(box, { target: { value: 'roosting' } });
+  await fireEvent.keyDown(box, { key: 'Enter' });
+  const group = within(screen.getByRole('group', { name: 'Tags for these photos' }));
+  await vi.waitFor(() => expect(group.getByRole('button', { name: 'roosting' }).getAttribute('aria-pressed')).toBe('true'));
+  expect(getTags).toHaveBeenCalledTimes(2);
+
+  await fireEvent.change(screen.getByLabelText('Choose photos'), { target: { files: [jpeg('a.jpg')] } });
+  await fireEvent.click(screen.getByRole('button', { name: 'Add 1 photo' }));
+  await vi.waitFor(() => expect(uploadPhoto).toHaveBeenCalledWith('A5', expect.anything(), expect.objectContaining({ tags: ['roosting'] })));
+});
+
 test('a file dropped on the page is never opened by the web view; unsupported files are named and left out', async () => {
   getTaxon.mockResolvedValue(plainTiger());
   render(Species, { id: 'A5' });
