@@ -2,7 +2,9 @@
   import { onDestroy, tick } from 'svelte';
   import { createTag } from './api.js';
   import { checkTagName, matchTags, tagNamed } from './tags.js';
-  import { FIND_A_TAG, FIND_OR_ADD_A_TAG, MATCHING_TAGS, createTag as createWords, moreTags, noTagCalled } from './messages.js';
+  import {
+    FIND_A_TAG, FIND_OR_ADD_A_TAG, MATCHING_TAGS, alreadyChosen, createTag as createWords, moreTags, noTagCalled,
+  } from './messages.js';
 
   const SHOWN_MATCHES = 12;
 
@@ -171,6 +173,8 @@
     {/if}
     {#if open.length > SHOWN_MATCHES}<p class="muted" aria-live="polite">{moreTags(open.length - SHOWN_MATCHES)}</p>{/if}
     {#if !found.length}<p class="muted" aria-live="polite">{noTagCalled(typed)}</p>{/if}
+    <!-- every tag the name matches is already chosen (shown above): said, so the box is never left with nothing under it -->
+    {#if found.length && !open.length}<p class="muted" aria-live="polite">{alreadyChosen(found.map((tag) => tag.label))}</p>{/if}
     {#if problem}<p class="problem" id="{uid}-problem" aria-live="polite">{problem}</p>{/if}
   {/if}
   {#if refusal}<p class="problem" id="{uid}-refusal" role="alert">{refusal}</p>{/if}

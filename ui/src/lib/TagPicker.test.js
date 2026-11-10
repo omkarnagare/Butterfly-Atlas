@@ -176,11 +176,19 @@ test('Enter on the exact name of a tag already chosen keeps it chosen and clears
   expect(box().value).toBe('');
 });
 
-test('a name every tag already chosen has says nothing is missing and offers no Create', async () => {
-  setup({ chosen: ['wet_sand'] });
+test('a name only chosen tags match says they are already chosen, and offers no Create', async () => {
+  setup({ chosen: ['wet_sand', 'on_lantana', 'nectaring_on_lantana'] });
   await type('wet sand');
   expect(matchNames()).toEqual([]);
   expect(screen.queryByText(/No tag called/)).toBeNull();
+  expect(screen.getByText('Already chosen: wet_sand')).toBeTruthy();
+  await type('lantana');
+  expect(screen.getByText('Already chosen: nectaring_on_lantana, on_lantana')).toBeTruthy();
+  await type('lant');
+  expect(matchNames()).toEqual(['Create "lant"']);
+  expect(screen.getByText('Already chosen: nectaring_on_lantana, on_lantana')).toBeTruthy();
+  await type('bask');
+  expect(screen.queryByText(/Already chosen/)).toBeNull();
 });
 
 test('Esc with text clears the box and goes no further', async () => {

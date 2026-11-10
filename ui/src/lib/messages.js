@@ -95,6 +95,7 @@ export const MATCHING_TAGS = 'Matching tags';
 export const noTagCalled = (name) => `No tag called "${name}".`;
 export const createTag = (name) => `Create "${name}"`;
 export const moreTags = (n) => `and ${n} more: keep typing`;
+export const alreadyChosen = (names) => `Already chosen: ${names.join(', ')}`;
 
 // Change the library folder (change-library-folder design). Sizes come in as words ("12.4 GB", lib/filter.js formatBytes).
 const fileCount = (n) => (n === 1 ? '1 file' : `${n.toLocaleString()} files`);

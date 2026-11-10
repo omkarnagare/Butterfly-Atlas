@@ -1,7 +1,8 @@
 import { expect, test } from 'vitest';
 import { ADULT_KEYS, checkTagName, formTagName, labeller, matchTags, tagNamed, tagWords, withTag } from './tags.js';
 import {
-  FIND_A_TAG, FIND_OR_ADD_A_TAG, TAG_NAME_EMPTY, TAG_NAME_TOO_LONG, TAG_NAME_TOO_MANY_WORDS, createTag, moreTags, noTagCalled, tagNameTaken,
+  FIND_A_TAG, FIND_OR_ADD_A_TAG, TAG_NAME_EMPTY, TAG_NAME_TOO_LONG, TAG_NAME_TOO_MANY_WORDS, alreadyChosen, createTag, moreTags, noTagCalled,
+  tagNameTaken,
 } from './messages.js';
 
 test('a tag name takes its one form, as the server does (TagNamesTest)', () => {
@@ -90,6 +91,7 @@ test('the picker\'s words', () => {
   expect(noTagCalled('basking spot')).toBe('No tag called "basking spot".');
   expect(createTag('basking_spot')).toBe('Create "basking_spot"');
   expect(moreTags(4)).toBe('and 4 more: keep typing');
+  expect(alreadyChosen(['larva', 'on_lantana'])).toBe('Already chosen: larva, on_lantana');
 });
 
 test('the tag named exactly what is typed, after its one form and without case', () => {
