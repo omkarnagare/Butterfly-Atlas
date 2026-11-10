@@ -197,6 +197,7 @@ class MacNativeWindowTest {
         List<String> seen = new java.util.ArrayList<>();
         seen.add("open: " + mac.describe(pid));
         assertThat(mac.windows(pid)).as("one app window, counted once").isEqualTo(new MacApps.Windows(1, 1));
+        List<Long> appWindow = mac.windowIds(pid);
 
         assertThat(mac.activate(pid)).as("activated by its process ID").isTrue();
 
@@ -216,13 +217,19 @@ class MacNativeWindowTest {
         devTools.restore(window);
         assertThat(await(() -> mac.windows(pid).onScreen() == 1, 10_000)).as("restored: on screen again").isTrue();
         devTools.call("Target.closeTarget", JSON.createObjectNode().put("targetId", pages.get(0)));
+        // Chrome 157 drops the closed window from the list, so the app quits at once; Chrome 156 (GitHub's macOS runner)
+        // keeps it, off screen and the same in every detail as a minimised one, so the app cannot tell and waits its 10 s.
+        // Either is right; anything else left is not.
         boolean gone = await(() -> mac.windows(pid).all() == 0, 10_000);
         if (!gone) {
             seen.add("closed: " + mac.describe(pid));
             seen.add("pages left: " + devTools.pages());
             seen.add("browser: " + devTools.call("Browser.getVersion", null).get("product").asText());
+            assertThat(devTools.pages()).as(() -> "the page closed; the browser's windows " + seen).isEmpty();
+            assertThat(mac.windows(pid).onScreen()).as(() -> "nothing on screen; the browser's windows " + seen).isZero();
+            assertThat(mac.windowIds(pid)).as(() -> "only the closed window is kept; the browser's windows " + seen)
+                    .isEqualTo(appWindow);
         }
-        assertThat(gone).as(() -> "no window left once it closed; the browser's windows " + seen).isTrue();
         assertThat(browser.isAlive()).as("Chrome still runs with no window").isTrue();
 
         socket.abort();

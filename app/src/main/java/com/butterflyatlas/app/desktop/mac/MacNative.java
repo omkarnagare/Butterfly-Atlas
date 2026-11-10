@@ -119,14 +119,23 @@ public final class MacNative implements MacApps {
     @Override
     public Windows windows(long pid) {
         Libraries.APP_KIT.getName(); // AppKit's classes are there for the pool
-        return inPool(objc -> new Windows(count(pid, LIST_ALL), count(pid, LIST_ON_SCREEN)));
+        return inPool(objc -> new Windows(ids(pid, LIST_ALL).size(), ids(pid, LIST_ON_SCREEN).size()));
+    }
+
+    /**
+     * The window numbers of what {@link #windows} counts in every window, for a real-window check to tell one window from
+     * another: Chrome 156 keeps a closed window in the list, the same in every detail as a minimised one.
+     */
+    List<Long> windowIds(long pid) {
+        Libraries.APP_KIT.getName();
+        return inPool(objc -> ids(pid, LIST_ALL));
     }
 
     /**
      * The process's ordinary windows (layer 0, at least {@link #MIN_SIDE} each way) in the window list made with
      * {@code option}.
      */
-    private static int count(long pid, int option) {
+    private static List<Long> ids(long pid, int option) {
         CoreFoundation cf = Libraries.CF;
         Pointer list = Libraries.CG.CGWindowListCopyWindowInfo(option, NULL_WINDOW);
         if (list == null) {
@@ -137,8 +146,9 @@ public final class MacNative implements MacApps {
         Pointer boundsKey = cf.CFStringCreateWithCString(null, "kCGWindowBounds", CF_UTF8);
         Pointer widthKey = cf.CFStringCreateWithCString(null, "Width", CF_UTF8);
         Pointer heightKey = cf.CFStringCreateWithCString(null, "Height", CF_UTF8);
+        Pointer numberKey = cf.CFStringCreateWithCString(null, "kCGWindowNumber", CF_UTF8);
         try {
-            int found = 0;
+            List<Long> found = new ArrayList<>();
             long size = cf.CFArrayGetCount(list);
             for (long i = 0; i < size; i++) {
                 Pointer window = cf.CFArrayGetValueAtIndex(list, i);
@@ -147,7 +157,7 @@ public final class MacNative implements MacApps {
                     Pointer bounds = cf.CFDictionaryGetValue(window, boundsKey);
                     if (bounds != null && side(cf, cf.CFDictionaryGetValue(bounds, widthKey)) >= MIN_SIDE
                             && side(cf, cf.CFDictionaryGetValue(bounds, heightKey)) >= MIN_SIDE) {
-                        found++;
+                        found.add(number(cf, cf.CFDictionaryGetValue(window, numberKey)));
                     }
                 }
             }
@@ -157,7 +167,7 @@ public final class MacNative implements MacApps {
             if (ownerKey != null) {
                 cf.CFRelease(ownerKey);
             }
-            for (Pointer key : new Pointer[] {layerKey, boundsKey, widthKey, heightKey}) {
+            for (Pointer key : new Pointer[] {layerKey, boundsKey, widthKey, heightKey, numberKey}) {
                 if (key != null) {
                     cf.CFRelease(key);
                 }
