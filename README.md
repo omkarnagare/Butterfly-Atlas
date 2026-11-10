@@ -248,7 +248,7 @@ while experimenting, add `-DskipTests`.
 | Folder | What is in it |
 |---|---|
 | `packaging/target/dist/` | **The installers**: `Butterfly_Atlas-1.0.0-<system>-<cpu>.exe` (Windows), `.deb` and `.rpm` (Linux) or `.dmg` (macOS). This is what you give to people. |
-| `packaging/target/work/image/` | The built application itself, before it is wrapped in an installer (`Butterfly Atlas.app` on macOS, a `Butterfly Atlas` folder on Windows and Linux). You can run it from there to try it without installing; the smoke test runs this. |
+| `packaging/target/work.noindex/image/` | The built application itself, before it is wrapped in an installer (`Butterfly Atlas.app` on macOS, a `Butterfly Atlas` folder on Windows and Linux). You can run it from there to try it without installing; the smoke test runs this. The `.noindex` ending keeps macOS Spotlight from listing this build copy (and jpackage's temporary copies, made in the same folder) next to the installed app. |
 
 `./mvnw clean …` (and `clean verify`) **deletes the whole `packaging/target/` folder**, installers
 included, so copy what you want to keep before the next clean build.

@@ -46,7 +46,7 @@ import java.util.zip.ZipFile;
  * step. One file, no dependencies, the same on Windows, Linux and macOS:
  *
  * <pre>
- *   java packaging/smoke/SmokeTest.java --app packaging/target/work/image/"Butterfly Atlas.app" --version 1.0.0
+ *   java packaging/smoke/SmokeTest.java --app packaging/target/work.noindex/image/"Butterfly Atlas.app" --version 1.0.0
  * </pre>
  *
  * Options: {@code --app} the application image folder (the .app on macOS); {@code --version} the version the app must
