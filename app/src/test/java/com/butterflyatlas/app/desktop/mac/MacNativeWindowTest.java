@@ -194,6 +194,8 @@ class MacNativeWindowTest {
                 .as("SingletonLock names the browser process").isTrue();
         assertThat(await(() -> mac.windows(pid).onScreen() >= 1, 30_000)).as("the app window is on screen").isTrue();
         // exactly one: Chrome's hidden helper windows (33 px strips, never on screen) are not counted
+        List<String> seen = new java.util.ArrayList<>();
+        seen.add("open: " + mac.describe(pid));
         assertThat(mac.windows(pid)).as("one app window, counted once").isEqualTo(new MacApps.Windows(1, 1));
 
         assertThat(mac.activate(pid)).as("activated by its process ID").isTrue();
@@ -205,6 +207,7 @@ class MacNativeWindowTest {
         int window = devTools.windowOf(pages.get(0));
         devTools.minimise(window);
         assertThat(await(() -> mac.windows(pid).onScreen() == 0, 10_000)).as("minimised: none on screen").isTrue();
+        seen.add("minimised: " + mac.describe(pid));
         assertThat(mac.windows(pid)).as("a minimised window is still listed").isEqualTo(new MacApps.Windows(1, 0));
         assertThat(devTools.state(window)).isEqualTo("minimized");
 
@@ -213,8 +216,13 @@ class MacNativeWindowTest {
         devTools.restore(window);
         assertThat(await(() -> mac.windows(pid).onScreen() == 1, 10_000)).as("restored: on screen again").isTrue();
         devTools.call("Target.closeTarget", JSON.createObjectNode().put("targetId", pages.get(0)));
-        assertThat(await(() -> mac.windows(pid).all() == 0, 10_000))
-                .as(() -> "no window left once it closed; the browser's windows: " + mac.describe(pid)).isTrue();
+        boolean gone = await(() -> mac.windows(pid).all() == 0, 10_000);
+        if (!gone) {
+            seen.add("closed: " + mac.describe(pid));
+            seen.add("pages left: " + devTools.pages());
+            seen.add("browser: " + devTools.call("Browser.getVersion", null).get("product").asText());
+        }
+        assertThat(gone).as(() -> "no window left once it closed; the browser's windows " + seen).isTrue();
         assertThat(browser.isAlive()).as("Chrome still runs with no window").isTrue();
 
         socket.abort();

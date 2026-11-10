@@ -166,7 +166,7 @@ public final class MacNative implements MacApps {
     }
 
     /**
-     * Every window of {@code pid} in both lists, unfiltered, one line each ({@code all|on-screen #id layer=L WxH}): for a
+     * Every window of {@code pid} in both lists, unfiltered, one line each ({@code all|on-screen #id layer=L WxH at X,Y alpha= store= sharing= memory=}): for a
      * real-window check to say what it saw when a count is not what it expected. Needs no Screen Recording permission.
      */
     List<String> describe(long pid) {
@@ -184,7 +184,13 @@ public final class MacNative implements MacApps {
                         cf.CFStringCreateWithCString(null, "kCGWindowBounds", CF_UTF8),
                         cf.CFStringCreateWithCString(null, "Width", CF_UTF8),
                         cf.CFStringCreateWithCString(null, "Height", CF_UTF8),
-                        cf.CFStringCreateWithCString(null, "kCGWindowNumber", CF_UTF8)};
+                        cf.CFStringCreateWithCString(null, "kCGWindowNumber", CF_UTF8),
+                        cf.CFStringCreateWithCString(null, "X", CF_UTF8),
+                        cf.CFStringCreateWithCString(null, "Y", CF_UTF8),
+                        cf.CFStringCreateWithCString(null, "kCGWindowAlpha", CF_UTF8),
+                        cf.CFStringCreateWithCString(null, "kCGWindowStoreType", CF_UTF8),
+                        cf.CFStringCreateWithCString(null, "kCGWindowSharingState", CF_UTF8),
+                        cf.CFStringCreateWithCString(null, "kCGWindowMemoryUsage", CF_UTF8)};
                 try {
                     for (long i = 0, size = cf.CFArrayGetCount(list); i < size; i++) {
                         Pointer window = cf.CFArrayGetValueAtIndex(list, i);
@@ -196,7 +202,13 @@ public final class MacNative implements MacApps {
                                 + number(cf, cf.CFDictionaryGetValue(window, keys[5])) + " layer="
                                 + number(cf, cf.CFDictionaryGetValue(window, keys[1])) + " "
                                 + (bounds == null ? "?" : Math.round(side(cf, cf.CFDictionaryGetValue(bounds, keys[3])))
-                                + "x" + Math.round(side(cf, cf.CFDictionaryGetValue(bounds, keys[4])))));
+                                + "x" + Math.round(side(cf, cf.CFDictionaryGetValue(bounds, keys[4])))
+                                + " at " + Math.round(side(cf, cf.CFDictionaryGetValue(bounds, keys[6]))) + ","
+                                + Math.round(side(cf, cf.CFDictionaryGetValue(bounds, keys[7]))))
+                                + " alpha=" + side(cf, cf.CFDictionaryGetValue(window, keys[8]))
+                                + " store=" + number(cf, cf.CFDictionaryGetValue(window, keys[9]))
+                                + " sharing=" + number(cf, cf.CFDictionaryGetValue(window, keys[10]))
+                                + " memory=" + number(cf, cf.CFDictionaryGetValue(window, keys[11])));
                     }
                 } finally {
                     cf.CFRelease(list);
