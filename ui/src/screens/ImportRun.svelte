@@ -304,6 +304,15 @@
     regrouped = true;
   });
 
+  /** The tags again, after one was created in Tag photos (behaviour tags §4.4); a failure keeps the ones read before. */
+  async function readTags() {
+    try {
+      tags = await getTags();
+    } catch {
+      // the tag was made all the same; the list stays as it was until the import is opened again
+    }
+  }
+
   function open(item) {
     focusId = item.id;
     noteViewerOpen();
@@ -374,7 +383,7 @@
   {#if choosing === 'species'}
     <SpeciesPicker title="Assign {photoCount(chosen.length)} to a species" onPick={assignTo} onClose={() => (choosing = null)} />
   {:else if choosing === 'tags'}
-    <BulkTagDialog photos={chosen} {tags} onApply={tagChosen} onClose={() => (choosing = null)} />
+    <BulkTagDialog photos={chosen} {tags} onApply={tagChosen} onTagsChanged={readTags} onClose={() => (choosing = null)} />
   {:else if choosing === 'place'}
     <PlacePicker count={chosen.length} onChoose={placeChosen} onPlacesChanged={() => resync(id)} onClose={() => (choosing = null)} />
   {/if}

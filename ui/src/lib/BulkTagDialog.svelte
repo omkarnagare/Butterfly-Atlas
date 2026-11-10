@@ -1,17 +1,23 @@
 <script>
   import { untrack } from 'svelte';
   import Dialog from './Dialog.svelte';
+  import TagPicker from './TagPicker.svelte';
 
   /**
    * Tag many photos at once. Each tag shows whether all, some or none of the chosen photos carry it;
    * pressing it puts it on all of them, pressing again takes it off all. Only changes are sent.
+   * The tags are a tristate TagPicker (behaviour tags §4): built-in tags, the user tags some or all of the photos carry,
+   * and the search box. A tag created there has the screen read its tags again (`onTagsChanged`), then is marked "all"
+   * (it starts as "none": no photo carries it).
    */
-  let { photos, tags = [], onApply, onClose } = $props();
+  let { photos, tags = [], onApply, onClose, onTagsChanged = async () => {} } = $props();
 
   const stateOf = (key) => {
     const n = photos.filter((photo) => photo.tags.includes(key)).length;
     return n === 0 ? 'none' : n === photos.length ? 'all' : 'some';
   };
+  // What the photos carry as the dialog opens; a tag first seen later (created here, or found after a re-read) starts
+  // from what they carry when it is first pressed (none, for a new one).
   const initial = untrack(() => Object.fromEntries(tags.map((tag) => [tag.key, stateOf(tag.key)])));
   let states = $state({ ...initial });
   let busy = $state(false);
@@ -19,7 +25,14 @@
 
   let add = $derived(tags.map((t) => t.key).filter((key) => states[key] === 'all' && initial[key] !== 'all'));
   let remove = $derived(tags.map((t) => t.key).filter((key) => states[key] === 'none' && initial[key] !== 'none'));
-  const checked = (state) => (state === 'all' ? 'true' : state === 'some' ? 'mixed' : 'false');
+  const PICKER = { all: 'on', some: 'some', none: 'off' };
+
+  function toggle(key) {
+    if (busy) return;
+    if (!(key in initial)) initial[key] = stateOf(key);
+    const now = states[key] ?? initial[key];
+    states[key] = now === 'all' ? 'none' : 'all';
+  }
 
   async function apply() {
     if (busy) return;
@@ -36,13 +49,8 @@
 
 <Dialog title="Tag {photos.length === 1 ? '1 photo' : `${photos.length} photos`}" {onClose}>
   <p class="muted">A dash means some of these photos have the tag. Press a tag to put it on all of them; press again to take it off.</p>
-  <div class="chips" role="group" aria-label="Tags">
-    {#each tags as tag (tag.key)}
-      <button class="chip" type="button" role="checkbox" aria-checked={checked(states[tag.key])}
-              class:on={states[tag.key] === 'all'} class:some={states[tag.key] === 'some'}
-              onclick={() => { if (!busy) states[tag.key] = states[tag.key] === 'all' ? 'none' : 'all'; }}>{tag.label}</button>
-    {/each}
-  </div>
+  <TagPicker {tags} tristate stateOf={(key) => PICKER[states[key] ?? 'none']} onToggle={toggle} onCreated={() => onTagsChanged()}
+             disabled={busy} />
   {#if error}<p class="problem" role="alert">{error}</p>{/if}
   {#snippet actions()}
     <button class="btn ghost" type="button" onclick={onClose}>Cancel</button>

@@ -262,7 +262,7 @@
                       onRemovePlace={unplaceSelected} onDelete={deleteSelected} onCancel={stopSelecting} />
       {/if}
       {#if choosing === 'tags'}
-        <BulkTagDialog photos={chosen} {tags} onApply={tagSelected} onClose={() => (choosing = null)} />
+        <BulkTagDialog photos={chosen} {tags} onApply={tagSelected} onTagsChanged={refresh} onClose={() => (choosing = null)} />
       {:else if choosing === 'species'}
         <SpeciesPicker title="Move {photoCount(chosen.length)} to another species" exclude={taxon.id}
                        onPick={moveSelected} onClose={() => (choosing = null)} />

@@ -289,6 +289,28 @@ test('a failed bulk tag shows its error in the dialog and the dialog stays usabl
   expect(screen.getByRole('button', { name: 'Delete' }).getAttribute('aria-disabled')).toBe('false');
 });
 
+test('a tag created in Tag photos: the page is read again, and the new tag is marked for the selected photos', async () => {
+  const roosting = { id: 21, key: 'roosting', label: 'roosting', source: 'user', photoCount: 0 };
+  createTag.mockResolvedValue(roosting);
+  editTags.mockResolvedValue({});
+  await selectTwo();
+  getTags.mockResolvedValue([...TAGS, roosting]);
+
+  await fireEvent.click(screen.getByRole('button', { name: 'Tag' }));
+  const dialog = screen.getByRole('dialog', { name: 'Tag 2 photos' });
+  const box = within(dialog).getByRole('searchbox');
+  await fireEvent.input(box, { target: { value: 'roosting' } });
+  await fireEvent.keyDown(box, { key: 'Enter' });
+
+  const tags = within(within(dialog).getByRole('group', { name: 'Tags' }));
+  await vi.waitFor(() => expect(tags.getByRole('checkbox', { name: 'roosting' }).getAttribute('aria-checked')).toBe('true'));
+  expect(getTags).toHaveBeenCalledTimes(2);
+  expect(screen.getByText('2 photos selected')).toBeTruthy();
+  await fireEvent.click(within(dialog).getByRole('button', { name: 'Apply' }));
+  await vi.waitFor(() => expect(editTags).toHaveBeenCalled());
+  expect(editTags.mock.calls[0]).toEqual(expect.arrayContaining([['roosting']]));
+});
+
 test('a failed move shows its error in the picker', async () => {
   movePhotos.mockRejectedValueOnce(new Error('That species folder is read-only.'));
   search.mockResolvedValue([{ id: 'A6', rank: 'species', name: 'Danaus genutia', common: 'Striped Tiger', family: 'Nymphalidae' }]);
