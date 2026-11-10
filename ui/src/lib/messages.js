@@ -88,6 +88,14 @@ export const tagNameTaken = (name) => `There is already a tag called "${name}".`
 export const tagSavedAs = (name) => `Saved as: ${name}`;
 export const OVER_3_WORDS = 'over 3 words';
 
+// The tag picker (behaviour tags design §4, §6): its search box, its matches and Create.
+export const FIND_OR_ADD_A_TAG = 'Find or add a tag';
+export const FIND_A_TAG = 'Find a tag';
+export const MATCHING_TAGS = 'Matching tags';
+export const noTagCalled = (name) => `No tag called "${name}".`;
+export const createTag = (name) => `Create "${name}"`;
+export const moreTags = (n) => `and ${n} more: keep typing`;
+
 // Change the library folder (change-library-folder design). Sizes come in as words ("12.4 GB", lib/filter.js formatBytes).
 const fileCount = (n) => (n === 1 ? '1 file' : `${n.toLocaleString()} files`);
 // Settings → Library folder (§2, §3).
