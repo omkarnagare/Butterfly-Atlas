@@ -14,6 +14,23 @@ test('a move to a new folder says where, how big and how much is free; Move here
   expect(changeCanChoose(c, 'move')).toBe(true);
 });
 
+// A library in a cloud folder, or a cloud folder chosen (cloud-library-folder design §4).
+test('a move of a library in a cloud folder says its size is counted when the move starts', () => {
+  const c = check('create', { free: 80.1 * GB, needed: null, cloud: null });
+  expect(changeHere(c, 'move', null)).toBe('Your library will be moved to /Volumes/B/Butterfly_Atlas. Its size is counted when the move starts;'
+    + ' that drive has 80.1 GB free.');
+  expect(changeCanChoose(c, 'move')).toBe(true);
+});
+
+test('a move into a cloud folder says its free space is this device\'s, and so does its refusal', () => {
+  expect(changeHere(check('create', { free: 80.1 * GB, needed: 13.2 * GB, cloud: 'Dropbox' }), 'move', 12.4 * GB))
+    .toBe('Your library will be moved to /Volumes/B/Butterfly_Atlas. It is 12.4 GB; that folder has 80.1 GB free on this device.');
+  expect(changeHere(check('create', { free: 80.1 * GB, needed: null, cloud: 'Dropbox' }), 'move', null))
+    .toBe('Your library will be moved to /Volumes/B/Butterfly_Atlas. Its size is counted when the move starts; that folder has 80.1 GB free on this device.');
+  expect(changeHere(check('create', { refusal: 'not_enough_space', free: 3.2 * GB, needed: 13.2 * GB, cloud: 'Dropbox' }), 'move', 12.4 * GB))
+    .toBe('That folder has 3.2 GB free on this device; moving your library needs about 13.2 GB.');
+});
+
 test('a move is refused, with the table\'s words, for too little space, a library there, or a folder inside the library', () => {
   const cases = [
     [check('create', { refusal: 'not_enough_space', free: 3.2 * GB, needed: 13.2 * GB }), 'That drive has 3.2 GB free; moving your library needs about 13.2 GB.'],

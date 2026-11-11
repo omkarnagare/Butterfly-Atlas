@@ -10,9 +10,9 @@
   import { loadProblem } from './problems.js';
   import { changeStarted } from './status.svelte.js';
   import {
-    CANCEL, DELETE_OLD_COPY, DELETE_OLD_COPY_TITLE, DELETING, FIXED_FOLDER_NOTE, FOLDER, FREE_ON_DRIVE, GO_TO_BACKUP, LIBRARY_FOLDER,
+    CANCEL, DELETE_OLD_COPY, DELETE_OLD_COPY_TITLE, DELETING, FIXED_FOLDER_NOTE, FOLDER, FREE_ON_DEVICE, FREE_ON_DRIVE, GO_TO_BACKUP, LIBRARY_FOLDER,
     LIBRARY_FOLDER_HINT, MOVE_LIBRARY, NO_BACKUP_YET, OLD_COPY_DELETED, SIZE, USE_DIFFERENT_LIBRARY, andMoreLine, deleteOldCopyAsk,
-    lastBackupLine, oldCopyLeftLine, oldCopyLine, otherFilesLeftLine,
+    cloudLibraryNote, lastBackupLine, oldCopyLeftLine, oldCopyLine, otherFilesLeftLine,
   } from './messages.js';
 
   /**
@@ -26,6 +26,8 @@
    * "You have no backup yet." with Go to Backup, `onGoToBackup`). What the delete did is said in plain words: deleted, or
    * how many files couldn't be and where (the first ten, "and N more"), when Delete can be chosen again; files that
    * aren't part of a library are named as left. A refused delete says why in the confirmation.
+   * A library in a cloud folder (`cloud`, cloud-library-folder design §3) isn't counted (`size` null): no Size row, "Free
+   * on this device", and a note that the space left in the service isn't shown here. An old copy in one has no size.
    */
   let { onGoToBackup } = $props();
 
@@ -116,9 +118,10 @@
   {:else}
     <dl class="set-about">
       <dt>{FOLDER}</dt><dd class="mono" dir="auto">{library.folder}</dd>
-      <dt>{SIZE}</dt><dd>{formatBytes(library.size ?? 0)}</dd>
-      <dt>{FREE_ON_DRIVE}</dt><dd>{formatBytes(library.free ?? 0)}</dd>
+      {#if library.size != null}<dt>{SIZE}</dt><dd>{formatBytes(library.size)}</dd>{/if}
+      <dt>{library.cloud ? FREE_ON_DEVICE : FREE_ON_DRIVE}</dt><dd>{formatBytes(library.free ?? 0)}</dd>
     </dl>
+    {#if library.cloud}<p class="set-note">{cloudLibraryNote(library.cloud)}</p>{/if}
     <p class="lf-actions">
       <button class="btn ghost" type="button" bind:this={moveButton} aria-disabled={library.fixed}
               aria-describedby={library.fixed ? `${uid}-fixed` : undefined} onclick={() => choose('move')}>{MOVE_LIBRARY}</button>
@@ -128,7 +131,7 @@
     {#if library.fixed}<p class="set-note muted" id="{uid}-fixed">{FIXED_FOLDER_NOTE}</p>{/if}
     {#if library.oldCopy}
       <div class="set-unread lf-old">
-        <p>{oldCopyLine(library.oldCopy.folder, formatBytes(library.oldCopy.size ?? 0))}</p>
+        <p>{oldCopyLine(library.oldCopy.folder, library.oldCopy.size == null ? null : formatBytes(library.oldCopy.size))}</p>
         <button class="btn ghost" type="button" bind:this={deleteButton} onclick={openConfirm}>{DELETE_OLD_COPY}</button>
       </div>
     {/if}
@@ -154,7 +157,7 @@
 </section>
 
 {#if choosing}
-  <FolderBrowser change={choosing} librarySize={library.size ?? 0} returnFocus={() => returnTo} onChoose={start} onClose={() => (choosing = null)} />
+  <FolderBrowser change={choosing} librarySize={library.size ?? null} returnFocus={() => returnTo} onChoose={start} onClose={() => (choosing = null)} />
 {/if}
 
 {#if confirming && library?.oldCopy}

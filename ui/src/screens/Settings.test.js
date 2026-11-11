@@ -42,7 +42,7 @@ beforeEach(() => {
 
 const GB = 1024 ** 3;
 const libraryChange = (over = {}) => ({
-  folder: '/Users/me/Atlas', size: 12.4 * GB, free: 80.1 * GB, fixed: false, changing: null, oldCopy: null, ...over,
+  folder: '/Users/me/Atlas', size: 12.4 * GB, free: 80.1 * GB, cloud: null, fixed: false, changing: null, oldCopy: null, ...over,
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -305,6 +305,35 @@ test('the Library folder section says where the library is, its size and the dri
     expect(within(section).getByRole('button', { name }).getAttribute('aria-disabled')).not.toBe('true');
   }
   expect(within(section).queryByText(/fixed folder/)).toBeNull();
+  expect(within(section).getByText('Size')).toBeTruthy();
+  expect(within(section).getByText('Free on its drive')).toBeTruthy();
+  expect(within(section).queryByText('Free on this device')).toBeNull();
+  expect(within(section).queryByText(/isn't shown here/)).toBeNull();
+});
+
+test('a library in a cloud folder has no Size row, says its free space is this device\'s and where to see the space left', async () => {
+  getLibraryChange.mockResolvedValue(libraryChange({
+    folder: '/Users/me/Library/CloudStorage/GoogleDrive-me/My Drive/Butterfly_Atlas', size: null, cloud: 'Google Drive',
+  }));
+  render(Settings);
+  const section = await librarySection();
+  await within(section).findByText('/Users/me/Library/CloudStorage/GoogleDrive-me/My Drive/Butterfly_Atlas');
+  expect(within(section).queryByText('Size')).toBeNull();
+  expect(within(section).queryByText('0 B')).toBeNull();
+  expect(within(section).getByText('Free on this device')).toBeTruthy();
+  expect(within(section).queryByText('Free on its drive')).toBeNull();
+  expect(within(section).getByText('80.1 GB')).toBeTruthy();
+  expect(within(section).getByText('Your library is in Google Drive. The space left in Google Drive isn\'t shown here; check it in Google Drive.'))
+    .toBeTruthy();
+});
+
+test('a library whose size is null for any reason has no Size row', async () => {
+  getLibraryChange.mockResolvedValue(libraryChange({ size: null }));
+  render(Settings);
+  const section = await librarySection();
+  await within(section).findByText('/Users/me/Atlas');
+  expect(within(section).queryByText('Size')).toBeNull();
+  expect(within(section).getByText('Free on its drive')).toBeTruthy();
 });
 
 test('a copy started on a fixed folder shows the section with both buttons disabled and says why', async () => {
@@ -388,6 +417,13 @@ test('after a move the old copy is offered for deleting, naming the last backup;
   expect(await within(section).findByText('The old copy was deleted.')).toBeTruthy();
   expect(screen.queryByRole('dialog')).toBeNull();
   await vi.waitFor(() => expect(within(section).queryByText(/The old copy of your library is still at/)).toBeNull());
+});
+
+test('an old copy in a cloud folder is named without a size', async () => {
+  getLibraryChange.mockResolvedValue(libraryChange({ oldCopy: oldCopy({ size: null }) }));
+  render(Settings);
+  const section = await librarySection();
+  expect(await within(section).findByText('The old copy of your library is still at /Users/me/Old Atlas.')).toBeTruthy();
 });
 
 test('with no backup the confirmation says so and leads to Backup; Cancel deletes nothing', async () => {

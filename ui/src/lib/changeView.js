@@ -23,18 +23,23 @@ function refusalWords(check, kind) {
     // A move's table says the same for the library itself as for a folder inside it.
     case CURRENT_LIBRARY: return kind === 'switch' ? CURRENT_LIBRARY_WORDS : OUTSIDE_LIBRARY_WORDS;
     case LIBRARY_IN_USE: return LIBRARY_IN_USE_WORDS;
-    case NOT_ENOUGH_SPACE: return tooLittleSpaceLine(formatBytes(check.free ?? 0), formatBytes(check.needed ?? 0));
+    case NOT_ENOUGH_SPACE: return tooLittleSpaceLine(formatBytes(check.free ?? 0), formatBytes(check.needed ?? 0), check.cloud ?? null);
     default: return null;
   }
 }
 
-/** The line beside the button for a folder's check; '' before there is one. */
+/**
+ * The line beside the button for a folder's check; '' before there is one. `size` is null for a library in a cloud folder
+ * (not counted until the move starts); the check's `cloud` names the service of a cloud folder chosen.
+ */
 export function changeHere(check, kind, size) {
   if (!check) return '';
   const refused = check.refusal ? refusalWords(check, kind) : null;
   if (refused) return refused;
   if (kind === 'move') {
-    if (check.kind === 'create') return movingToLine(check.libraryFolder, formatBytes(size ?? 0), formatBytes(check.free ?? 0));
+    if (check.kind === 'create') {
+      return movingToLine(check.libraryFolder, size == null ? null : formatBytes(size), formatBytes(check.free ?? 0), check.cloud ?? null);
+    }
     if (check.kind === 'existing') return EXISTING_LIBRARY_WORDS;
   }
   return setupHere(check);
