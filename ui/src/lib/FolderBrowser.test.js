@@ -517,6 +517,34 @@ test('Move library: a refused folder says why and Move here does nothing', async
   expect(onChoose).not.toHaveBeenCalled();
 });
 
+test('Move library from a cloud folder: the size is counted when the move starts', async () => {
+  setUpForChange({ '/Users/you/Documents': inspected('/Users/you/Documents', 'create', { refusal: null, free: 80.1 * GB, needed: null, cloud: null }) });
+  render(FolderBrowser, { change: 'move', librarySize: null, onChoose: vi.fn(), onClose: vi.fn() });
+
+  expect(await screen.findByText('Your library will be moved to /Users/you/Documents/Butterfly_Atlas. Its size is counted when the move starts;'
+    + ' that drive has 80.1 GB free.')).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Move here' }).getAttribute('aria-disabled')).not.toBe('true');
+});
+
+test('Move library into a cloud folder: its free space is said to be this device\'s', async () => {
+  setUpForChange({
+    '/Users/you/Documents': inspected('/Users/you/Documents', 'create', { refusal: null, free: 80.1 * GB, needed: 13.2 * GB, cloud: 'OneDrive' }),
+  });
+  render(FolderBrowser, { change: 'move', librarySize: 12.4 * GB, onChoose: vi.fn(), onClose: vi.fn() });
+
+  expect(await screen.findByText('Your library will be moved to /Users/you/Documents/Butterfly_Atlas. It is 12.4 GB; that folder has 80.1 GB free'
+    + ' on this device.')).toBeTruthy();
+});
+
+test('Move library into a cloud folder without the room says the free space is this device\'s', async () => {
+  setUpForChange({
+    '/Users/you/Documents': inspected('/Users/you/Documents', 'create', { refusal: 'not_enough_space', free: 3.2 * GB, needed: 13.2 * GB, cloud: 'OneDrive' }),
+  });
+  render(FolderBrowser, { change: 'move', librarySize: 12.4 * GB, onChoose: vi.fn(), onClose: vi.fn() });
+
+  expect(await screen.findByText('That folder has 3.2 GB free on this device; moving your library needs about 13.2 GB.')).toBeTruthy();
+});
+
 test('Use a different library: setup\'s lines and buttons, and the library in use is refused', async () => {
   setUpForChange({
     '/Users/you/Documents': inspected('/Users/you/Documents', 'existing', { libraryFolder: '/Users/you/Documents', refusal: 'current_library' }),

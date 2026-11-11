@@ -21,7 +21,7 @@
    * `change` ('move' or 'switch') is Settings' Move library and Use a different library (change-library-folder design §3):
    * as setup, but titled "Choose where to move your library" or "Choose a library to use", the folder checked for that
    * change (GET /api/library/change/inspect), and its lines and button from lib/changeView.js (`librarySize`, bytes, is the
-   * library's size, said for a move); while the change starts the button reads "Starting…".
+   * library's size, said for a move; null for a library in a cloud folder, not counted until the move starts); while the change starts the button reads "Starting…".
    * Starts at `startPath`, else Pictures (Documents for setup and a change), else the first shortcut.
    *
    * Keyboard: the folder list is one Tab stop (Up/Down/Home/End move in it, Enter opens); Backspace or Alt+Up

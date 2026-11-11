@@ -105,6 +105,9 @@ export const LIBRARY_FOLDER_HINT = 'Where your photos and their database are kep
 export const FOLDER = 'Folder';
 export const SIZE = 'Size';
 export const FREE_ON_DRIVE = 'Free on its drive';
+// A library in a cloud folder (cloud-library-folder design §3): not counted, so no Size row; its free space is this device's.
+export const FREE_ON_DEVICE = 'Free on this device';
+export const cloudLibraryNote = (service) => `Your library is in ${service}. The space left in ${service} isn't shown here; check it in ${service}.`;
 export const MOVE_LIBRARY = 'Move library…';
 export const USE_DIFFERENT_LIBRARY = 'Use a different library…';
 export const FIXED_FOLDER_NOTE = 'This copy of Butterfly Atlas was started on a fixed folder.';
@@ -112,8 +115,13 @@ export const FIXED_FOLDER_NOTE = 'This copy of Butterfly Atlas was started on a 
 export const CHOOSE_MOVE_TITLE = 'Choose where to move your library';
 export const CHOOSE_SWITCH_TITLE = 'Choose a library to use';
 export const MOVE_HERE = 'Move here';
-export const movingToLine = (folder, size, free) => `Your library will be moved to ${folder}. It is ${size}; that drive has ${free} free.`;
-export const tooLittleSpaceLine = (free, needed) => `That drive has ${free} free; moving your library needs about ${needed}.`;
+// `size` null: the library is in a cloud folder and is counted when the move starts; `cloud`: the folder chosen is in that
+// service's cloud folder, whose free space is this device's (cloud-library-folder design §4).
+export const movingToLine = (folder, size, free, cloud = null) => `Your library will be moved to ${folder}.`
+  + (size == null ? ' Its size is counted when the move starts;' : ` It is ${size};`)
+  + (cloud ? ` that folder has ${free} free on this device.` : ` that drive has ${free} free.`);
+export const tooLittleSpaceLine = (free, needed, cloud = null) => (cloud ? `That folder has ${free} free on this device` : `That drive has ${free} free`)
+  + `; moving your library needs about ${needed}.`;
 export const EXISTING_LIBRARY_WORDS = 'That folder already holds a library. To open it, use Use a different library.';
 export const OUTSIDE_LIBRARY_WORDS = 'Choose a folder outside your library.';
 export const CURRENT_LIBRARY_WORDS = 'That is the library you are using.';
@@ -151,7 +159,8 @@ export const OPENS_IN_NEW_WINDOW = 'It opens in a new window. You can close this
 export const OPEN_AGAIN = 'Open Butterfly Atlas again to continue.';
 export const COULD_NOT_REOPEN = "Butterfly Atlas couldn't reopen itself.";
 // Settings → the old copy after a move (§9).
-export const oldCopyLine = (folder, size) => `The old copy of your library is still at ${folder} (${size}).`;
+// `size` null: the old copy is in a cloud folder and isn't counted.
+export const oldCopyLine = (folder, size) => `The old copy of your library is still at ${folder}${size == null ? '' : ` (${size})`}.`;
 export const DELETE_OLD_COPY = 'Delete old copy';
 export const DELETE_OLD_COPY_TITLE = 'Delete the old copy?';
 export const DELETING = 'Deleting…';

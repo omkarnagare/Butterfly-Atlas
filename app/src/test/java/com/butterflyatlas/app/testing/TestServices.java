@@ -162,6 +162,7 @@ public final class TestServices {
         LibraryChange change = new LibraryChange(holder::library, setup, ChangeSteps.REAL, usableSpace,
                 LibraryChange.Background.of(holder::library), setup::rememberChange,
                 RunningWork.of(exports, backups, imports, updates, processing, () -> false));
+        change.cloudFolders(com.butterflyatlas.app.imports.CloudFolders::service); // as Main
         if (sync != null) {
             change.syncWith(sync::publishNow, sync::close);
         }
