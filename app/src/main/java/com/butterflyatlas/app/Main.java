@@ -340,6 +340,8 @@ public final class Main {
         LibraryChange change = new LibraryChange(holder::library, setup, ChangeSteps.REAL, LibraryDrive::usableSpace,
                 LibraryChange.Background.of(holder::library), setup::rememberChange,
                 RunningWork.of(exports, backups, imports, updates, processing, startupWork::running));
+        // A library in a cloud folder isn't walked in Settings (cloud-library-folder design §2–§4).
+        change.cloudFolders(com.butterflyatlas.app.imports.CloudFolders::service);
         AtlasServices services = new AtlasServices(setup, taxa, new SearchWordService(holder, clock),
                 search, photos, photoQueries, new TagService(holder::library),
                 thumbnails, rescan, processing, new FolderBrowser(holder::current, imports.store(), home), imports,

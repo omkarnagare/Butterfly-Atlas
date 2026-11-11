@@ -3,7 +3,6 @@ package com.butterflyatlas.app.library;
 import com.butterflyatlas.app.AtlasException;
 import com.butterflyatlas.app.ErrorCodes;
 import com.butterflyatlas.app.db.Database;
-import com.butterflyatlas.app.imports.CloudFolders;
 import com.butterflyatlas.app.window.InstanceLock;
 import com.butterflyatlas.app.window.Relaunch;
 import org.slf4j.Logger;
@@ -223,8 +222,11 @@ public final class LibraryChange {
     private final ToLongFunction<Path> usableSpace;
     private final Background background;
     private final Switcher switcher;
-    /** The service of the cloud folder a folder is in, else null; and the size of a folder (cloud-library-folder §2–§4). */
-    private volatile Function<Path, String> cloud = CloudFolders::service;
+    /**
+     * The service of the cloud folder a folder is in, else null (the app gives {@code CloudFolders::service}; none until
+     * then); and the size of a folder (cloud-library-folder §2–§4).
+     */
+    private volatile Function<Path, String> cloud = folder -> null;
     private volatile ToLongFunction<Path> sizer = LibraryChange::size;
     /** One device at a time (one-device design §9): a move publishes first; once switched, the library is closed here. */
     private volatile Runnable publishFirst = () -> { };
@@ -284,6 +286,11 @@ public final class LibraryChange {
     public void syncWith(Runnable publishFirst, Runnable closeCurrent) {
         this.publishFirst = publishFirst;
         this.closeCurrent = closeCurrent;
+    }
+
+    /** How a folder's cloud service is told: the app gives {@code CloudFolders::service} (cloud-library-folder §2). */
+    public void cloudFolders(Function<Path, String> cloud) {
+        this.cloud = cloud;
     }
 
     /** How a folder's cloud service is told and its size counted (tests: fake cloud folders, a counted walk). */
