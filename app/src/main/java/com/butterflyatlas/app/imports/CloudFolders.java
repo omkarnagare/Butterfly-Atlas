@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.DirectoryIteratorException;
 import java.nio.file.DirectoryStream;
+import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
@@ -16,6 +17,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * The folders a sync app keeps in step on this device, for the folder browser's shortcuts (one-device design §9), so a
@@ -29,6 +31,11 @@ import java.util.Map;
  *   <li>Linux: {@code Dropbox} in the home folder</li>
  * </ul>
  * Only folders that exist are listed. Names are plain ("Google Drive"); two accounts of one service add the account.
+ * <p>
+ * {@link #service(Path)} tells whether a folder is inside one of them (cloud-library-folder design §2), so Settings doesn't
+ * walk a library a sync app would have to fetch: the same folders, with all of a macOS account folder (Google Drive's
+ * {@code Shared drives} too) and all of {@code ~/Library/Mobile Documents}, plus Google Drive's drive letter on Windows,
+ * told by its volume's name or type.
  */
 public final class CloudFolders {
 
@@ -40,6 +47,120 @@ public final class CloudFolders {
             "Dropbox", "Dropbox", "Box", "Box");
 
     private CloudFolders() {
+    }
+
+    /** A drive's volume name and file system type, as {@link FileStore#name()} and {@link FileStore#type()} give them. */
+    public record Store(String name, String type) {
+    }
+
+    /** The plain name of the service whose cloud folder {@code folder} is in on this device ("Google Drive"), or null. */
+    public static String service(Path folder) {
+        return service(folder, Path.of(System.getProperty("user.home", "")), System.getenv(),
+                System.getProperty("os.name", ""), CloudFolders::store);
+    }
+
+    /**
+     * The service whose cloud folder {@code folder} is in, or null: for a home folder {@code home}, the environment
+     * {@code env}, the system's name {@code os}, and {@code store} giving the drive a folder is on (Windows only; null when
+     * it can't be told). Nothing in a folder is listed: paths are compared, and on Windows one volume is asked its name.
+     */
+    public static String service(Path folder, Path home, Map<String, String> env, String os,
+                                 Function<Path, Store> store) {
+        String system = os.toLowerCase(Locale.ROOT);
+        List<Path> forms = forms(folder);
+        if (system.contains("mac")) {
+            Path library = home.resolve("Library");
+            Path storage = library.resolve("CloudStorage");
+            for (Path root : forms(storage)) {
+                for (Path p : forms) {
+                    if (p.startsWith(root) && p.getNameCount() > root.getNameCount()) {
+                        String entry = p.getName(root.getNameCount()).toString();
+                        if (ImportNames.isHidden(entry)) {
+                            return null;
+                        }
+                        int dash = entry.indexOf('-');
+                        String prefix = dash < 0 ? entry : entry.substring(0, dash);
+                        return SERVICES.getOrDefault(prefix, prefix);
+                    }
+                }
+            }
+            return inside(forms, library.resolve("Mobile Documents")) ? "iCloud Drive" : null;
+        }
+        if (system.contains("win")) {
+            for (String key : new String[] {"OneDrive", "OneDriveConsumer", "OneDriveCommercial"}) {
+                String value = env.get(key);
+                if (value == null || value.isBlank()) {
+                    continue;
+                }
+                try {
+                    if (inside(forms, Path.of(value))) {
+                        return "OneDrive";
+                    }
+                } catch (InvalidPathException e) {
+                    LOG.debug("OneDrive's setting {} is not a path", key, e);
+                }
+            }
+        }
+        if (inside(forms, home.resolve("Dropbox"))) {
+            return "Dropbox";
+        }
+        if (system.contains("win")) {
+            Store drive = store.apply(folder);
+            if (drive != null && (googleDrive(drive.name()) || googleDrive(drive.type()))) {
+                return "Google Drive";
+            }
+        }
+        return null;
+    }
+
+    /** Google Drive for desktop names its drive "Google Drive" and reports a type such as "GoogleDriveFS". */
+    private static boolean googleDrive(String words) {
+        return words != null && words.replace(" ", "").toLowerCase(Locale.ROOT).contains("googledrive");
+    }
+
+    /** The drive of the nearest folder of {@code folder} that exists, or null when it can't be told. */
+    private static Store store(Path folder) {
+        for (Path p = folder.toAbsolutePath(); p != null; p = p.getParent()) {
+            if (Files.isDirectory(p)) {
+                try {
+                    FileStore fs = Files.getFileStore(p);
+                    return new Store(fs.name(), fs.type());
+                } catch (IOException | RuntimeException e) {
+                    LOG.debug("Could not tell the drive of {}", p, e);
+                    return null;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static boolean inside(List<Path> forms, Path root) {
+        for (Path r : forms(root)) {
+            for (Path p : forms) {
+                if (p.startsWith(r)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** A path as given (absolute, normalised) and with its links resolved as far as it exists ({@code /var} is {@code /private/var}). */
+    private static List<Path> forms(Path path) {
+        Path plain = path.toAbsolutePath().normalize();
+        Path existing = plain;
+        while (existing != null && !Files.exists(existing)) {
+            existing = existing.getParent();
+        }
+        if (existing == null) {
+            return List.of(plain);
+        }
+        try {
+            Path real = existing.toRealPath().resolve(existing.relativize(plain).toString());
+            return real.equals(plain) ? List.of(plain) : List.of(plain, real);
+        } catch (IOException | RuntimeException e) {
+            return List.of(plain);
+        }
     }
 
     /** This device's cloud folders. */

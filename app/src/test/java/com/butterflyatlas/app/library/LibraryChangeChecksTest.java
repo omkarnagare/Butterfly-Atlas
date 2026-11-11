@@ -72,8 +72,75 @@ class LibraryChangeChecksTest {
         assertThat(overview.size()).isEqualTo(LibraryChange.size(current));
         assertThat(overview.size()).isGreaterThan(4_000_000);
         assertThat(overview.free()).isEqualTo(free);
+        assertThat(overview.cloud()).isNull();
         assertThat(overview.fixed()).isFalse();
         assertThat(overview.changing()).isNull();
+    }
+
+    /** The library in use in a fake cloud folder ("Google Drive"), and any folder under {@code Cloud} in OneDrive. */
+    private final java.util.concurrent.atomic.AtomicInteger counted = new java.util.concurrent.atomic.AtomicInteger();
+
+    private LibraryChange cloudChange(boolean libraryInCloud) {
+        LibraryChange change = change();
+        change.cloudWith(folder -> libraryInCloud && folder.startsWith(current) ? "Google Drive"
+                : folder.startsWith(home.resolve("Cloud")) ? "OneDrive" : null, folder -> {
+                    counted.incrementAndGet();
+                    return LibraryChange.size(folder);
+                });
+        return change;
+    }
+
+    @Test
+    void theOverviewDoesNotCountALibraryInACloudFolderButNamesTheServiceAndTheFreeSpaceOnThisDevice() {
+        LibraryChange.Overview overview = cloudChange(true).overview();
+
+        assertThat(overview.size()).isNull();
+        assertThat(overview.cloud()).isEqualTo("Google Drive");
+        assertThat(overview.free()).isEqualTo(free);
+        assertThat(counted).as("the folder is never walked").hasValue(0);
+
+        LibraryChange.Overview normal = cloudChange(false).overview();
+        assertThat(normal.size()).isEqualTo(LibraryChange.size(current));
+        assertThat(normal.cloud()).isNull();
+        assertThat(counted).hasValue(1);
+    }
+
+    @Test
+    void aMoveFromACloudFolderIsNotCountedWhileTheBrowserLooksNorRefusedForSpaceBeforeItStarts() throws Exception {
+        Path drive = Files.createDirectories(home.resolve("Drive"));
+        free = 1 * MB;
+        LibraryChange change = cloudChange(true);
+
+        LibraryChange.Inspect inspect = change.inspect(drive.toString(), LibraryChange.MOVE);
+        assertThat(inspect.needed()).isNull();
+        assertThat(inspect.free()).isEqualTo(free);
+        assertThat(inspect.refusal()).isNull();
+        assertThat(inspect.cloud()).isNull();
+
+        LibraryChange.Changing started = change.move(drive.toString());
+        assertThat(started.step()).isEqualTo(LibraryChange.COPYING);
+        assertThat(change.await(java.time.Duration.ofSeconds(20))).isTrue();
+        LibraryChange.Changing end = change.changing().orElseThrow();
+        assertThat(end.step()).as("the copy step counted it and found too little space").isEqualTo(LibraryChange.FAILED);
+        assertThat(end.problem()).startsWith("Your library couldn't be copied to " + drive.resolve("Butterfly_Atlas")
+                + ". That drive has 1.0 MB free; moving your library needs about ");
+        assertThat(drive.resolve("Butterfly_Atlas")).doesNotExist();
+        assertThat(counted).as("the size function isn't used: the copy step lists the files itself").hasValue(0);
+    }
+
+    @Test
+    void aMoveIntoACloudFolderSaysItsFreeSpaceIsThisDevices() throws Exception {
+        Path cloud = Files.createDirectories(home.resolve("Cloud"));
+        free = 100 * MB;
+        LibraryChange change = cloudChange(false);
+
+        LibraryChange.Inspect inspect = change.inspect(cloud.toString(), LibraryChange.MOVE);
+        assertThat(inspect.cloud()).isEqualTo("OneDrive");
+        assertThat(inspect.refusal()).isEqualTo(ErrorCodes.NOT_ENOUGH_SPACE);
+
+        assertThatThrownBy(() -> change.move(cloud.toString())).isInstanceOfSatisfying(AtlasException.class,
+                refused(AtlasException.Kind.CONFLICT, ErrorCodes.NOT_ENOUGH_SPACE, "That folder has 100.0 MB free on this"
+                        + " device; moving your library needs about " + LibraryChange.words(inspect.needed()) + "."));
     }
 
     @Test
@@ -163,6 +230,7 @@ class LibraryChangeChecksTest {
         assertThat(fine.unfinished()).isEqualTo(new UnfinishedWork.Counts(0, 0, 0));
         assertThat(fine.free()).as("move only").isNull();
         assertThat(fine.needed()).isNull();
+        assertThat(fine.cloud()).isNull();
         assertThat(change.inspect(home.resolve("Empty").toString(), LibraryChange.SWITCH).refusal()).isNull();
         assertThat(change.inspect(current.toString(), LibraryChange.SWITCH).refusal()).isEqualTo(LibraryChange.CURRENT_LIBRARY);
         assertThatThrownBy(() -> change.switchTo(current.toString())).isInstanceOfSatisfying(AtlasException.class,

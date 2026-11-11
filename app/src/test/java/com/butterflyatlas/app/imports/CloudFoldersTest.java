@@ -102,4 +102,81 @@ class CloudFoldersTest {
                 .containsExactly("home", "documents", "cloud", "drive");
         assertThat(browser.roots().get(2)).isEqualTo(cloud("Dropbox", dropbox));
     }
+    // Which cloud folder a library folder is in (cloud-library-folder design §2): paths compared, nothing listed.
+
+    private String service(Path folder, String os) {
+        return CloudFolders.service(folder, home, Map.of(), os, p -> null);
+    }
+
+    @Test
+    void onMacOsAFolderInCloudStorageIsInItsServiceWithoutTheAccount() throws Exception {
+        Path myDrive = folder("Library", "CloudStorage", "GoogleDrive-me@example.com", "My Drive");
+        Path shared = folder("Library", "CloudStorage", "GoogleDrive-me@example.com", "Shared drives", "Team");
+
+        assertThat(service(myDrive.resolve("Butterfly_Atlas"), "Mac OS X")).isEqualTo("Google Drive");
+        assertThat(service(shared.resolve("Butterfly_Atlas"), "Mac OS X")).as("outside My Drive too").isEqualTo("Google Drive");
+        assertThat(service(home.resolve("Library/CloudStorage/OneDrive-Acme Ltd/Photos"), "Mac OS X")).isEqualTo("OneDrive");
+        assertThat(service(home.resolve("Library/CloudStorage/Dropbox/Butterfly_Atlas"), "Mac OS X")).isEqualTo("Dropbox");
+        assertThat(service(home.resolve("Library/CloudStorage/Box-Box/A"), "Mac OS X")).isEqualTo("Box");
+        assertThat(service(home.resolve("Library/CloudStorage/pCloud-me/A"), "Mac OS X")).as("another service: its prefix")
+                .isEqualTo("pCloud");
+        assertThat(service(home.resolve("Library/CloudStorage"), "Mac OS X")).as("the folder that holds them").isNull();
+    }
+
+    @Test
+    void onMacOsAFolderInICloudDriveIsInICloudDrive() throws Exception {
+        Path icloud = folder("Library", "Mobile Documents", "com~apple~CloudDocs");
+
+        assertThat(service(icloud.resolve("Butterfly_Atlas"), "Mac OS X")).isEqualTo("iCloud Drive");
+    }
+
+    @Test
+    void aFolderReachedThroughALinkIsInTheCloudFolderTheLinkLeadsTo() throws Exception {
+        Path dropbox = folder("Library", "CloudStorage", "Dropbox");
+        Path link = Files.createSymbolicLink(home.resolve("Shortcut"), dropbox);
+        Path realHome = home.toRealPath();
+
+        assertThat(CloudFolders.service(link.resolve("Butterfly_Atlas"), realHome, Map.of(), "Mac OS X", p -> null))
+                .isEqualTo("Dropbox");
+    }
+
+    @Test
+    void onWindowsOneDriveComesFromItsSettingsAndDropboxFromHome() throws Exception {
+        Path work = folder("OneDrive - Acme Ltd");
+        Map<String, String> env = Map.of("OneDriveCommercial", work.toString());
+
+        assertThat(CloudFolders.service(work.resolve("Butterfly_Atlas"), home, env, "Windows 11", p -> null)).isEqualTo("OneDrive");
+        assertThat(CloudFolders.service(home.resolve("Dropbox").resolve("A"), home, env, "Windows 11", p -> null))
+                .isEqualTo("Dropbox");
+        assertThat(CloudFolders.service(home.resolve("Documents"), home, env, "Windows 11", p -> null)).isNull();
+    }
+
+    @Test
+    void onWindowsGoogleDrivesDriveLetterIsToldByItsVolumesNameOrType() {
+        Path g = home.resolve("G").resolve("My Drive").resolve("Butterfly_Atlas");
+
+        assertThat(CloudFolders.service(g, home, Map.of(), "Windows 11", p -> new CloudFolders.Store("Google Drive", "FAT32")))
+                .isEqualTo("Google Drive");
+        assertThat(CloudFolders.service(g, home, Map.of(), "Windows 11", p -> new CloudFolders.Store("", "GoogleDriveFS")))
+                .isEqualTo("Google Drive");
+        assertThat(CloudFolders.service(g, home, Map.of(), "Windows 11", p -> new CloudFolders.Store("Photos", "NTFS"))).isNull();
+        assertThat(CloudFolders.service(g, home, Map.of(), "Mac OS X", p -> new CloudFolders.Store("Google Drive", "x")))
+                .as("a drive's name counts on Windows only").isNull();
+    }
+
+    @Test
+    void onLinuxDropboxInHomeIsACloudFolder() {
+        assertThat(service(home.resolve("Dropbox").resolve("Butterfly_Atlas"), "Linux")).isEqualTo("Dropbox");
+    }
+
+    @Test
+    void aNormalFolderIsInNoCloudFolder() throws Exception {
+        folder("Library", "CloudStorage", "Dropbox");
+        Path pictures = folder("Pictures", "Butterfly_Atlas");
+
+        assertThat(service(pictures, "Mac OS X")).isNull();
+        assertThat(service(pictures, "Windows 11")).isNull();
+        assertThat(service(pictures, "Linux")).isNull();
+        assertThat(service(home.resolve("Dropboxes"), "Linux")).as("a name that only starts the same").isNull();
+    }
 }

@@ -87,6 +87,22 @@ class OldCopyTest {
     }
 
     @Test
+    void anOldCopyInACloudFolderIsNotCounted() {
+        LibraryChange change = change(ChangeSteps.REAL);
+        java.util.concurrent.atomic.AtomicInteger counted = new java.util.concurrent.atomic.AtomicInteger();
+        change.cloudWith(folder -> folder.startsWith(old) ? "Google Drive" : null, folder -> {
+            counted.incrementAndGet();
+            return LibraryChange.size(folder);
+        });
+
+        LibraryChange.OldCopy copy = change.overview().oldCopy();
+
+        assertThat(copy.folder()).isEqualTo(old.toString());
+        assertThat(copy.size()).isNull();
+        assertThat(counted).as("only the library in use, which isn't in a cloud folder").hasValue(1);
+    }
+
+    @Test
     void deletingTakesOnlyWhatALibraryIsMadeOfAndListsWhatElseIsLeft() throws Exception {
         Files.writeString(old.resolve("notes.txt"), "mine");
         Files.createDirectories(old.resolve("Mine"));

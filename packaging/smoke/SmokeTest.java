@@ -660,12 +660,13 @@ public final class SmokeTest {
         void libraryChange() throws Exception {
             Json overview = Json.parse(http.call("GET /api/library/change", "/api/library/change", null, 200).text());
             expect(library.toString().equals(overview.str("folder")) && !overview.bool("fixed")
-                    && overview.isNull("changing") && overview.isNull("oldCopy") && overview.num("size") > 0,
+                    && overview.isNull("changing") && overview.isNull("oldCopy") && overview.num("size") > 0
+                    && overview.has("cloud") && overview.isNull("cloud"),
                     "the library folder overview is wrong: " + overview);
             Path elsewhere = Files.createDirectories(work.resolve("mv"));
             Json inspect = Json.parse(http.call("GET /api/library/change/inspect", "/api/library/change/inspect?for=move&path="
                     + enc(elsewhere.toString()), null, 200).text());
-            expect("create".equals(inspect.str("kind"))
+            expect("create".equals(inspect.str("kind")) && inspect.has("cloud") && inspect.isNull("cloud")
                     && elsewhere.resolve("Butterfly_Atlas").toString().equals(inspect.str("libraryFolder")),
                     "the move check does not offer " + elsewhere + ": " + inspect);
             String itself = "{\"path\":" + Json.quote(library.toString()) + "}";
@@ -1434,6 +1435,11 @@ public final class SmokeTest {
 
         boolean isNull(String path) {
             return at(path) == null;
+        }
+
+        /** Whether this object has the field {@code key}, even when it is null. */
+        boolean has(String key) {
+            return value instanceof Map<?, ?> m && m.containsKey(key);
         }
 
         List<Object> list(String path) {

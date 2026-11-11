@@ -3,6 +3,7 @@ package com.butterflyatlas.app.library;
 import com.butterflyatlas.app.AtlasException;
 import com.butterflyatlas.app.ErrorCodes;
 import com.butterflyatlas.app.db.Database;
+import com.butterflyatlas.app.imports.CloudFolders;
 import com.butterflyatlas.app.window.InstanceLock;
 import com.butterflyatlas.app.window.Relaunch;
 import org.slf4j.Logger;
@@ -25,6 +26,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.ToLongFunction;
 import java.util.stream.Stream;
@@ -152,14 +154,20 @@ public final class LibraryChange {
     private static final long SPARE_BYTES = 200_000_000L;
 
     /**
-     * {@code GET /api/library/change} (contract §3): the library folder, its size (every file in it), its drive's usable
-     * space, whether it is fixed ({@code -Datlas.dataDir}), and the change running or waiting to be dismissed.
+     * {@code GET /api/library/change} (contract §3): the library folder, its size (every file in it; null when it is in a
+     * cloud folder, which isn't counted: cloud-library-folder contract §1), its drive's usable space, the cloud folder's
+     * service (else null), whether it is fixed ({@code -Datlas.dataDir}), and the change running or waiting to be
+     * dismissed.
      */
-    public record Overview(String folder, long size, long free, boolean fixed, Changing changing, OldCopy oldCopy) {
+    public record Overview(String folder, Long size, long free, String cloud, boolean fixed, Changing changing,
+                           OldCopy oldCopy) {
     }
 
-    /** The old copy a move left (spec §9): its folder, its size, and the library's last backup (null when none). */
-    public record OldCopy(String folder, long size, LastBackup lastBackup) {
+    /**
+     * The old copy a move left (spec §9): its folder, its size (null when it is in a cloud folder), and the library's last
+     * backup (null when none).
+     */
+    public record OldCopy(String folder, Long size, LastBackup lastBackup) {
     }
 
     /** The newest backup that finished: {@code everything} or {@code database}, and when (an ISO instant). */
@@ -180,10 +188,12 @@ public final class LibraryChange {
 
     /**
      * {@code GET /api/library/change/inspect} (contract §3): the setup screen's check of the folder shown, the refusal of
-     * this change (null when it may go ahead), and for a move the drive's free space and what the move needs.
+     * this change (null when it may go ahead), for a move the drive's free space and what the move needs (null when the
+     * library is in a cloud folder: counted when the move starts), and the cloud folder's service the library folder
+     * would be in (else null; cloud-library-folder contract §2).
      */
     public record Inspect(String path, boolean absolute, String libraryFolder, String kind, UnfinishedWork.Counts unfinished,
-                          String refusal, Long free, Long needed) {
+                          String refusal, Long free, Long needed, String cloud) {
     }
 
     /** One file of the library to copy: its path inside the library folder and its size. */
@@ -213,6 +223,9 @@ public final class LibraryChange {
     private final ToLongFunction<Path> usableSpace;
     private final Background background;
     private final Switcher switcher;
+    /** The service of the cloud folder a folder is in, else null; and the size of a folder (cloud-library-folder §2–§4). */
+    private volatile Function<Path, String> cloud = CloudFolders::service;
+    private volatile ToLongFunction<Path> sizer = LibraryChange::size;
     /** One device at a time (one-device design §9): a move publishes first; once switched, the library is closed here. */
     private volatile Runnable publishFirst = () -> { };
     private volatile Runnable closeCurrent = () -> { };
@@ -273,6 +286,12 @@ public final class LibraryChange {
         this.closeCurrent = closeCurrent;
     }
 
+    /** How a folder's cloud service is told and its size counted (tests: fake cloud folders, a counted walk). */
+    void cloudWith(Function<Path, String> cloud, ToLongFunction<Path> sizer) {
+        this.cloud = cloud;
+        this.sizer = sizer;
+    }
+
     /** The change running or waiting to be dismissed, else empty (from memory). */
     public Optional<Changing> changing() {
         synchronized (lock) {
@@ -280,11 +299,15 @@ public final class LibraryChange {
         }
     }
 
-    /** The Library folder section of Settings (contract §3). */
+    /**
+     * The Library folder section of Settings (contract §3): a library in a cloud folder isn't counted, since walking it
+     * would make the sync app fetch every folder (cloud-library-folder design §3).
+     */
     public Overview overview() {
         Path folder = library.get().folder();
-        return new Overview(folder.toString(), size(folder), usableSpace.applyAsLong(folder), setup != null && setup.fixed(),
-                changing().orElse(null), oldCopy());
+        String service = cloud.apply(folder);
+        return new Overview(folder.toString(), service == null ? sizer.applyAsLong(folder) : null,
+                usableSpace.applyAsLong(folder), service, setup != null && setup.fixed(), changing().orElse(null), oldCopy());
     }
 
     /** The old copy a move left, while the settings keep it (until it is deleted or the user went back to it). */
@@ -293,7 +316,8 @@ public final class LibraryChange {
         if (folder == null) {
             return null;
         }
-        return new OldCopy(folder.toString(), Files.isDirectory(folder) ? size(folder) : 0, lastBackup());
+        Long size = cloud.apply(folder) != null ? null : Files.isDirectory(folder) ? sizer.applyAsLong(folder) : 0L;
+        return new OldCopy(folder.toString(), size, lastBackup());
     }
 
     /** The newest backup of the library in use that finished (spec §9), or null; one that can't be read is none. */
@@ -432,14 +456,14 @@ public final class LibraryChange {
         boolean move = kind(kind);
         SetupService.FolderCheck check = setup.inspect(rawPath, false);
         if (check.libraryFolder() == null) {
-            return new Inspect(check.path(), check.absolute(), null, check.kind(), check.unfinished(), null, null, null);
+            return new Inspect(check.path(), check.absolute(), null, check.kind(), check.unfinished(), null, null, null, null);
         }
         Path folder = Path.of(check.libraryFolder());
         Long free = move ? usableSpace.applyAsLong(nearestExisting(folder)) : null;
-        Long needed = move ? needed(size(library.get().folder())) : null;
+        Long needed = move ? neededNow() : null;
         String refusal = refusal(move, Path.of(check.path()), folder, check.kind(), free, needed);
         return new Inspect(check.path(), check.absolute(), check.libraryFolder(), check.kind(), check.unfinished(), refusal,
-                free, needed);
+                free, needed, cloud.apply(folder));
     }
 
     /**
@@ -454,12 +478,21 @@ public final class LibraryChange {
             throw invalid(NOT_WRITABLE_WORDS);
         }
         long free = usableSpace.applyAsLong(nearestExisting(place.folder()));
-        long needed = needed(size(library.get().folder()));
+        Long needed = neededNow();
         String refusal = refusal(true, setup.resolve(rawPath), place.folder(), place.kind(), free, needed);
         if (refusal != null) {
-            throw refused(true, refusal, free, needed);
+            throw refused(true, refusal, free, needed == null ? 0 : needed, cloud.apply(place.folder()));
         }
-        return copyTo(place.folder());
+        return copyTo(place.folder(), needed == null);
+    }
+
+    /**
+     * What a move needs free, counted now; null when the library is in a cloud folder, whose size is counted when the move
+     * starts (its copy step lists every file anyway: cloud-library-folder design §4).
+     */
+    private Long neededNow() {
+        Path from = library.get().folder();
+        return cloud.apply(from) != null ? null : needed(sizer.applyAsLong(from));
     }
 
     /** Refuses any change on a fixed folder, while one runs, or while work runs that must finish first. */
@@ -500,7 +533,7 @@ public final class LibraryChange {
      * The refusal as the answer to a move or a switch (contract §3): a move refuses the library itself and a folder inside
      * it in the same words (spec §3).
      */
-    private static AtlasException refused(boolean move, String refusal, long free, long needed) {
+    private static AtlasException refused(boolean move, String refusal, long free, long needed, String cloud) {
         return switch (refusal) {
             case EXISTING_LIBRARY -> invalid(EXISTING_WORDS);
             case INSIDE_LIBRARY -> invalid(OUTSIDE_WORDS);
@@ -508,8 +541,7 @@ public final class LibraryChange {
             case ErrorCodes.LIBRARY_IN_USE -> new AtlasException(AtlasException.Kind.CONFLICT, ErrorCodes.LIBRARY_IN_USE,
                     IN_USE_WORDS);
             case ErrorCodes.NOT_ENOUGH_SPACE -> new AtlasException(AtlasException.Kind.CONFLICT,
-                    ErrorCodes.NOT_ENOUGH_SPACE, "That drive has " + words(free) + " free; moving your library needs about "
-                    + words(needed) + ".");
+                    ErrorCodes.NOT_ENOUGH_SPACE, tooLittleSpace(free, needed, cloud));
             default -> throw new IllegalArgumentException(refusal);
         };
     }
@@ -595,6 +627,15 @@ public final class LibraryChange {
         }
     }
 
+    /**
+     * The words for too little space where a move goes (spec §4); a cloud folder's free space is this device's
+     * (cloud-library-folder contract §3).
+     */
+    static String tooLittleSpace(long free, long needed, String cloud) {
+        return (cloud == null ? "That drive has " + words(free) + " free" : "That folder has " + words(free)
+                + " free on this device") + "; moving your library needs about " + words(needed) + ".";
+    }
+
     /** A size as a drive shows it: megabytes under a gigabyte, else gigabytes, one decimal. */
     static String words(long bytes) {
         if (bytes < 1_000_000_000L) {
@@ -622,6 +663,11 @@ public final class LibraryChange {
      * blocked. Answers the change as it starts.
      */
     Changing copyTo(Path to) {
+        return copyTo(to, false);
+    }
+
+    /** As {@link #copyTo(Path)}; {@code countFirst}: the space wasn't checked, so the copy step checks it (cloud §4). */
+    Changing copyTo(Path to, boolean countFirst) {
         Path from = library.get().folder();
         synchronized (lock) {
             if (current != null) {
@@ -630,7 +676,7 @@ public final class LibraryChange {
             }
             cancelRequested = false;
             current = new Changing(MOVE, to.toString(), COPYING, Count.NONE, Count.NONE, true, null, null, null);
-            worker = new Thread(() -> move(from, to), "atlas-library-change");
+            worker = new Thread(() -> move(from, to, countFirst), "atlas-library-change");
             worker.setDaemon(true);
             worker.start();
             return current;
@@ -696,7 +742,7 @@ public final class LibraryChange {
         return !running.isAlive();
     }
 
-    private void move(Path from, Path to) {
+    private void move(Path from, Path to, boolean countFirst) {
         boolean held = false;
         boolean created = false;
         try {
@@ -706,7 +752,7 @@ public final class LibraryChange {
             try {
                 steps.createFolder(to);
                 created = true;
-                copyFiles(from, to);
+                copyFiles(from, to, countFirst);
             } catch (IOException | RuntimeException e) {
                 throw new Failed("Your library couldn't be copied to " + to + ". " + reason(from, to, created, e), e);
             }
@@ -767,7 +813,7 @@ public final class LibraryChange {
         }
         String refusal = refusal(false, setup.resolve(rawPath), place.folder(), place.kind(), null, null);
         if (refusal != null) {
-            throw refused(false, refusal, 0, 0);
+            throw refused(false, refusal, 0, 0, null);
         }
         Path from = library.get().folder();
         Path to = place.folder();
@@ -952,13 +998,22 @@ public final class LibraryChange {
         }
     }
 
-    /** Step 1: every file but the database's, the lock, {@code .part} files and the decoder's working folder. */
-    private void copyFiles(Path from, Path to) throws IOException, Cancelled {
+    /**
+     * Step 1: every file but the database's, the lock, {@code .part} files and the decoder's working folder. With
+     * {@code countFirst} (a library in a cloud folder, not counted before), the size of every file in the library folder
+     * is added up while they are listed, and the move fails before any is copied when the drive chosen has too little
+     * space for it (cloud-library-folder design §4).
+     */
+    private void copyFiles(Path from, Path to, boolean countFirst) throws IOException, Cancelled, Failed {
         List<Path> folders = new ArrayList<>();
         List<Item> items = new ArrayList<>();
+        long all = 0;
         try (Stream<Path> walk = Files.walk(from)) {
             for (Path path : (Iterable<Path>) walk::iterator) {
                 Path relative = from.relativize(path);
+                if (countFirst && Files.isRegularFile(path, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+                    all += Files.size(path);
+                }
                 if (relative.toString().isEmpty() || relative.startsWith(DECODE)) {
                     continue;
                 }
@@ -967,6 +1022,14 @@ public final class LibraryChange {
                 } else if (Files.isRegularFile(path, java.nio.file.LinkOption.NOFOLLOW_LINKS) && copied(relative)) {
                     items.add(new Item(relative, Files.size(path)));
                 }
+            }
+        }
+        if (countFirst) {
+            long free = usableSpace.applyAsLong(to);
+            long needed = needed(all);
+            if (free < needed) {
+                throw new Failed("Your library couldn't be copied to " + to + ". " + tooLittleSpace(free, needed,
+                        cloud.apply(to)), new IOException(free + " bytes free, " + needed + " needed"));
             }
         }
         long totalBytes = items.stream().mapToLong(Item::size).sum();

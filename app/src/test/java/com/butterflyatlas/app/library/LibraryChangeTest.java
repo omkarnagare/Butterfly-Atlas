@@ -46,6 +46,10 @@ class LibraryChangeTest {
     private final List<String> background = new CopyOnWriteArrayList<>();
     private final List<Path> switched = new CopyOnWriteArrayList<>();
     private long freeSpace = Long.MAX_VALUE;
+    /** The old library in a fake cloud folder: the copy step counts it before copying (cloud-library-folder §4). */
+    private boolean fromCloud;
+    /** The service of the folder moved to, else null. */
+    private String toCloud;
 
     @BeforeEach
     void library() throws Exception {
@@ -86,6 +90,15 @@ class LibraryChangeTest {
     }
 
     private LibraryChange change(ChangeSteps steps) {
+        LibraryChange change = plainChange(steps);
+        change.cloudWith(folder -> fromCloud && folder.startsWith(old) ? "Google Drive"
+                : folder.startsWith(dir.resolve("Drive")) ? toCloud : null, folder -> {
+                    throw new AssertionError("the size function isn't used by the copy");
+                });
+        return change;
+    }
+
+    private LibraryChange plainChange(ChangeSteps steps) {
         return new LibraryChange(() -> library, steps, folder -> folder.startsWith(dir.resolve("Drive")) ? freeSpace
                 : Long.MAX_VALUE, new LibraryChange.Background() {
             @Override
@@ -216,7 +229,7 @@ class LibraryChangeTest {
         Map<String, String> before = contents();
         LibraryChange change = change(steps);
 
-        change.copyTo(to);
+        change.copyTo(to, fromCloud);
         LibraryChange.Changing end = done(change);
 
         assertThat(end.step()).isEqualTo(LibraryChange.FAILED);
@@ -247,6 +260,66 @@ class LibraryChangeTest {
                 super.copyFile(source, target);
             }
         }, "Your library couldn't be copied to " + to + ". " + LibraryChange.FULL_THERE);
+    }
+
+    /** Copies that fail the test: a move refused for space copies nothing. */
+    private static Steps noCopies() {
+        return new Steps() {
+            @Override
+            public void copyFile(Path source, Path target) {
+                throw new AssertionError("nothing is copied when there is too little space");
+            }
+        };
+    }
+
+    @Test
+    void aMoveFromACloudFolderCountsTheLibraryInItsCopyStepAndStopsBeforeCopyingWhenThereIsTooLittleSpace()
+            throws Exception {
+        fromCloud = true;
+        freeSpace = 150_000_000L;
+        long needed = LibraryChange.needed(LibraryChange.size(old));
+
+        LibraryChange.Changing end = failsWith(noCopies(), "Your library couldn't be copied to " + to + ". That drive has"
+                + " 150.0 MB free; moving your library needs about " + LibraryChange.words(needed) + ".");
+        assertThat(end.files()).as("nothing was counted as copied").isEqualTo(LibraryChange.Count.NONE);
+    }
+
+    @Test
+    void aMoveFromACloudFolderIntoACloudFolderSaysTheSpaceIsThisDevices() throws Exception {
+        fromCloud = true;
+        toCloud = "OneDrive";
+        freeSpace = 150_000_000L;
+
+        failsWith(noCopies(), "That folder has 150.0 MB free on this device; moving your library needs about ");
+    }
+
+    @Test
+    void aMoveFromACloudFolderWithRoomEnoughGoesAhead() throws Exception {
+        fromCloud = true;
+        freeSpace = LibraryChange.needed(LibraryChange.size(old)) + 1_000_000L;
+        LibraryChange change = change(new Steps());
+        change.reopenWith(new com.butterflyatlas.app.window.Relaunch.Reopener() {
+            @Override
+            public com.butterflyatlas.app.window.Relaunch.Plan plan() {
+                return com.butterflyatlas.app.window.Relaunch.plan(null);
+            }
+
+            @Override
+            public boolean begin(com.butterflyatlas.app.window.Relaunch.Plan plan) {
+                return false;
+            }
+
+            @Override
+            public void exit() {
+            }
+        }, Duration.ofMillis(10));
+
+        change.copyTo(to, true);
+        LibraryChange.Changing end = done(change);
+
+        assertThat(end.step()).isEqualTo(LibraryChange.REOPENING);
+        assertThat(end.files()).isEqualTo(new LibraryChange.Count(5, 5));
+        assertThat(switched).containsExactly(to);
     }
 
     @Test

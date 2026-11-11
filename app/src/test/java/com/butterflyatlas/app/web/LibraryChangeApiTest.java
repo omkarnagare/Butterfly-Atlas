@@ -137,12 +137,14 @@ class LibraryChangeApiTest {
         JsonNode overview = JSON.readTree(get("/api/library/change").body());
         assertThat(overview.get("folder").asText()).isEqualTo(home.resolve("Atlas").toString());
         assertThat(overview.get("size").asLong()).isGreaterThan(5000);
+        assertThat(overview.get("cloud").isNull()).as("present, and null outside a cloud folder").isTrue();
         assertThat(overview.get("fixed").asBoolean()).isFalse();
         assertThat(overview.get("changing").isNull()).isTrue();
         JsonNode inspect = JSON.readTree(get("/api/library/change/inspect?for=move&path=" + enc(drive)).body());
         assertThat(inspect.get("libraryFolder").asText()).isEqualTo(moved.toString());
         assertThat(inspect.get("refusal").isNull()).isTrue();
         assertThat(inspect.get("needed").asLong()).isGreaterThan(200_000_000L);
+        assertThat(inspect.get("cloud").isNull()).isTrue();
 
         RawHttp.Response started = post("/api/library/change/move", path(drive));
         assertThat(started.status()).isEqualTo(202);
