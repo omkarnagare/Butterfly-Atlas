@@ -3,12 +3,14 @@ package com.butterflyatlas.app.imports;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.abort;
 
 /**
  * The folder browser's cloud folders (one-device design §9): the folders that Google Drive, OneDrive, Dropbox, Box and
@@ -22,6 +24,27 @@ class CloudFoldersTest {
 
     private Path folder(String first, String... more) throws Exception {
         return Files.createDirectories(home.resolve(Path.of(first, more)));
+    }
+
+    /**
+     * A link at {@code link} to the folder {@code target}: a symbolic link, or on Windows, where only an administrator or
+     * Developer Mode may make one, a directory junction ({@code mklink /J}), which anyone may make.
+     */
+    private static Path linkToFolder(Path link, Path target) throws Exception {
+        try {
+            return Files.createSymbolicLink(link, target);
+        } catch (FileSystemException | UnsupportedOperationException e) {
+            if (!System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win")) {
+                abort("symbolic links can't be made here: " + e.getMessage());
+            }
+        }
+        Process mklink = new ProcessBuilder("cmd", "/c", "mklink", "/J", link.toString(), target.toString())
+                .redirectErrorStream(true).start();
+        mklink.getInputStream().transferTo(java.io.OutputStream.nullOutputStream());
+        if (mklink.waitFor() != 0) {
+            abort("neither a symbolic link nor a junction can be made here");
+        }
+        return link;
     }
 
     private static FolderBrowser.Root cloud(String name, Path path) {
@@ -133,7 +156,7 @@ class CloudFoldersTest {
     @Test
     void aFolderReachedThroughALinkIsInTheCloudFolderTheLinkLeadsTo() throws Exception {
         Path dropbox = folder("Library", "CloudStorage", "Dropbox");
-        Path link = Files.createSymbolicLink(home.resolve("Shortcut"), dropbox);
+        Path link = linkToFolder(home.resolve("Shortcut"), dropbox);
         Path realHome = home.toRealPath();
 
         assertThat(CloudFolders.service(link.resolve("Butterfly_Atlas"), realHome, Map.of(), "Mac OS X", p -> null))
