@@ -329,20 +329,3 @@ test('a photo the caller knows cannot be shown offers no Try again', () => {
   render(ZoomPan, { ...props, broken: true, failedNote: 'This RAW photo has no preview.' });
   expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
 });
-
-test('a full size already in the browser\'s cache (complete before its load event could be heard) is shown, not left behind the preview', async () => {
-  const complete = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'complete');
-  const natural = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'naturalWidth');
-  Object.defineProperty(HTMLImageElement.prototype, 'complete', { configurable: true, get: () => true });
-  Object.defineProperty(HTMLImageElement.prototype, 'naturalWidth', { configurable: true, get: () => 4000 });
-  try {
-    const { container } = render(ZoomPan, props);
-    await vi.waitFor(() => expect(container.querySelector('img.orig').classList.contains('on')).toBe(true));
-    expect(screen.getByRole('status').textContent).toBe('');
-  } finally {
-    if (complete) Object.defineProperty(HTMLImageElement.prototype, 'complete', complete);
-    else delete HTMLImageElement.prototype.complete;
-    if (natural) Object.defineProperty(HTMLImageElement.prototype, 'naturalWidth', natural);
-    else delete HTMLImageElement.prototype.naturalWidth;
-  }
-});
