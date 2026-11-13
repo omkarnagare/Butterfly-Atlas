@@ -29,6 +29,7 @@ import com.butterflyatlas.app.photos.ProcessingLedger;
 import com.butterflyatlas.app.photos.Rescan;
 import com.butterflyatlas.app.photos.StartupWork;
 import com.butterflyatlas.app.photos.TagService;
+import com.butterflyatlas.app.photos.SharpCopies;
 import com.butterflyatlas.app.photos.Thumbnails;
 import com.butterflyatlas.app.photos.consumers.Dimensions;
 import com.butterflyatlas.app.photos.consumers.Place;
@@ -185,7 +186,7 @@ public final class Main {
      * its record so the next start reports the import as stopped (they need the library and the thumbnails, which a
      * filing batch adopts previews into); then the export's copy closes, waiting at most {@code ExportJobs.CLOSE_WAIT}
      * for the photo it is copying, whose progress is saved (the export stays running, so the next start pauses it as
-     * closing); then the thumbnails stop; then (one device at a time) what is unsent is published and the library's marker
+     * closing); then the sharp copies and the thumbnails stop; then (one device at a time) what is unsent is published and the library's marker
  * closed. The library's database stays open for the JVM's exit.
      */
     static void shutdown(AtlasServer server, AtlasServices services) {
@@ -223,6 +224,9 @@ public final class Main {
                         services.backups().close();
                     } finally {
                         try {
+                            if (services.sharp() != null) {
+                                services.sharp().close();
+                            }
                             services.thumbnails().close();
                         } finally {
                             try {
@@ -260,7 +264,11 @@ public final class Main {
                 .map(library -> library.folder().resolve(Thumbnails.FOLDER).resolve(".decode")).orElse(null));
         PhotoProcessor processor = new ImageIoPhotoProcessor(heic);
         Thumbnails thumbnails = new Thumbnails(holder::library, processor, clock);
-        // Once HEIC photos can be shown (at start or after Check again), their missing thumbnails are made.
+        // Sharp copies for large tiles, beside this device's working copy (never in the library folder), made after the
+        // thumbnails; those no photo needs are tidied in the background as a library opens.
+        SharpCopies sharp = new SharpCopies(holder::library, processor, SharpCopies.onThisDevice(options.configDir()),
+                () -> thumbnails.progress().pending());
+        holder.whenOpened(library -> sharp.start());
 
         // The fact consumers: caught up at startup, and applied inline to every photo added, filed or edited.
         // The place consumer's version is the newest place list's position: after a place update every photo is due again.
@@ -277,6 +285,7 @@ public final class Main {
         heic.onChange(status -> {
             if (status.isAvailable() && holder.current().isPresent()) {
                 thumbnails.heicAvailable();
+                sharp.heicAvailable();
                 imports.heicAvailable();
             }
         });
@@ -348,7 +357,7 @@ public final class Main {
                 placeSearch, new UserPlaces(() -> holder.library().database(), clock, placeSearch,
                         new ImportPlaceChoices(holder::library)),
                 photoPlaces, filters, exports, custom, updates, splits, new LibraryDrive(holder), placeNotes, backups, heic,
-                change, sync);
+                change, sync, sharp);
         sync.stopWorkWith(() -> beginClose(services)); // the library was opened on another device: work stops
         change.syncWith(sync::publishNow, sync::close); // a move publishes first; a change closes the library here
         return services;

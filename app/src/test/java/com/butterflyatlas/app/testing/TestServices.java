@@ -27,6 +27,7 @@ import com.butterflyatlas.app.photos.PhotoQueries;
 import com.butterflyatlas.app.photos.PhotoStore;
 import com.butterflyatlas.app.photos.ProcessingLedger;
 import com.butterflyatlas.app.photos.Rescan;
+import com.butterflyatlas.app.photos.SharpCopies;
 import com.butterflyatlas.app.photos.TagService;
 import com.butterflyatlas.app.photos.Thumbnails;
 import com.butterflyatlas.app.photos.consumers.Dimensions;
@@ -116,6 +117,12 @@ public final class TestServices {
         SetupService setup = new SetupService(new ConfigStore(home.resolve("config")), holder, bundles,
                 places, home, TestBundles.CLOCK, null, sync);
         Thumbnails thumbnails = new Thumbnails(holder::library, processor, TestBundles.CLOCK);
+        // Beside the working copy as in the app; a library opened in place (most tests) keeps them in the config folder too.
+        Path config = home.resolve("config");
+        SharpCopies sharp = new SharpCopies(holder::library, processor, library -> {
+            Path folder = SharpCopies.onThisDevice(config).apply(library);
+            return folder != null ? folder : config.resolve("libraries").resolve("in-place").resolve(SharpCopies.FOLDER);
+        }, () -> thumbnails.progress().pending());
         SearchService search = new SearchService(holder);
         int placeVersion = places.position(places.version());
         List<PhotoConsumer> facts = List.of(new Dimensions(), new Place(places.index(), placeVersion, TestBundles.CLOCK));
@@ -177,7 +184,7 @@ public final class TestServices {
                 new SplitSorter(holder::library, photos, photoQueries, updates::libraryChanged),
                 new LibraryDrive(() -> holder.current().map(Library::folder), usableSpace, System::nanoTime), placeNotes,
                 backups, TestDecoders.none("mac", () -> holder.current().map(l -> l.folder().resolve(Thumbnails.FOLDER)
-                        .resolve(".decode")).orElse(null)), change, sync);
+                        .resolve(".decode")).orElse(null)), change, sync, sharp);
     }
 
     /** The same services with {@code change} as their library change (tests of a change's steps). */
@@ -185,7 +192,7 @@ public final class TestServices {
         return new AtlasServices(s.setup(), s.taxa(), s.searchWords(), s.search(), s.photos(), s.photoQueries(), s.tags(),
                 s.thumbnails(), s.rescan(), s.processing(), s.folders(), s.imports(), s.placeSearch(), s.places(),
                 s.photoPlaces(), s.filters(), s.exports(), s.custom(), s.updates(), s.splits(), s.drive(), s.placeNotes(),
-                s.backups(), s.heic(), change);
+                s.backups(), s.heic(), change, null, s.sharp());
     }
 
     /**
