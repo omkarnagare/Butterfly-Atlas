@@ -88,3 +88,16 @@ test('stop aborts a request already on its way, and its answer is ignored', asyn
   await vi.advanceTimersByTimeAsync(0);
   expect(onAnswer).not.toHaveBeenCalled();
 });
+
+test('ask with now skips the pause (the same filter, another view of it)', async () => {
+  const { fetcher } = deferred();
+  const live = liveCount(fetcher, { delay: 200, onAnswer: () => {} });
+  live.ask('tags=female', { now: true });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  live.ask('tags=male');
+  await vi.advanceTimersByTimeAsync(199);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});

@@ -3,6 +3,7 @@
  * changes pause for `delay` ms, then calls `fetcher(query, { signal })`, aborting the request it replaces. Only the
  * answer for the newest filter reaches `onAnswer(answer, query)`; an older one arriving late is ignored, and so is its
  * failure. `onError(error, query)` hears the newest request's failure (not an abort). `stop()` drops anything pending.
+ * `ask(query, { now: true })` skips the pause (the filter did not change, only what is shown of it).
  */
 export function liveCount(fetcher, { delay = 200, onAnswer, onError = () => {} }) {
   let timer = 0;
@@ -16,7 +17,7 @@ export function liveCount(fetcher, { delay = 200, onAnswer, onError = () => {} }
     newest += 1;
   }
 
-  function ask(query) {
+  function ask(query, { now = false } = {}) {
     stop();
     const mine = newest;
     timer = setTimeout(async () => {
@@ -27,7 +28,7 @@ export function liveCount(fetcher, { delay = 200, onAnswer, onError = () => {} }
       } catch (e) {
         if (mine === newest && e?.name !== 'AbortError') onError(e, query);
       }
-    }, delay);
+    }, now ? 0 : delay);
   }
 
   return { ask, stop };

@@ -206,30 +206,56 @@
   const loadPhotos = (fromStart) => pages.load(query, fromStart, { keep: viewing });
 
   let shownView = untrack(() => view);
+  // `shownView` as state, for what is drawn (`shownView` itself is read and written inside effects).
+  let shownViewNow = $state(untrack(() => view));
 
-  function loadView(which) {
+  // The view whose rows are on screen. Another view of the same filter is asked for at once and takes its place only
+  // when its first answer (or its problem) comes, so the page does not empty and fill again (2026-11-14 design §5); a
+  // new filter shows its view at once, with "Opening…" until its rows come.
+  let onScreen = $state(untrack(() => view));
+
+  function loadView(which, { keepShown = false } = {}) {
     // The view effect then skips a view already loaded (a filter and a view changed together load it once).
     if (which !== shownView) placesFocus = false;
     shownView = which;
+    shownViewNow = which;
     speciesLive.stop();
     placesLive.stop();
     clearTimeout(photoTimer);
     viewError = '';
     viewAsked = query;
-    if (which === 'species') speciesLive.ask(query);
-    else if (which === 'places') placesLive.ask(query);
-    else {
+    if (!keepShown) onScreen = which;
+    if (which === 'species') speciesLive.ask(query, { now: keepShown });
+    else if (which === 'places') placesLive.ask(query, { now: keepShown });
+    else if (keepShown) {
+      pages.forget();
+      loadPhotos(true);
+    } else {
       pages.forget();
       photoTimer = setTimeout(() => loadPhotos(true), wait);
     }
   }
 
+  let viewReady = $derived(Boolean(viewError) || (shownViewNow === 'species' ? species !== null && speciesFor === viewAsked
+    : shownViewNow === 'places' ? places !== null && placesFor === viewAsked
+      : pages.loaded || Boolean(pages.error)));
+  $effect(() => {
+    if (viewReady && onScreen !== shownViewNow) untrack(() => (onScreen = shownViewNow));
+  });
+
   // A new filter: count it and load the view; but not the filter the count just rewrote the address to (the answers
   // for the old address are its own).
+  // `counted`: the filter last counted and loaded, so new props with the same filter (a view change) do not load again.
+  let counted = null;
   $effect(() => {
     const now = query;
-    if (!results) return;
+    if (!results) {
+      counted = null;
+      return;
+    }
     untrack(() => {
+      if (now === counted) return;
+      counted = now;
       if (now === adopted) {
         adopted = null;
         return;
@@ -245,7 +271,7 @@
     const which = view;
     if (!results) return;
     untrack(() => {
-      if (which !== shownView) loadView(which);
+      if (which !== shownView) loadView(which, { keepShown: true });
     });
   });
 
@@ -408,9 +434,9 @@
 
 {#if viewError}
   <div class="ex-problem"><p class="problem" role="alert">{viewError}</p><button class="btn ghost" type="button" onclick={retryView}>Try again</button></div>
-{:else if view === 'species'}
+{:else if onScreen === 'species'}
   {#if species === null || speciesFor !== viewAsked}<p class="muted loading" role="status">Opening…</p>{:else}<SpeciesResults rows={species} {filter} query={speciesFor} />{/if}
-{:else if view === 'places'}
+{:else if onScreen === 'places'}
   {#if places === null || placesFor !== viewAsked}<p class="muted loading" role="status">Opening…</p>{:else}<PlaceResults rows={places} onChoose={choosePlace} />{/if}
 {:else}
   {#if pages.loaded && !pages.photos.length && !pages.error}
