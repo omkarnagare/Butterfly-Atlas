@@ -484,6 +484,8 @@ kbd { font: 500 11px/1 var(--mono); border: 1px solid var(--line); border-bottom
 .toast { position: fixed; left: 50%; translate: -50% 0; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); z-index: 70; max-width: calc(100% - 32px);
   background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-weight: 600; font-size: 14px; box-shadow: var(--shadow);
   animation: pop .3s both; }
+/* above a selection bar (fixed 18px from the bottom, its height noted by lib/reserve.js), not over its buttons */
+html:has(.selbar) .toast { bottom: calc(18px + var(--selbar-h, 72px) + 12px + env(safe-area-inset-bottom, 0px)); }
 
 /* photo viewer: deliberately always dark, like a photo viewer */
 .lb { background: rgba(5,9,8,.96); color: #eaf1ed; display: grid; grid-template-columns: minmax(0, 1fr) 300px;
