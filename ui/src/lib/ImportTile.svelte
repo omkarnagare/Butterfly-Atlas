@@ -16,7 +16,9 @@
    * former (Phase 5c) is labelled so, and its tile's name and the label's title say to choose its new place.
    * A cell of the grid (role gridcell, aria-selected; `col` is its column): the grid decides what clicks and keys
    * do; only the focused tile is in the Tab order. A photo that can no longer be changed (filed, missing,
-   * unreadable) has no aria-selected: it opens, it isn't selected. A RAW photo carries a "RAW" badge; a RAW + JPEG
+   * unreadable) has no aria-selected: it opens, it isn't selected. One that can be selected has a tick (top left,
+   * `data-tick`) that adds or removes it with a plain click; a double-click on the tick doesn't open it.
+   * A RAW photo carries a "RAW" badge; a RAW + JPEG
    * pair (lib/importView.js `shots`: the JPEG with its RAW as `pairOf`) is one tile with a "RAW + JPEG" badge (Phase 7a);
    * filed as JPEG only or RAW only, its badge says the half filed ("JPEG filed") and a line under its label the half
    * left out ("RAW not filed"), review fix U4.
@@ -55,7 +57,8 @@
 <button type="button" class="it k-{status.kind}" class:sel={selected && canPick} class:waiting={src ? !ready : status.kind === 'waiting'}
         data-item-id={item.id} tabindex={tabbable ? 0 : -1} role="gridcell" aria-colindex={col}
         aria-selected={canPick ? selected : undefined} aria-label={described}
-        onclick={(event) => onClick(item, event)} ondblclick={() => onOpen(item)} onkeydown={(event) => onKey(item, event)}
+        onclick={(event) => onClick(item, event)} ondblclick={(event) => { if (!event.target?.closest?.('[data-tick]')) onOpen(item); }}
+        onkeydown={(event) => onKey(item, event)}
         onkeyup={(event) => { if (event.key === ' ') event.preventDefault(); }} onfocus={() => onFocus(item)}>
   {#if src}
     <img {src} alt="" loading="lazy" decoding="async" draggable="false" data-keep-asking use:thumbRetry={() => (ready = true)} />
@@ -76,5 +79,5 @@
     {#if item.copyOf != null && !item.outcome}<span>Copy</span>{/if}
     {#if pairDone}<span class="ty">{pairDone.badge}</span>{:else if badge}<span class="ty">{badge}</span>{:else if item.fileType === 'raw'}<span class="ty">RAW</span>{:else if isHeic(item)}<span class="ty">HEIC</span>{/if}
   </span>
-  <span class="check" aria-hidden="true"></span>
+  {#if canPick}<span class="check" data-tick aria-hidden="true" title="Select or unselect this photo"></span>{/if}
 </button>

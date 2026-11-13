@@ -651,7 +651,11 @@ a.lb-name:hover span, a.lb-name:focus-visible span { text-decoration: underline;
 .it-b .ty { background: rgba(8,14,12,.6); color: #f1f6f3; letter-spacing: .04em; }
 .it .check { position: absolute; top: 6px; left: 6px; width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff; background: rgba(8,14,12,.35);
   opacity: 0; transition: opacity .15s; }
-.it:hover .check, .it:focus-visible .check, .it.sel .check { opacity: 1; }
+.it:hover .check, .it:focus-visible .check, .it.sel .check, .ig.picking .it .check { opacity: 1; }
+/* the tick adds or removes its photo; a wider invisible ring makes it easy to hit */
+.it .check { cursor: pointer; }
+.it .check::before { content: ""; position: absolute; inset: -9px; border-radius: 50%; }
+.it .check:hover { border-color: var(--accent); }
 .it.sel { outline: 3px solid var(--accent); outline-offset: -3px; }
 .it.sel img { transform: scale(.92); }
 .it.sel .check { background: var(--accent); border-color: var(--accent); }

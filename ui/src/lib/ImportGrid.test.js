@@ -256,3 +256,12 @@ test('a scroll that does not move the view works nothing out again', async () =>
   await fireEvent.scroll(window);
   expect(visibleRange.mock.calls.length).toBe(before);
 });
+
+test('while any photo is selected the grid is marked so every tick shows, not only on hover', async () => {
+  const items = Array.from({ length: 3 }, (_, k) => item(k + 1));
+  const { rerender } = render(ImportGrid, { importId: 3, sections: folderSections(items, 'Root'), taxa, ...handlers() });
+  const grid = screen.getByRole('grid');
+  expect(grid.classList.contains('picking')).toBe(false);
+  await rerender({ importId: 3, sections: folderSections(items, 'Root'), taxa, selected: new Set([2]), ...handlers() });
+  expect(grid.classList.contains('picking')).toBe(true);
+});

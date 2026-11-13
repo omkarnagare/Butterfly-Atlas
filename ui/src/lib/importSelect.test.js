@@ -85,3 +85,20 @@ test('A selects all, S T X start the bar\'s actions on a selection, Escape clear
   opening.onKey(key('a'));
   expect(opening.sel.selected.size).toBe(0);
 });
+
+test('a click on a tile\'s tick adds or removes that photo and keeps the rest; Shift on a tick ranges from the last one picked', () => {
+  const run = fakeRun();
+  const tick = () => { const t = document.createElement('span'); t.dataset.tick = ''; return t; };
+  run.onTileClick(item(2), {});
+  run.onTileClick(item(5), { target: tick() });
+  expect([...run.sel.selected].sort()).toEqual([2, 5]);
+  expect(run.focusId).toBe(5);
+  run.onTileClick(item(2), { target: tick() });
+  expect([...run.sel.selected]).toEqual([5]);
+  run.onTileClick(item(1), { target: tick(), shiftKey: true }); // from 2, the last one picked, as Shift-click does
+  expect([...run.sel.selected].sort()).toEqual([1, 2, 5]);
+  run.onTileClick(item(4, { outcome: 'filed' }), { target: tick() });
+  expect([...run.sel.selected].sort()).toEqual([1, 2, 5]);
+  run.onTileClick(item(3), { target: document.createElement('img') }); // the photo itself still selects only it
+  expect([...run.sel.selected]).toEqual([3]);
+});

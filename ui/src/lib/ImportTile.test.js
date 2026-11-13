@@ -202,3 +202,17 @@ test('a HEIC preview answered as pending (a decode that timed out) keeps being a
   expect(container.querySelector('img')).toBeNull();
   expect(container.querySelector('.cant').textContent).toBe("Can't show this photo");
 });
+
+test('a photo that can be selected has a tick to click (a double-click on it doesn\'t open the photo); one that cannot has none', async () => {
+  const h = handlers();
+  const { container, unmount } = render(ImportTile, { importId: 3, item: item(), taxa, ...h });
+  const tick = container.querySelector('[data-tick]');
+  await fireEvent.dblClick(tick);
+  expect(h.onOpen).not.toHaveBeenCalled();
+  expect(tick).not.toBeNull();
+  expect(tick.getAttribute('aria-hidden')).toBe('true');
+  expect(tick.title).toBe('Select or unselect this photo');
+  unmount();
+  const filed = render(ImportTile, { importId: 3, item: item({ taxonId: 'A5', outcome: 'filed' }), taxa, ...handlers() });
+  expect(filed.container.querySelector('[data-tick]')).toBeNull();
+});
