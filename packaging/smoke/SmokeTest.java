@@ -1255,9 +1255,9 @@ public final class SmokeTest {
                         expect(r.next() && "ok".equals(r.getString(1)), "the copied " + db + " fails integrity_check");
                     }
                     try (ResultSet r = s.executeQuery("SELECT MAX(CAST(version AS INTEGER)) FROM flyway_schema_history WHERE success = 1")) {
-                        // The newest migration (V17, behaviour tags): raise this with every new migration.
-                        expect(r.next() && r.getInt(1) == 17, "the copied database is at schema version "
-                                + (r.getInt(1)) + ", not 17");
+                        // The newest migration (V18, resting and basking, tag last used): raise this with every new migration.
+                        expect(r.next() && r.getInt(1) == 18, "the copied database is at schema version "
+                                + (r.getInt(1)) + ", not 18");
                     }
                     try (ResultSet r = s.executeQuery("SELECT COUNT(*) FROM image")) {
                         expect(r.next() && r.getInt(1) == 4, "the copied database has " + r.getInt(1) + " photos, not 4");

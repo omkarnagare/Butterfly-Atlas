@@ -153,7 +153,7 @@ class UpdatesGateTest {
         assertThat(services.photos().purgeOlderThan(Duration.ZERO)).as("the startup's purge waits for the next start").isZero();
         assertThat(services.photos().deletedCount()).isEqualTo(1);
 
-        assertThat(services.tags().create("basking").label()).isEqualTo("basking");
+        assertThat(services.tags().create("roosting").label()).isEqualTo("roosting");
         assertThat(services.searchWords().add("A5", "tiger")).contains("tiger");
         assertThat(services.photos().setCover("A6", genutia.id())).isEqualTo(genutia.id());
         assertThat(services.exports().check("", "photos", home.toString()).photos()).isEqualTo(2);

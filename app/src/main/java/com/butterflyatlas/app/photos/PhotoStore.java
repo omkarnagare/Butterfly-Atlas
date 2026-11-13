@@ -158,6 +158,7 @@ public final class PhotoStore {
                 if (PhotoRows.addTags(c, id, keys) != keys.size()) {
                     throw AtlasException.invalid(PhotoRows.noSuchTag(keys, c));
                 }
+                TagService.used(c, keys, clock.instant()); // Add photos: the Recent row of the tag pickers
                 ImageMeta.write(c, id, received.facts(), clock.instant());
                 facts.applyAll(c, List.of(new PhotoConsumer.Subject(id, received.facts(), named.file())));
                 PhotoNames.setNextNumber(c, taxonId, named.number() + 1);

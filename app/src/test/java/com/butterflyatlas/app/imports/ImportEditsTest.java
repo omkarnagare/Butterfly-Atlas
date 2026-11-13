@@ -3,6 +3,7 @@ package com.butterflyatlas.app.imports;
 import com.butterflyatlas.app.AtlasException;
 import com.butterflyatlas.app.db.Database;
 import com.butterflyatlas.app.library.Library;
+import com.butterflyatlas.app.photos.TagService;
 import com.butterflyatlas.app.testing.TestBundles;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -118,6 +119,24 @@ class ImportEditsTest {
                 .isInstanceOfSatisfying(AtlasException.class, e -> assertThat(e.code()).isEqualTo("unknown_tag"));
         assertThatThrownBy(() -> edits.tags(run, List.of(a), List.of("male"), List.of("male")))
                 .isInstanceOf(AtlasException.class);
+    }
+
+    @Test
+    void taggingImportItemsCountsAsUsingTheUsersOwnTags() {
+        long a = item(db, run, "a.jpg", "read_state", "read");
+        TagService tags = new TagService(() -> library, TestBundles.CLOCK);
+        tags.create("roosting");
+        tags.create("on dung");
+        db.write(c -> {
+            try (var st = c.createStatement()) {
+                st.executeUpdate("UPDATE tag SET last_used_at = '2020-01-01T00:00:00Z' WHERE source = 'user'");
+            }
+            return null;
+        });
+        edits.tags(run, List.of(a), List.of("roosting", "male"), List.of());
+        assertThat(tags.recent()).containsExactly("roosting", "on_dung");
+        edits.tags(run, List.of(a), List.of(), List.of("roosting"));
+        assertThat(tags.recent()).as("removing doesn't count").containsExactly("roosting", "on_dung");
     }
 
     @Test

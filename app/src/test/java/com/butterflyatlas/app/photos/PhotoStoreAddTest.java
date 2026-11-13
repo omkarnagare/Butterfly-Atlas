@@ -71,6 +71,19 @@ class PhotoStoreAddTest {
                 + " WHERE image_id = " + noGps.id() + " ORDER BY consumer)")).isEqualTo("dimensions done, place done");
     }
 
+    @Test
+    void addingAPhotoWithTheUsersOwnTagCountsAsUsingIt() {
+        TagService tags = new TagService(() -> library, clock);
+        tags.create("roosting");
+        clock.advance(java.time.Duration.ofMinutes(1));
+        tags.create("on dung");
+        clock.advance(java.time.Duration.ofMinutes(1));
+
+        add("A5", TestImages.jpeg(40, 30, 3), "roosting", "male");
+
+        assertThat(tags.recent()).containsExactly("roosting", "on_dung");
+    }
+
     private AddResult add(String taxonId, byte[] bytes, String... tags) {
         return store.add(taxonId, new ByteArrayInputStream(bytes), "image/jpeg", "IMG_0001.JPG", List.of(tags));
     }

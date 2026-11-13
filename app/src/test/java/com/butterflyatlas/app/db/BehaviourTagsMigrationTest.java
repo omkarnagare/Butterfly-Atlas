@@ -63,7 +63,7 @@ class BehaviourTagsMigrationTest {
     }
 
     private Database migrate() {
-        Database db = Database.open(file());
+        Database db = Database.open(file(), "17"); // V18 orders the built-ins again (RestingBaskingMigrationTest)
         assertThat(Database.newestSchemaVersion(file())).hasValue(17);
         return db;
     }
@@ -195,7 +195,7 @@ class BehaviourTagsMigrationTest {
     }
 
     @Test
-    void tagServiceListsTheBuiltInsInTheNewOrderThenTheUsersTags() {
+    void tagServiceListsTheBuiltInsInOrderThenTheUsersTags() {
         version16Library("INSERT INTO tag (key, label, source, sort_order) VALUES ('zebra', 'zebra', 'user', 1000),"
                 + " ('nectaring', 'Nectaring', 'user', 1000), ('Apple', 'Apple', 'user', 1000)");
 
@@ -203,10 +203,13 @@ class BehaviourTagsMigrationTest {
 
         List<Tag> list = new TagService(() -> library).list();
         assertThat(list).extracting(Tag::key).containsExactly("egg", "larva", "pupa", "upper_wing", "under_wing", "male",
-                "female", "dsf", "wsf", "mating", "nectaring", "puddling", "predated", "unconfirmed", "Apple", "zebra");
+                "female", "dsf", "wsf", "mating", "resting", "basking", "nectaring", "puddling", "predated", "unconfirmed", "Apple",
+                "zebra"); // as V18 leaves them
         assertThat(list).extracting(Tag::label).containsExactly("egg", "larva", "pupa", "upper_wing", "under_wing", "male",
-                "female", "DSF", "WSF", "mating", "Nectaring", "puddling", "predated", "unconfirmed", "Apple", "zebra");
+                "female", "DSF", "WSF", "mating", "resting", "basking", "Nectaring", "puddling", "predated", "unconfirmed",
+                "Apple", "zebra");
         assertThat(list).extracting(Tag::source).containsExactly("builtin", "builtin", "builtin", "builtin", "builtin",
-                "builtin", "builtin", "builtin", "builtin", "builtin", "builtin", "builtin", "builtin", "builtin", "user", "user");
+                "builtin", "builtin", "builtin", "builtin", "builtin", "builtin", "builtin", "builtin", "builtin", "builtin",
+                "builtin", "user", "user");
     }
 }

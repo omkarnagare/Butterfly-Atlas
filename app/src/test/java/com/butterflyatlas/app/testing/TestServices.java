@@ -167,7 +167,7 @@ public final class TestServices {
             change.syncWith(sync::publishNow, sync::close);
         }
         return new AtlasServices(setup, taxa, new SearchWordService(holder, TestBundles.CLOCK), search,
-                photos, photoQueries, new TagService(holder::library), thumbnails,
+                photos, photoQueries, new TagService(holder::library, TestBundles.CLOCK), thumbnails,
                 new Rescan(holder::library, processor, TestBundles.CLOCK, thumbnails::request, facts),
                 processing,
                 new FolderBrowser(holder::current, imports.store(), home), imports, placeSearch,
