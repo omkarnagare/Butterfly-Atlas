@@ -129,9 +129,9 @@ class CustomSpeciesApiTest {
     void theCheckAnswersAsTheContractSays() throws Exception {
         answers(send("GET", check(" neptis  SANKARA "), null), 200, "{\"ok\":true,\"name\":\"Neptis sankara\"}");
         answers(send("GET", check("Neptis"), null), 200, "{\"ok\":false,\"code\":\"invalid\",\"message\":\"Enter the scientific"
-                + " name as genus and species, e.g. Neptis sankara.\",\"taxon\":null}");
+                + " name as genus and species, with a subspecies if you like, e.g. Neptis sankara or Papilio agenor polymnestor.\",\"taxon\":null}");
         answers(send("GET", "api/custom-species/check", null), 200, "{\"ok\":false,\"code\":\"invalid\",\"message\":\"Enter"
-                + " the scientific name as genus and species, e.g. Neptis sankara.\",\"taxon\":null}");
+                + " the scientific name as genus and species, with a subspecies if you like, e.g. Neptis sankara or Papilio agenor polymnestor.\",\"taxon\":null}");
         answers(send("GET", check("Danaus chrysippus"), null), 200, "{\"ok\":false,\"code\":\"in_list\",\"message\":"
                 + "\"Danaus chrysippus is already in the list as Plain Tiger.\",\"taxon\":" + TIGER + "}");
         answers(send("GET", check("limnas klugii"), null), 200, "{\"ok\":false,\"code\":\"in_list\",\"message\":"
@@ -148,7 +148,7 @@ class CustomSpeciesApiTest {
                 "{\"error\":{\"code\":\"in_list\",\"message\":\"Danaus chrysippus is already in the list as Plain Tiger.\","
                         + "\"taxon\":" + TIGER + "}}");
         refused(send("POST", "api/custom-species", "{\"familyId\":\"A1\",\"name\":\"Neptis\"}"), 400, "invalid",
-                "Enter the scientific name as genus and species, e.g. Neptis sankara.");
+                "Enter the scientific name as genus and species, with a subspecies if you like, e.g. Neptis sankara or Papilio agenor polymnestor.");
         refused(send("POST", "api/custom-species", "{\"familyId\":\"A1\",\"name\":\"Neptis sankara\",\"common\":\""
                 + "x".repeat(101) + "\"}"), 400, "invalid", "The common name can be at most 100 characters.");
         refused(send("POST", "api/custom-species", "{\"name\":\"Neptis sankara\"}"), 400, "invalid", "Choose the species' family.");
