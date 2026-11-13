@@ -372,3 +372,17 @@ test('no Delete these… while nothing narrows the photos, so one click can neve
   await screen.findByRole('link', { name: 'Export these…' });
   expect(screen.queryByRole('button', { name: 'Delete these…' })).toBeNull();
 });
+
+test('Export these… and Delete these… sit together as one group at the right of the view bar, not spread across it', async () => {
+  getTaxon.mockResolvedValue(top());
+  getChildren.mockResolvedValue([]);
+  render(Explore, { id: 'G:butterflies', query: 'tags=female', view: 'photos', delay: 0 });
+
+  const exportLink = await screen.findByRole('link', { name: 'Export these…' });
+  const deleteButton = screen.getByRole('button', { name: 'Delete these…' });
+  const group = exportLink.parentElement;
+  expect(group.classList.contains('ex-actions')).toBe(true);
+  expect(deleteButton.parentElement).toBe(group);
+  // The bar holds two things: the views and the actions.
+  expect([...group.parentElement.children].map((el) => el.className.split(' ')[0])).toEqual(['seg', 'ex-actions']);
+});

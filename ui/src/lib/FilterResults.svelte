@@ -26,7 +26,7 @@
   /**
    * A filter and its results (Phase 4a contract §4; moved out of the Export screen for Explore, filters-in-Explore
    * design §5): the filter row and its popovers, the presets, the live count line, and the Species · Photos · Places
-   * views of the result, with the screen's own `actions` at the right of the view bar. The address holds the filter
+   * views of the result, with the screen's own `actions` together at the right of the view bar. The address holds the filter
    * (`query`, as printed by lib/filter.js) and the view: every change of the filter is a new address (a popover's
    * changes while it is open count as one), so Back and Forward step through filters and a reload restores one. The
    * screen says how they are written: `resultsHref(query, view)` and `photoHref(photoId, query)`. The count answer's
@@ -403,7 +403,7 @@
       <button type="button" class:on={view === each.key} aria-pressed={view === each.key} onclick={() => showView(each.key)}>{each.label}</button>
     {/each}
   </div>
-  {@render actions?.()}
+  {#if actions}<div class="ex-actions">{@render actions()}</div>{/if}
 </div>
 
 {#if viewError}
@@ -452,6 +452,8 @@
   .ex-problem { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
   .ex-note { margin: 0; font-size: 14px; }
   .ex-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 22px 0 14px; }
+  /* the screen's actions stay together at the right, however many there are */
+  .ex-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-left: auto; }
   /* inactive, but still shows its title on hover */
   .ex-bar :global(.btn[aria-disabled='true']) { pointer-events: auto; cursor: not-allowed; }
   .ex-bar :global(.btn[aria-disabled='true']:hover) { transform: none; box-shadow: none; }
