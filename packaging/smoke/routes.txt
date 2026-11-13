@@ -75,6 +75,7 @@ POST /api/tag-names/dismiss | tags
 POST /api/places | places
 GET /api/places/mine | places
 GET /api/places/recent | places
+GET /api/places/in-use | places
 GET /api/places/search | places
 DELETE /api/places/{id} | places
 PATCH /api/places/{id} | places

@@ -479,6 +479,7 @@ public final class SmokeTest {
             Json places = Json.parse(http.call("GET /api/places/search", "/api/places/search?q=Pune", null, 200).text());
             expect(places.list("places").size() > 0, "searching the place list for Pune found nothing (place bundle)");
             http.call("GET /api/places/recent", "/api/places/recent", null, 200);
+            http.call("GET /api/places/in-use", "/api/places/in-use", null, 200);
             expect(Files.isRegularFile(config.resolve("logs").resolve("atlas.log")), "no log file at " + config.resolve("logs/atlas.log"));
         }
 

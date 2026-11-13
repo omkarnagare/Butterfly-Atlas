@@ -450,6 +450,7 @@ kbd { font: 500 11px/1 var(--mono); border: 1px solid var(--line); border-bottom
 /* the filter popovers (Taxa, Place): the search's status line, and the chosen items with their Remove buttons */
 .pop .fp-status { margin: 0; font-size: 13px; }
 .pop .fp-status:empty { display: none; }
+.pop .fp-head { margin: 0; font-size: 12px; }
 .pop .chosen { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 10px 0 0; list-style: none; border-top: 1px solid var(--line); }
 .pl-h { margin: 0; }
 .pl-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

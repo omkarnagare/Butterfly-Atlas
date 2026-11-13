@@ -309,6 +309,8 @@ export const searchPlaces = (query, { level, signal } = {}) =>
     .then((r) => Object.assign(r.places, { formerMatches: r.formerMatches ?? [] }));
 /** The last five places applied, newest first. */
 export const getRecentPlaces = () => request('places/recent').then((r) => r.places);
+/** The places the live photos use, the most photos first (at most 20), each with `photos`, its count. */
+export const getPlacesInUse = () => request('places/in-use').then((r) => r.places);
 /** The places the user added, by name, each with `photos` (how many live photos use it). */
 export const getMyPlaces = () => request('places/mine').then((r) => r.places);
 /** Adds a district of the user's inside the state `parentId`. */

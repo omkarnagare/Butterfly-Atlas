@@ -201,11 +201,13 @@ class PlaceApiTest {
         answers(send("POST", "api/photos/place", "{\"ids\":[" + b + "," + a + "],\"placeId\":\"P5\"}"), 200,
                 "{\"photos\":[" + withPlace(photo(b), BETA_USER) + "," + withPlace(photo(a), BETA_USER) + "]}");
         answers(send("GET", "api/places/recent", null), 200, "{\"places\":[" + BETA + "]}");
+        answers(send("GET", "api/places/in-use", null), 200, "{\"places\":[" + BETA.replace("}", ",\"photos\":2}") + "]}");
 
         answers(send("POST", "api/photos/place", "{\"ids\":[" + a + "],\"remove\":true}"), 200,
                 "{\"photos\":[" + withPlace(photo(a), "null") + "]}");
         assertThat(photo(a).get("place").isNull()).isTrue();
         answers(send("GET", "api/places/recent", null), 200, "{\"places\":[" + BETA + "]}");
+        answers(send("GET", "api/places/in-use", null), 200, "{\"places\":[" + BETA.replace("}", ",\"photos\":1}") + "]}");
     }
 
     @Test

@@ -1,16 +1,19 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { beforeEach, expect, test, vi } from 'vitest';
 import PlacePopover from './PlacePopover.svelte';
-import { searchPlaces } from './api.js';
+import { getPlacesInUse, searchPlaces } from './api.js';
 import { EMPTY, mergeNames } from './filter.js';
 
-vi.mock('./api.js', () => ({ searchPlaces: vi.fn() }));
+vi.mock('./api.js', () => ({ searchPlaces: vi.fn(), getPlacesInUse: vi.fn() }));
 
 const place = (id, path, level, mine = false) => ({ id, name: path[0], path, level, mine });
 const pune = place('P414', ['Pune', 'Maharashtra', 'India'], 'district');
 const maharashtra = place('P20', ['Maharashtra', 'India'], 'state');
 
-beforeEach(() => vi.resetAllMocks());
+beforeEach(() => {
+  vi.resetAllMocks();
+  getPlacesInUse.mockResolvedValue([]);
+});
 
 const field = () => screen.getByRole('combobox', { name: 'Place' });
 const rows = () => screen.getAllByRole('option').map((o) => o.textContent.replace(/\s+/g, ' ').trim());
@@ -78,4 +81,30 @@ test('a chosen place whose name is not known yet reads "…", and its Remove but
   const chosen = screen.getByRole('list', { name: 'Chosen places' });
   expect([...chosen.querySelectorAll('li')].map((li) => li.textContent)).toEqual(['… ×']);
   expect(screen.getByRole('button', { name: 'Remove P99' })).toBeTruthy();
+});
+
+test('before anything is typed it lists the places the photos use, under "Unknown place", with their photo counts', async () => {
+  getPlacesInUse.mockResolvedValue([{ ...pune, photos: 140 }, { ...maharashtra, photos: 1 }]);
+  searchPlaces.mockResolvedValue([maharashtra]);
+  const onChange = vi.fn();
+  render(PlacePopover, { filter: EMPTY, names: mergeNames(undefined, {}), onChange, onClose: vi.fn() });
+
+  await vi.waitFor(() => expect(rows()).toEqual(['Unknown place', 'Pune · Maharashtra, India 140 photos',
+    'Maharashtra · India 1 photo']));
+  expect(screen.getByRole('listbox', { name: 'Places' }).getAttribute('aria-describedby')).toBeTruthy();
+  expect(screen.getByText('Places in your photos')).toBeTruthy();
+  await fireEvent.click(screen.getAllByRole('option')[1]);
+  expect(onChange).toHaveBeenCalledWith({ ...EMPTY, places: ['P414'] }, { places: [{ ...pune, photos: 140 }] });
+
+  await fireEvent.input(field(), { target: { value: 'ma' } });
+  await vi.waitFor(() => expect(rows()).toEqual(['Unknown place', 'Maharashtra · India state']));
+  await fireEvent.input(field(), { target: { value: '' } });
+  expect(rows()).toEqual(['Unknown place', 'Pune · Maharashtra, India 140 photos', 'Maharashtra · India 1 photo']);
+});
+
+test('if the places in use can\'t be read, it says so and searching still works', async () => {
+  getPlacesInUse.mockRejectedValue(new Error('The library is busy.'));
+  render(PlacePopover, { filter: EMPTY, names: mergeNames(undefined, {}), onChange: vi.fn(), onClose: vi.fn() });
+  expect((await screen.findByRole('alert')).textContent).toBe('Your photos\' places could not be listed: The library is busy.');
+  expect(rows()).toEqual(['Unknown place']);
 });

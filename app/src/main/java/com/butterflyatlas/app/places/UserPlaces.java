@@ -56,6 +56,42 @@ public final class UserPlaces {
         this.imports = imports;
     }
 
+    /** How many places the Place filter lists before anything is typed (2026-11-13 design, addendum §3). */
+    public static final int IN_USE_LIMIT = 20;
+
+    /** A place the live photos use, as {@link PlaceSearch.Place}, with how many of them. */
+    public record InUse(String id, String name, List<String> path, String level, boolean mine, boolean former, int photos) {
+
+        public InUse {
+            path = List.copyOf(path);
+        }
+    }
+
+    /**
+     * The places the live photos use, the most photos first, then by name, at most {@value #IN_USE_LIMIT}: what the
+     * Place filter lists before anything is typed, so the user sees the places in their atlas.
+     */
+    public List<InUse> inUse() {
+        return database.get().read(c -> {
+            Map<String, Integer> counts = new LinkedHashMap<>();
+            try (PreparedStatement ps = c.prepareStatement("SELECT i.place_id, count(*) AS n FROM image i JOIN place p"
+                    + " ON p.id = i.place_id WHERE i.deleted_at IS NULL GROUP BY i.place_id"
+                    + " ORDER BY n DESC, p.sort_key, i.place_id LIMIT ?")) {
+                ps.setInt(1, IN_USE_LIMIT);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        counts.put(rs.getString(1), rs.getInt(2));
+                    }
+                }
+            }
+            Map<String, PlaceSearch.Place> places = PlaceRules.places(c, counts.keySet());
+            return counts.entrySet().stream().map(e -> {
+                PlaceSearch.Place p = places.get(e.getKey());
+                return new InUse(p.id(), p.name(), p.path(), p.level(), p.mine(), p.former(), e.getValue());
+            }).toList();
+        });
+    }
+
     /** The places last applied to photos or import items, newest first, at most {@value #RECENT_LIMIT}. */
     public List<Place> recent() {
         return database.get().read(c -> {

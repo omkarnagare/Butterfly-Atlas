@@ -6,12 +6,12 @@ const pune = { id: 'P414', name: 'Pune', path: ['Pune', 'Maharashtra', 'India'],
 const india = { id: 'P1', name: 'India', path: ['India'], level: 'country', mine: false, species: 1, photos: 1 };
 const unknown = { id: 'unknown', species: 3, photos: 7 };
 
-test('one row per place with its species and photo counts; the unknown row last', () => {
+test('one row per place with its species and photo counts; the unknown row first', () => {
   render(PlaceResults, { rows: [pune, india, unknown], onChoose: vi.fn() });
   // role="list" kept explicitly: WebKit drops the list role of a list without bullets
   expect(screen.getByRole('list', { name: 'Places' }).getAttribute('role')).toBe('list');
   expect(screen.getAllByRole('button').map((b) => b.textContent.replace(/\s+/g, ' ').trim())).toEqual([
-    'Pune · Maharashtra, India — 31 species · 140 photos', 'India — 1 species · 1 photo', 'Unknown place — 3 species · 7 photos',
+    'Unknown place — 3 species · 7 photos', 'Pune · Maharashtra, India — 31 species · 140 photos', 'India — 1 species · 1 photo',
   ]);
 });
 
