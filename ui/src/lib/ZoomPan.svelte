@@ -90,6 +90,18 @@
     return () => clearTimeout(retryTimer);
   });
 
+  // A full size already in the browser's cache can be complete before its load event is listened for: it counts as
+  // loaded (else the stretched preview stayed, with nothing to say why).
+  let origEl = $state(null);
+  $effect(() => {
+    const el = origEl;
+    shownSrc;
+    if (!el) return;
+    untrack(() => {
+      if (!loaded && el.complete && el.naturalWidth > 0) arrived(el);
+    });
+  });
+
   // Each try of the full size (a new photo, a retry, Try again) gets SLOW_MS before Try again is offered.
   $effect(() => {
     shownSrc;
@@ -219,8 +231,9 @@
     if (pointers.size === 0) swipeFrom = null;
   }
 
-  async function onLoad(event) {
-    const img = event.currentTarget;
+  const onLoad = (event) => arrived(event.currentTarget);
+
+  async function arrived(img) {
     const wanted = shownSrc;
     try {
       await img.decode?.();
@@ -298,7 +311,7 @@
        style="width:{placed.w}px;height:{placed.h}px;margin:{-placed.h / 2}px 0 0 {-placed.w / 2}px;transform:translate({placed.x}px, {placed.y}px)">
     <img class="ph" src={placeholder} alt={loaded ? '' : alt} draggable="false" />
     {#if !gone}
-      <img class="orig" class:on={loaded} src={shownSrc} alt={loaded ? alt : ''} draggable="false" decoding="async" style={origStyle}
+      <img class="orig" class:on={loaded} bind:this={origEl} src={shownSrc} alt={loaded ? alt : ''} draggable="false" decoding="async" style={origStyle}
            onload={onLoad} onerror={onError} />
     {/if}
   </div>
