@@ -4,6 +4,7 @@
   import SpeciesPicker, { addedButFailed } from './SpeciesPicker.svelte';
   import PlacePicker from './PlacePicker.svelte';
   import TagPicker from './TagPicker.svelte';
+  import { toggled } from './tags.js';
   import { showToast } from './toast.svelte.js';
   import { REMOVE, UNKNOWN_PLACE } from './messages.js';
 
@@ -41,7 +42,8 @@
     }
   }
 
-  const toggleTag = (key) => act(() => setPhotoTags(photo.id, photo.tags.includes(key) ? photo.tags.filter((k) => k !== key) : [...photo.tags, key]));
+  /** One change for the tag and those going the same way with it (`also`: mating's male and female). */
+  const toggleTag = (key, also = []) => act(() => setPhotoTags(photo.id, toggled(photo.tags, key, also)));
   const makeCover = () => act(() => setCover(species.id, photo.id), `This photo is now the cover of ${title}.`);
   const automaticCover = () => act(() => setCover(species.id, null), `${title} picks its cover by itself again.`);
 

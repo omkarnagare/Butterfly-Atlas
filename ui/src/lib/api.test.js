@@ -792,3 +792,10 @@ test('a request refused because the library was opened on another device tells t
   expect(heard.mock.calls[0][0].detail.code).toBe('library_opened_elsewhere');
   window.removeEventListener('atlas:library-problem', heard);
 });
+
+test('getTags marks the user\'s tags used last with their place in the Recent row', async () => {
+  vi.stubGlobal('fetch', ok({ tags: [{ key: 'male', source: 'builtin' }, { key: 'on_dung', source: 'user' },
+    { key: 'roosting', source: 'user' }], recent: ['roosting', 'on_dung'] }));
+  expect(await getTags()).toEqual([{ key: 'male', source: 'builtin' }, { key: 'on_dung', source: 'user', recent: 1 },
+    { key: 'roosting', source: 'user', recent: 0 }]);
+});

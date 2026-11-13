@@ -86,3 +86,17 @@ test('while a change is being saved the picker does nothing', async () => {
   finish({});
   await vi.waitFor(() => expect(create.getAttribute('aria-disabled')).toBe('false'));
 });
+
+test('ticking mating on a photo puts male and female on with it in one change; unticking it takes all three off', async () => {
+  setPhotoTags.mockResolvedValue({});
+  const withMating = [...tags, { id: 10, key: 'mating', label: 'mating', source: 'builtin' }];
+  const view = render(PhotoEdits, { photo, species, tags: withMating, onChanged: vi.fn(async () => {}), onLeft: vi.fn() });
+
+  await fireEvent.click(screen.getByRole('button', { name: 'mating' }));
+  expect(setPhotoTags).toHaveBeenCalledOnce();
+  expect(setPhotoTags).toHaveBeenLastCalledWith(7, ['male', 'mating', 'female']);
+
+  await view.rerender({ photo: { ...photo, tags: ['male', 'mating', 'female', 'basking'] }, species, tags: withMating });
+  await fireEvent.click(screen.getByRole('button', { name: 'mating' }));
+  await vi.waitFor(() => expect(setPhotoTags).toHaveBeenLastCalledWith(7, ['basking']));
+});

@@ -138,3 +138,21 @@ test('while a tag is being created, Apply waits: it is aria-disabled and sends n
   await fireEvent.click(apply);
   expect(onApply).toHaveBeenCalledOnce();
 });
+
+test('ticking mating ticks male and female on all the photos too, and unticking it takes all three off', async () => {
+  const onApply = vi.fn(async () => {});
+  const withMating = [...tags, { id: 10, key: 'mating', label: 'mating', source: 'builtin', photoCount: 0 }];
+  render(BulkTagDialog, { photos, tags: withMating, onApply, onClose: vi.fn() });
+
+  await fireEvent.click(screen.getByRole('checkbox', { name: 'mating' }));
+  for (const name of ['mating', 'male', 'female']) {
+    expect(screen.getByRole('checkbox', { name }).getAttribute('aria-checked')).toBe('true');
+  }
+  await fireEvent.click(screen.getByRole('checkbox', { name: 'mating' }));
+  for (const name of ['mating', 'male', 'female']) {
+    expect(screen.getByRole('checkbox', { name }).getAttribute('aria-checked')).toBe('false');
+  }
+  await fireEvent.click(screen.getByRole('checkbox', { name: 'mating' }));
+  await fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+  expect(onApply).toHaveBeenCalledWith(['male', 'female', 'mating'], []);
+});

@@ -433,3 +433,18 @@ test('while a tag is being created, Add waits: it is aria-disabled and sends not
   await fireEvent.click(add);
   await vi.waitFor(() => expect(uploadPhoto).toHaveBeenCalledOnce());
 });
+
+test('ticking mating for the batch ticks male and female too', async () => {
+  uploadPhoto.mockImplementation(async () => added(1));
+  const withPair = [...tags, { id: 7, key: 'female', label: 'female', source: 'builtin', photoCount: 0 },
+    { id: 10, key: 'mating', label: 'mating', source: 'builtin', photoCount: 0 }];
+  render(AddPhotosSheet, { taxon, tags: withPair, onAdded: vi.fn(), onClose: vi.fn() });
+  await choose(jpeg('a.jpg'));
+  await fireEvent.click(screen.getByRole('button', { name: 'mating' }));
+  for (const name of ['mating', 'male', 'female']) {
+    expect(screen.getByRole('button', { name }).getAttribute('aria-pressed')).toBe('true');
+  }
+  await fireEvent.click(screen.getByRole('button', { name: 'Add 1 photo' }));
+  await vi.waitFor(() => expect(uploadPhoto).toHaveBeenCalledWith('A5', expect.anything(),
+    expect.objectContaining({ tags: ['male', 'female', 'mating'] })));
+});

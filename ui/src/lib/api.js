@@ -272,7 +272,13 @@ export const emptyDeleted = (ids) =>
 export const placePhotos = (ids, placeId) => request('photos/place', { method: 'POST', body: { ids, placeId } }).then((r) => r.photos);
 /** Takes the place off every listed photo (it becomes Unknown place, as the user's choice). */
 export const unplacePhotos = (ids) => request('photos/place', { method: 'POST', body: { ids, remove: true } }).then((r) => r.photos);
-export const getTags = ({ signal } = {}) => request('tags', { signal }).then((r) => r.tags);
+/**
+ * Every tag; the user's tags used last (the tag pickers' Recent row, newest first) carry `recent`, their place in it.
+ */
+export const getTags = ({ signal } = {}) => request('tags', { signal }).then((r) => {
+  const at = new Map((r.recent ?? []).map((key, i) => [key, i]));
+  return r.tags.map((tag) => (at.has(tag.key) ? { ...tag, recent: at.get(tag.key) } : tag));
+});
 export const createTag = (label) => request('tags', { method: 'POST', body: { label } });
 export const renameTag = (tagId, label) => request(`tags/${id(tagId)}`, { method: 'PATCH', body: { label } });
 export const deleteTag = (tagId) => request(`tags/${id(tagId)}`, { method: 'DELETE' }).then((r) => r.removedFromPhotos);

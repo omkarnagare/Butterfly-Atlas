@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { ADULT_KEYS, checkTagName, formTagName, labeller, matchTags, tagNamed, tagWords, withTag } from './tags.js';
+import { ADULT_KEYS, alsoChanging, checkTagName, formTagName, labeller, matchTags, tagNamed, tagWords, withTag } from './tags.js';
 import {
   FIND_A_TAG, FIND_OR_ADD_A_TAG, TAG_NAME_EMPTY, TAG_NAME_TOO_LONG, TAG_NAME_TOO_MANY_WORDS, alreadyChosen, createTag, moreTags, noTagCalled,
   tagNameTaken,
@@ -49,8 +49,9 @@ test('an unknown key is shown as it is', () => {
   expect(label('upper_wing')).toBe('upper_wing');
 });
 
-test('the adult keys are the server\'s nine, in its order (PhotoRows.ADULT_KEYS, behaviour tags §3)', () => {
-  expect(ADULT_KEYS).toEqual(['upper_wing', 'under_wing', 'male', 'female', 'dsf', 'wsf', 'mating', 'nectaring', 'puddling']);
+test('the adult keys are the server\'s eleven, in its order (PhotoRows.ADULT_KEYS, behaviour tags §3, V18)', () => {
+  expect(ADULT_KEYS).toEqual(['upper_wing', 'under_wing', 'male', 'female', 'dsf', 'wsf', 'mating', 'resting', 'basking', 'nectaring',
+    'puddling']);
   expect(ADULT_KEYS).not.toContain('predated');
 });
 
@@ -110,4 +111,14 @@ test('a tag just created goes into a list in tag order: built-in tags as they ar
   expect(keys(withTag([tag('egg', 'egg', 'builtin')], tag('a')))).toEqual(['egg', 'a']);
   expect(withTag(list, tag('wet_sand'))).toBe(list); // already there: the list as it is
   expect(keys(withTag(null, tag('a')))).toEqual(['a']);
+});
+
+test('pressing mating also changes male and female: on with it, off with it, each only if not already so', () => {
+  const states = (map) => (key) => map[key] ?? 'off';
+  expect(alsoChanging('mating', states({}))).toEqual(['male', 'female']);
+  expect(alsoChanging('mating', states({ male: 'on', female: 'some' }))).toEqual(['female']);
+  expect(alsoChanging('mating', states({ mating: 'some' }))).toEqual(['male', 'female']); // some → all
+  expect(alsoChanging('mating', states({ mating: 'on', male: 'on', female: 'some' }))).toEqual(['male', 'female']);
+  expect(alsoChanging('mating', states({ mating: 'on', female: 'on' }))).toEqual(['female']);
+  expect(alsoChanging('male', states({}))).toEqual([]);
 });

@@ -2,7 +2,28 @@ import { TAG_NAME_EMPTY, TAG_NAME_TOO_LONG, TAG_NAME_TOO_MANY_WORDS, tagNameTake
 
 /** Tag helpers shared by the gallery, viewer and sheets. Photos carry tag keys; labels come from GET /api/tags. */
 /** The tags that mean "an adult" (behaviour tags §3): the same keys, in the same order, as the server's PhotoRows.ADULT_KEYS. */
-export const ADULT_KEYS = ['upper_wing', 'under_wing', 'male', 'female', 'dsf', 'wsf', 'mating', 'nectaring', 'puddling'];
+export const ADULT_KEYS = ['upper_wing', 'under_wing', 'male', 'female', 'dsf', 'wsf', 'mating', 'resting', 'basking', 'nectaring',
+  'puddling'];
+
+/** Tags that change with another while tagging (2026-11-13 design, addendum §5): a mating pair is a male and a female. */
+const PARTNERS = { mating: ['male', 'female'] };
+
+/** `keys` with `key` turned the other way, and `also` with it (each added once, or all taken out). */
+export function toggled(keys, key, also = []) {
+  const changing = [key, ...also];
+  return keys.includes(key) ? keys.filter((k) => !changing.includes(k)) : [...keys, ...changing.filter((k) => !keys.includes(k))];
+}
+
+/**
+ * The other tags a press of `key` changes while tagging, given each tag's state ('on', 'some', 'off'): pressing mating
+ * when it isn't on turns it on, and with it male and female (those not on already); when it is on, it goes off, and with
+ * it male and female (those not off already).
+ */
+export function alsoChanging(key, stateOf) {
+  const partners = PARTNERS[key] ?? [];
+  const on = stateOf(key) !== 'on';
+  return partners.filter((partner) => (on ? stateOf(partner) !== 'on' : stateOf(partner) !== 'off'));
+}
 
 /** A key → label function for the given tag list; unknown keys read as the key itself. */
 export function labeller(tags) {
