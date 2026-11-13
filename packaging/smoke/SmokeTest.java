@@ -521,6 +521,10 @@ public final class SmokeTest {
                 long id = photo.getKey();
                 byte[] thumb = waitForThumb(id);
                 expect(thumb.length > 100, "the thumbnail of " + photo.getValue() + " is " + thumb.length + " bytes");
+                // No bigger than a thumbnail: there is no sharp copy, and none is on its way.
+                Resp sharp = http.call("GET /api/photos/{id}/sharp", "/api/photos/" + id + "/sharp?v=1", null, 204);
+                expect(sharp.header("x-atlas-pending") == null, "a sharp copy of the small " + photo.getValue()
+                        + " is on its way");
                 Resp display = http.call("GET /api/photos/{id}/display", "/api/photos/" + id + "/display", null, 200);
                 expect(display.body().length > 100, "the display image of " + photo.getValue() + " is empty");
                 Resp original = http.call("GET /api/photos/{id}/original", "/api/photos/" + id + "/original", null, 200);
@@ -554,6 +558,24 @@ public final class SmokeTest {
                 }
                 if (System.nanoTime() > deadline) {
                     throw new Fail("the thumbnail of photo " + id + " never came (last answer " + r.status() + ", pending=" + pending + ")");
+                }
+                Thread.sleep(250);
+            }
+        }
+
+        /** The photo's sharp copy, asked for (as the UI does) until it is made; it must come within 40 s. */
+        byte[] waitForSharp(long id) throws Exception {
+            long deadline = System.nanoTime() + Duration.ofSeconds(40).toNanos();
+            while (true) {
+                Resp r = http.call("GET /api/photos/{id}/sharp", "/api/photos/" + id + "/sharp?v=1", null, null);
+                boolean pending = "1".equals(r.header("x-atlas-pending"));
+                if (r.status() == 200) {
+                    return r.body();
+                }
+                expect(r.status() == 204 && pending, "the sharp copy of photo " + id + " will not come (answer "
+                        + r.status() + ", pending=" + pending + ")");
+                if (System.nanoTime() > deadline) {
+                    throw new Fail("the sharp copy of photo " + id + " never came");
                 }
                 Thread.sleep(250);
             }
@@ -816,6 +838,9 @@ public final class SmokeTest {
             long id = (long) photo.num("photo.id");
             byte[] thumb = waitForThumb(id);
             expect(thumb.length > 100, "the thumbnail of raw.dng is " + thumb.length + " bytes");
+            byte[] sharp = waitForSharp(id);
+            expect(sharp.length > 100 && (sharp[0] & 0xFF) == 0xFF && (sharp[1] & 0xFF) == 0xD8,
+                    "the sharp copy of raw.dng is not a JPEG");
             byte[] display = http.call("GET /api/photos/{id}/display", "/api/photos/" + id + "/display", null, 200).body();
             expect(display.length > 100 && (display[0] & 0xFF) == 0xFF && (display[1] & 0xFF) == 0xD8,
                     "the display image of raw.dng is not its JPEG preview");
