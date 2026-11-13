@@ -125,6 +125,8 @@ final class PhotoChanges {
      * when it is free there, else under the species' next free number. A photo whose file was
      * already missing when it was deleted comes back without a file (the next rescan drops it). A photo restored
      * without a place it is due (deleted before the place consumer caught up) gets it at the next start's catch-up.
+     * A photo whose species already has the same photo is not restored, and nothing in the call is (see
+     * {@link #refuseIfAlreadyLive}).
      */
     List<Photo> restore(List<Long> rawIds) {
         List<Long> ids = ids(rawIds);
@@ -135,6 +137,7 @@ final class PhotoChanges {
             TaxonSnapshot snapshot = TaxonSnapshot.load(c); // once per call: a big batch holds the write lock
             for (long id : ids) {
                 Deleted d = deletedRow(c, id);
+                refuseIfAlreadyLive(c, d);
                 TaxonSnapshot.Row row = snapshot.find(d.taxonId())
                         .orElseThrow(() -> AtlasException.noTaxon(d.taxonId()));
                 String oldRelPath = snapshot.folder(row) + d.fileName();
@@ -231,6 +234,31 @@ final class PhotoChanges {
             return ids;
         });
         return old.isEmpty() ? 0 : purge(old);
+    }
+
+    /**
+     * Refuses to restore a photo whose species already holds a live photo with the same bytes (imported or added again
+     * while this one waited in Recently deleted): restoring it would put the same photo in the species twice, which
+     * imports and Add photos never do. The user is told which photo it is and how to remove this copy. The same bytes
+     * under another species don't stop it, as with imports.
+     */
+    private static void refuseIfAlreadyLive(Connection c, Deleted d) throws SQLException {
+        if (d.sha256() == null) {
+            return;
+        }
+        try (PreparedStatement ps = c.prepareStatement("SELECT i.file_name, t.name, t.common_name FROM image i"
+                + " JOIN taxon t ON t.id = i.taxon_id WHERE i.sha256 = ? AND i.taxon_id = ? AND i.deleted_at IS NULL"
+                + " ORDER BY i.id LIMIT 1")) {
+            ps.setString(1, d.sha256());
+            ps.setString(2, d.taxonId());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    String species = rs.getString(3) != null ? rs.getString(3) : rs.getString(2);
+                    throw new AtlasException(AtlasException.Kind.CONFLICT, species + " already has this photo ("
+                            + rs.getString(1) + "), so it wasn't restored. To remove this copy, use Delete for good.");
+                }
+            }
+        }
     }
 
     private record Deleted(long id, String taxonId, String relPath, String fileName, Integer number,

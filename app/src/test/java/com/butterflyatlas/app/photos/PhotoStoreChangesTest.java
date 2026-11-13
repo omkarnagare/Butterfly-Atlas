@@ -310,6 +310,59 @@ class PhotoStoreChangesTest {
                 e -> assertThat(e.getMessage()).isEqualTo("There is no photo " + a.id() + " in Recently deleted."));
     }
 
+    private Photo addBytes(String taxonId, byte[] bytes) {
+        clock.advance(Duration.ofMinutes(1));
+        return store.add(taxonId, new ByteArrayInputStream(bytes), "image/jpeg", null, List.of()).photo();
+    }
+
+    @Test
+    void aPhotoWhoseSpeciesAlreadyHasTheSamePhotoIsNotRestoredAndTheUserIsToldWhy() {
+        byte[] bytes = TestImages.jpeg(40, 30, 900);
+        Photo deleted = addBytes("A5", bytes);
+        store.delete(List.of(deleted.id()));
+        Photo again = addBytes("A5", bytes); // imported again while the first sits in Recently deleted
+
+        assertThatThrownBy(() -> store.restore(List.of(deleted.id()))).isInstanceOfSatisfying(AtlasException.class, e -> {
+            assertThat(e.kind()).isEqualTo(AtlasException.Kind.CONFLICT);
+            assertThat(e.getMessage()).isEqualTo("Plain Tiger already has this photo (" + again.fileName()
+                    + "), so it wasn't restored. To remove this copy, use Delete for good.");
+        });
+        assertThat(store.deletedCount()).isEqualTo(1);
+        assertThat(file(deletedPath(deleted.id()))).exists();
+        assertThat(strings("SELECT kind FROM change_log")).containsExactly("photo.delete");
+    }
+
+    @Test
+    void aPhotoWhoseSamePhotoIsUnderAnotherSpeciesIsRestored() {
+        byte[] bytes = TestImages.jpeg(40, 30, 901);
+        Photo deleted = addBytes("A5", bytes);
+        store.delete(List.of(deleted.id()));
+        addBytes("A6", bytes);
+
+        Photo restored = store.restore(List.of(deleted.id())).get(0);
+
+        assertThat(restored.taxonId()).isEqualTo("A5");
+        assertThat(store.deletedCount()).isZero();
+    }
+
+    @Test
+    void twoDeletedCopiesOfOnePhotoAreNotRestoredTogetherButTheFirstAloneIs() {
+        byte[] bytes = TestImages.jpeg(40, 30, 902);
+        Photo first = addBytes("A5", bytes);
+        store.delete(List.of(first.id()));
+        Photo second = addBytes("A5", bytes);
+        store.delete(List.of(second.id()));
+
+        assertThatThrownBy(() -> store.restore(List.of(first.id(), second.id()))).isInstanceOf(AtlasException.class);
+        assertThat(store.deletedCount()).isEqualTo(2);
+        assertThat(file(deletedPath(first.id()))).exists();
+        assertThat(file(deletedPath(second.id()))).exists();
+
+        Photo restored = store.restore(List.of(first.id())).get(0);
+        assertThatThrownBy(() -> store.restore(List.of(second.id()))).isInstanceOfSatisfying(AtlasException.class,
+                e -> assertThat(e.getMessage()).contains("(" + restored.fileName() + ")"));
+    }
+
     @Test
     void aRestoredPhotoWhoseNameWasTakenGetsTheNextFreeNumber() throws Exception {
         Photo a = add("A5");
