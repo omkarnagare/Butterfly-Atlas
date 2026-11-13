@@ -477,3 +477,24 @@ test('a deleted old copy that left other files names them; a refused delete says
   expect(within(section).getByText("1 file that isn't part of a library was left in /Users/me/Old Atlas.")).toBeTruthy();
   expect(within(section).getByText('/Users/me/Old Atlas/notes.txt')).toBeTruthy();
 });
+
+test('Recently deleted has its own section: how many photos are there, kept for 30 days, and a way to open it', async () => {
+  status.deletedCount = 40;
+  render(Settings);
+
+  const section = screen.getByRole('region', { name: 'Recently deleted' });
+  expect(within(section).getByText('40 photos, kept for 30 days after they were deleted.')).toBeTruthy();
+  expect(within(section).getByRole('link', { name: 'Open Recently deleted' }).getAttribute('href')).toBe('#/deleted');
+});
+
+test('with nothing deleted the section still shows, and says so; it follows the count as it changes', async () => {
+  render(Settings);
+
+  const section = screen.getByRole('region', { name: 'Recently deleted' });
+  expect(within(section).getByText('Nothing deleted in the last 30 days.')).toBeTruthy();
+  expect(within(section).queryByRole('link')).toBeNull();
+
+  status.deletedCount = 1;
+  await vi.waitFor(() => expect(within(section).getByText('1 photo, kept for 30 days after it was deleted.')).toBeTruthy());
+  expect(within(section).getByRole('link', { name: 'Open Recently deleted' })).toBeTruthy();
+});

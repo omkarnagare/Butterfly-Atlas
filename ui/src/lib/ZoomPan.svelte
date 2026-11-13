@@ -18,10 +18,19 @@
    * first error the address is fetched once and the server's own words are said; a refusal because Butterfly Atlas is
    * busy (`busy`, still checking for a decoder, or a decode taking too long) gets Try again, which loads it afresh; so
    * does no answer at all, or one without the server's words ("Butterfly Atlas isn't answering. Try again.", review fix U7).
+   * 2026-11-14 design §3–§4: fitted, a photo is never drawn larger than one photo pixel per screen pixel (the size of the
+   * image actually loaded, once it has, over the screen's density), so a small photo or a small RAW preview is not
+   * stretched; zoom still goes further. Until the full size comes the note says "Loading full size…" on the photo (the
+   * caller's `loadingNote` when given); if it has not come after 10 s, or failed after its retries, Try again asks for
+   * it afresh (not for a photo the caller knows is `broken`, nor a refusal the server explained as not busy; and not at
+   * all with `offerRetry` false, the import viewer, whose previews keep their own loading). `shownLong`: the long side
+   * of the display copy when it is smaller than the photo (HEIC and TIFF: 2560), so the photo is fitted at that size
+   * from the start and does not shrink when the copy arrives.
    */
   let {
-    src, placeholder, width, height, alt = '', onSwipe = () => {}, loadingNote = '',
+    src, placeholder, width, height, alt = '', onSwipe = () => {}, loadingNote = 'Loading full size…',
     failedNote = 'This photo could not be opened at full size; showing a preview.', broken = false, orientation = 1, explain = false,
+    shownLong = 0, offerRetry = true,
   } = $props();
 
   let stageEl = $state(null);
@@ -42,14 +51,32 @@
   let swipeFrom = null;
   let retryTimer = 0;
   let lastScale = 1;
+  const SLOW_MS = 10000;
+  // The full size has not come in SLOW_MS: Try again is offered.
+  let slow = $state(false);
+  let slowTimer = 0;
+  // Screen pixels per page pixel (2 on most Mac screens), read again when the window changes size or screen.
+  let density = $state(typeof window !== 'undefined' && window.devicePixelRatio > 0 ? window.devicePixelRatio : 1);
 
   // Without a size from the library, the loaded image's own size is used (turned, when it is shown turned).
   let quarter = $derived(turned(orientation));
-  let natural = $derived(width && height ? { w: width, h: height } : seen.w ? (quarter ? { w: seen.h, h: seen.w } : seen) : { w: 1600, h: 1200 });
-  let shownSrc = $derived(attempt ? `${src}${src.includes('?') ? '&' : '?'}retry=${attempt}` : src);
+  // The library's size, made no bigger than the display copy when that is known to be smaller.
+  let expected = $derived.by(() => {
+    if (!width || !height) return null;
+    const k = shownLong > 0 ? Math.min(1, shownLong / Math.max(width, height)) : 1;
+    return { w: Math.round(width * k), h: Math.round(height * k) };
+  });
+  let natural = $derived(loaded && seen.w ? (quarter ? { w: seen.h, h: seen.w } : seen)
+    : expected ?? (seen.w ? (quarter ? { w: seen.h, h: seen.w } : seen) : { w: 1600, h: 1200 }));
+  // The photo's size in page pixels at one photo pixel per screen pixel: the most it is drawn at when fitted.
+  let capped = $derived({ w: natural.w / density, h: natural.h / density });
+  // The address as a value (see the new-photo effect below).
+  let address = $derived(src);
+  let shownSrc = $derived(attempt ? `${address}${address.includes('?') ? '&' : '?'}retry=${attempt}` : address);
   let stage = $derived({ w: stageW, h: stageH });
-  let fit = $derived(fitSize(natural, stage));
-  let max = $derived(maxScale(natural, fit));
+  let fit = $derived(fitSize(capped, stage));
+  // Zoom goes as deep as before (4×, or the photo's own pixels at one per page pixel).
+  let max = $derived(maxScale(width && height ? { w: width, h: height } : natural, fit));
   let placed = $derived(placement(view, fit));
   let gone = $derived(broken || failed);
   // A quarter turn lays the image out at the frame's height by its width, centred, then turns it.
@@ -60,9 +87,11 @@
     return `inset:auto;left:50%;top:50%;width:${placed.h}px;height:${placed.w}px;transform:translate(-50%, -50%) ${turn}`;
   });
 
-  // A new photo starts fitted, with its full-size image still to load.
+  // A new photo starts fitted, with its full-size image still to load. The address as a value: new props with the same
+  // photo (spread in by the viewers, given again when the page reads its photos again) are not a new photo, else the
+  // full size went back behind the stretched preview, with no new load to bring it back, and the zoom was lost.
   $effect(() => {
-    src;
+    address;
     untrack(() => {
       view = { ...FIT };
       loaded = false;
@@ -73,6 +102,18 @@
       clearTimeout(retryTimer);
     });
     return () => clearTimeout(retryTimer);
+  });
+
+  // Each try of the full size (a new photo, a retry, Try again) gets SLOW_MS before Try again is offered.
+  $effect(() => {
+    shownSrc;
+    if (broken) return undefined;
+    untrack(() => (slow = false));
+    clearTimeout(slowTimer);
+    slowTimer = setTimeout(() => {
+      if (!loaded) slow = true;
+    }, SLOW_MS);
+    return () => clearTimeout(slowTimer);
   });
 
   // Keep the view inside the edges when the window changes size.
@@ -89,6 +130,7 @@
     const measure = () => {
       stageW = stageEl.clientWidth;
       stageH = stageEl.clientHeight;
+      density = window.devicePixelRatio > 0 ? window.devicePixelRatio : 1;
     };
     measure();
     if (typeof ResizeObserver !== 'function') {
@@ -202,6 +244,8 @@
     if (wanted !== shownSrc) return;
     if (img.naturalWidth) seen = { w: img.naturalWidth, h: img.naturalHeight };
     loaded = true;
+    slow = false;
+    clearTimeout(slowTimer);
   }
 
   // A failed download is tried again twice (after 2 s and 4 s) before the preview is all there is.
@@ -248,6 +292,8 @@
   function tryAgain() {
     why = null;
     failed = false;
+    slow = false;
+    clearTimeout(retryTimer);
     attempt += 1;
   }
 
@@ -271,5 +317,5 @@
     {/if}
   </div>
   <p class={gone || (loadingNote && !loaded) ? 'zp-note' : 'sr-only'} role="status">{gone ? why?.message || failedNote : !loaded ? loadingNote : ''}</p>
-  {#if gone && why?.busy}<button class="btn ghost zp-again" type="button" onclick={tryAgain}>Try again</button>{/if}
+  {#if offerRetry ? !broken && ((failed && (!why || why.busy)) || (slow && !loaded && !failed)) : gone && why?.busy}<button class="btn ghost zp-again" type="button" onclick={tryAgain}>Try again</button>{/if}
 </div>

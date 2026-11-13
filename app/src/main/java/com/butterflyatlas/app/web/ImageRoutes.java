@@ -3,6 +3,7 @@ package com.butterflyatlas.app.web;
 import com.butterflyatlas.app.photos.PhotoFormat;
 import com.butterflyatlas.app.photos.PhotoQueries;
 import com.butterflyatlas.app.photos.RawDisplays;
+import com.butterflyatlas.app.photos.SharpCopies;
 import com.butterflyatlas.app.photos.Thumbnails;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
@@ -24,20 +25,25 @@ import java.util.Optional;
  * WebView2 (Windows) cannot show, so the viewer looks the same on every platform, and for RAW the JPEG preview read
  * from inside the file (the page turns it by the photo's {@code rawPreview.orientation}). A HEIC photo's is its 2560 px
  * display copy made by the computer's decoder, already upright (Phase 7b contract §2: 503 while the decoder is checked,
- * 415 {@code heic_decoder_missing} while it is missing); its original is the exact file ({@code image/heic}).
+ * 415 {@code heic_decoder_missing} while it is missing); its original is the exact file ({@code image/heic}). Large tiles
+ * on high-density screens ask for {@code /sharp}, a 960 px copy kept on this device ({@link SharpCopies}).
  */
 final class ImageRoutes {
 
     private final Thumbnails thumbnails;
     private final PhotoQueries queries;
+    /** Null: no sharp copies are made (the route always answers that there is none). */
+    private final SharpCopies sharp;
 
-    ImageRoutes(Thumbnails thumbnails, PhotoQueries queries) {
+    ImageRoutes(Thumbnails thumbnails, PhotoQueries queries, SharpCopies sharp) {
         this.thumbnails = thumbnails;
         this.queries = queries;
+        this.sharp = sharp;
     }
 
     void register(Javalin app) {
         app.get("/api/photos/{id}/thumb", this::thumb);
+        app.get("/api/photos/{id}/sharp", this::sharp);
         app.get("/api/photos/{id}/original", this::original);
         app.get("/api/photos/{id}/display", this::display);
     }
@@ -68,6 +74,43 @@ final class ImageRoutes {
             ctx.result(in);
         } else {
             placeholder(ctx, id, thumb.pending());
+        }
+    }
+
+    /**
+     * The photo's 960 px copy kept on this device, for large tiles on high-density screens; never waits. 200 with the
+     * copy ({@code image/jpeg}, kept for good with {@code ?v=}, as the thumbnail); 204 with {@code X-Atlas-Pending: 1}
+     * while it is not made yet (its photo moves to the front of the sharp queue; the UI asks again with back-off); 204
+     * without it when there will be none (the photo is no bigger than its thumbnail, or the copy could not be made
+     * lately): the UI keeps the thumbnail. An unknown photo is not found, as for its thumbnail.
+     */
+    private void sharp(Context ctx) {
+        long id = PhotoIds.photo(ctx);
+        SharpCopies.Lookup copy;
+        if (sharp == null) {
+            queries.original(id); // not found as for the other routes
+            copy = new SharpCopies.Lookup(null, false);
+        } else {
+            copy = sharp.lookup(id);
+        }
+        if (copy.file() != null) {
+            try {
+                InputStream in = Files.newInputStream(copy.file());
+                String v = ctx.queryParam("v");
+                ctx.header(Header.CACHE_CONTROL, v == null || v.isBlank() ? ResponseHeaders.NO_CACHE : ResponseHeaders.FOREVER);
+                ctx.contentType("image/jpeg");
+                ctx.result(in);
+                return;
+            } catch (IOException e) {
+                // Removed since the lookup (over the size limit, or tidied): it is made again (or there again: ask again).
+                SharpCopies.Lookup again = sharp.lookup(id);
+                copy = new SharpCopies.Lookup(null, again.file() != null || again.pending());
+            }
+        }
+        ctx.status(204);
+        ctx.header(Header.CACHE_CONTROL, ResponseHeaders.NO_STORE);
+        if (copy.pending()) {
+            ctx.header(ResponseHeaders.PENDING, "1");
         }
     }
 

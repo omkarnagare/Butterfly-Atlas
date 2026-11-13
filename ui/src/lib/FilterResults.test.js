@@ -161,3 +161,76 @@ test('a tag created in Explore\'s viewer while the tags can\'t be read again is 
   await vi.waitFor(() => expect(screen.getByRole('button', { name: 'roosting' }).getAttribute('aria-pressed')).toBe('true'));
   expect(screen.getByRole('button', { name: 'female' })).toBeTruthy();
 });
+
+const deferred = () => {
+  let resolve;
+  const promise = new Promise((r) => { resolve = r; });
+  return { promise, resolve };
+};
+const speciesRow = { id: 'A1', name: 'Danaus species1', common: 'Tiger 1', photos: 2, cover: null };
+
+test('another view with the same filter is asked for at once, and the view on screen stays until its first answer comes (no flicker)', async () => {
+  filterSpecies.mockResolvedValue([speciesRow]);
+  const { container, rerender } = render(FilterResults, { query: 'tags=female', view: 'species', delay: 300, resultsHref, photoHref });
+  await vi.waitFor(() => expect(container.querySelector('.flist')).not.toBeNull(), { timeout: 2000 });
+
+  const page = deferred();
+  filterPhotos.mockReturnValue(page.promise);
+  await rerender({ query: 'tags=female', view: 'photos' });
+
+  // asked without the typing pause
+  expect(filterPhotos).toHaveBeenCalledTimes(1);
+  // the species stay, and no empty grid or "Opening…" takes their place
+  expect(container.querySelector('.flist')).not.toBeNull();
+  expect(container.querySelector('.fgrid')).toBeNull();
+  expect(screen.getByRole('button', { name: 'Photos' }).getAttribute('aria-pressed')).toBe('true');
+
+  page.resolve({ photos: [photo(1), photo(2)], next: null });
+  await vi.waitFor(() => expect(container.querySelectorAll('.fgrid a')).toHaveLength(2));
+  expect(container.querySelector('.flist')).toBeNull();
+});
+
+test('going back to Species from Photos keeps the photos until the species come, also asked at once', async () => {
+  const { container, rerender } = render(FilterResults, { query: 'tags=female', view: 'photos', delay: 300, resultsHref, photoHref });
+  await vi.waitFor(() => expect(container.querySelectorAll('.fgrid a')).toHaveLength(2), { timeout: 2000 });
+
+  const rows = deferred();
+  filterSpecies.mockReturnValue(rows.promise);
+  await rerender({ query: 'tags=female', view: 'species' });
+  await new Promise((r) => setTimeout(r, 0));
+
+  expect(filterSpecies).toHaveBeenCalledTimes(1);
+  expect(container.querySelectorAll('.fgrid a')).toHaveLength(2);
+  expect(screen.queryByText('Opening…')).toBeNull();
+
+  rows.resolve([speciesRow]);
+  await vi.waitFor(() => expect(container.querySelector('.flist')).not.toBeNull());
+  expect(container.querySelector('.fgrid')).toBeNull();
+});
+
+test('a view that fails to load replaces the old one with its problem and Try again', async () => {
+  filterSpecies.mockResolvedValue([speciesRow]);
+  const { container, rerender } = render(FilterResults, { query: 'tags=female', view: 'species', delay: 0, resultsHref, photoHref });
+  await vi.waitFor(() => expect(container.querySelector('.flist')).not.toBeNull());
+
+  filterPhotos.mockRejectedValue(Object.assign(new Error('Butterfly Atlas isn\'t answering.'), { code: 'unreachable' }));
+  await rerender({ query: 'tags=female', view: 'photos' });
+
+  expect(await screen.findByRole('button', { name: 'Try again' })).toBeTruthy();
+  expect(container.querySelector('.flist')).toBeNull();
+});
+
+test('back to Photos before Places has answered: the photos on screen stay until their new first page comes', async () => {
+  const { container, rerender } = render(FilterResults, { query: 'tags=female', view: 'photos', delay: 0, resultsHref, photoHref });
+  await vi.waitFor(() => expect(container.querySelectorAll('.fgrid a')).toHaveLength(2));
+
+  filterPlaces.mockReturnValue(new Promise(() => {}));
+  await rerender({ query: 'tags=female', view: 'places' });
+  const page = deferred();
+  filterPhotos.mockReturnValue(page.promise);
+  await rerender({ query: 'tags=female', view: 'photos' });
+
+  expect(container.querySelectorAll('.fgrid a')).toHaveLength(2);
+  page.resolve({ photos: [photo(3)], next: null });
+  await vi.waitFor(() => expect(container.querySelectorAll('.fgrid a')).toHaveLength(1));
+});

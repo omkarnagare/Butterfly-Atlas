@@ -237,3 +237,146 @@ test('a quarter-turned preview zoomed in is laid out at the zoomed size too', as
   expect(original.style.width).toBe(box.style.height);
   expect(original.style.height).toBe(box.style.width);
 });
+
+// 2026-11-14 design §3: never more than one photo pixel per screen pixel when fitted.
+const screenDensity = (ratio) => Object.defineProperty(window, 'devicePixelRatio', { value: ratio, configurable: true });
+
+test('on a 2× screen a small photo is fitted at one photo pixel per screen pixel, not stretched; on a 1× screen at its own size', async () => {
+  screenDensity(2);
+  try {
+    const { container } = render(ZoomPan, { ...props, width: 800, height: 600 });
+    stageOf(container);
+    const photo = container.querySelector('.zp-photo');
+    await vi.waitFor(() => expect(photo.style.width).toBe('400px'));
+    expect(photo.style.height).toBe('300px');
+  } finally {
+    screenDensity(1);
+  }
+  const { container } = render(ZoomPan, { ...props, width: 800, height: 600 });
+  stageOf(container);
+  await vi.waitFor(() => expect(container.querySelectorAll('.zp-photo')[0].style.width).toBe('800px'));
+});
+
+test('a big photo still fills the window on a 2× screen', async () => {
+  screenDensity(2);
+  try {
+    const { container } = render(ZoomPan, props);
+    stageOf(container);
+    await vi.waitFor(() => expect(container.querySelector('.zp-photo').style.width).toBe('1000px'));
+  } finally {
+    screenDensity(1);
+  }
+});
+
+test('the cap follows the image actually loaded: a RAW preview smaller than the sensor is not stretched to the sensor size', async () => {
+  screenDensity(2);
+  try {
+    const { container } = render(ZoomPan, { ...props, width: 6000, height: 4000 });
+    stageOf(container);
+    const photo = container.querySelector('.zp-photo');
+    await vi.waitFor(() => expect(photo.style.width).toBe('1000px'));
+    const original = container.querySelector('img.orig');
+    Object.defineProperty(original, 'naturalWidth', { value: 1600 });
+    Object.defineProperty(original, 'naturalHeight', { value: 1000 });
+    await fireEvent.load(original);
+    await vi.waitFor(() => expect(photo.style.width).toBe('800px'));
+    expect(photo.style.height).toBe('500px');
+  } finally {
+    screenDensity(1);
+  }
+});
+
+test('while the full size loads the photo says so at once, on the photo; the note goes when it has loaded', async () => {
+  const { container } = render(ZoomPan, props);
+  const note = screen.getByRole('status');
+  expect(note.textContent).toBe('Loading full size…');
+  expect(note.className).toBe('zp-note');
+  await fireEvent.load(container.querySelector('img.orig'));
+  expect(note.className).toBe('sr-only');
+  expect(note.textContent).toBe('');
+});
+
+test('a full size still not here after 10 s offers Try again, which asks for it afresh', async () => {
+  vi.useFakeTimers();
+  const { container } = render(ZoomPan, props);
+  await vi.advanceTimersByTimeAsync(9999);
+  expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+  await vi.advanceTimersByTimeAsync(1);
+  await fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+  expect(container.querySelector('img.orig').getAttribute('src')).toBe('./api/photos/12/display?retry=1');
+  expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+  expect(screen.getByRole('status').textContent).toBe('Loading full size…');
+  // and again after another 10 s
+  await vi.advanceTimersByTimeAsync(10000);
+  expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+});
+
+test('a full size that could not be downloaded after its two retries offers Try again too', async () => {
+  vi.useFakeTimers();
+  const { container } = render(ZoomPan, props);
+  await fireEvent.error(container.querySelector('img.orig'));
+  await vi.advanceTimersByTimeAsync(2000);
+  await fireEvent.error(container.querySelector('img.orig'));
+  await vi.advanceTimersByTimeAsync(4000);
+  await fireEvent.error(container.querySelector('img.orig'));
+  expect(screen.getByRole('status').textContent).toBe('This photo could not be opened at full size; showing a preview.');
+  await fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+  expect(container.querySelector('img.orig').getAttribute('src')).toBe('./api/photos/12/display?retry=3');
+  expect(screen.getByRole('status').textContent).toBe('Loading full size…');
+});
+
+test('a photo the caller knows cannot be shown offers no Try again', () => {
+  render(ZoomPan, { ...props, broken: true, failedNote: 'This RAW photo has no preview.' });
+  expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+});
+
+test('the same photo given again (the page read its photos again) keeps the full size shown and the zoom, not back to the stretched preview', async () => {
+  const { default: ZoomPanSpread } = await import('./testing/ZoomPanSpread.svelte');
+  const photo = { id: 12, width: 4000, height: 3000, alt: 'Plain Tiger' };
+  const { container, rerender } = render(ZoomPanSpread, { photo });
+  stageOf(container);
+  const original = container.querySelector('img.orig');
+  await fireEvent.load(original);
+  expect(original.classList.contains('on')).toBe(true);
+  await fireEvent.dblClick(container.querySelector('.zp'), { clientX: 500, clientY: 400 });
+  expect(scaleOf(container)).toBeGreaterThan(1);
+
+  await rerender({ photo: { ...photo } });
+
+  expect(container.querySelector('img.orig').classList.contains('on')).toBe(true);
+  expect(screen.getByRole('status').textContent).toBe('');
+  expect(scaleOf(container)).toBeGreaterThan(1);
+});
+
+test('a photo whose display copy is smaller than the photo (HEIC, TIFF: 2560 px) is fitted at that size from the start, so it does not shrink when the copy arrives', async () => {
+  screenDensity(2);
+  try {
+    const { container } = render(ZoomPan, { ...props, width: 8000, height: 6000, shownLong: 2560 });
+    const stage = container.querySelector('.zp');
+    Object.defineProperty(stage, 'clientWidth', { value: 1600 });
+    Object.defineProperty(stage, 'clientHeight', { value: 1200 });
+    window.dispatchEvent(new Event('resize'));
+    const photo = container.querySelector('.zp-photo');
+    await vi.waitFor(() => expect(photo.style.width).toBe('1280px'));
+    const original = container.querySelector('img.orig');
+    Object.defineProperty(original, 'naturalWidth', { value: 2560 });
+    Object.defineProperty(original, 'naturalHeight', { value: 1920 });
+    await fireEvent.load(original);
+    expect(photo.style.width).toBe('1280px');
+  } finally {
+    screenDensity(1);
+  }
+});
+
+test('the import viewer keeps its own loading: no Try again after 10 s, nor for a preview that could not be loaded', async () => {
+  vi.useFakeTimers();
+  const { container } = render(ZoomPan, { ...props, loadingNote: 'Loading the photo…', offerRetry: false });
+  await vi.advanceTimersByTimeAsync(10000);
+  expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+  await fireEvent.error(container.querySelector('img.orig'));
+  await vi.advanceTimersByTimeAsync(2000);
+  await fireEvent.error(container.querySelector('img.orig'));
+  await vi.advanceTimersByTimeAsync(4000);
+  await fireEvent.error(container.querySelector('img.orig'));
+  expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+});

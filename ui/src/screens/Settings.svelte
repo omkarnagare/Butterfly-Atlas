@@ -16,8 +16,10 @@
   import LibraryFolder from '../lib/LibraryFolder.svelte';
 
   /**
-   * Settings (#/settings, Phase 6 contract §3–§4): the Backup section, Library folder (lib/LibraryFolder.svelte,
-   * change-library-folder design §2), Appearance and About.
+   * Settings (#/settings, Phase 6 contract §3–§4): the Backup section, Recently deleted, Library folder
+   * (lib/LibraryFolder.svelte, change-library-folder design §2), Appearance and About.
+   * Recently deleted (2026-11-14 design §1): always shown, with how many photos are in it (the status's `deletedCount`,
+   * followed as it changes) and Open Recently deleted, or "Nothing deleted in the last 30 days.".
    * Backup: the three reminder choices (Remind me / Remind me less often / No backup needed), saved at once
    * (PUT /api/backup/preference); one that can't be saved goes back to the saved choice and says why. Under them the
    * last backup in words ("Last backup: 12 days ago — Everything", "4 photos could not be copied" when the last one left
@@ -47,6 +49,10 @@
   let loads = 0;
 
   let busyBackup = $derived(status.backup !== null);
+  // Recently deleted always has its place here (the footer's link shows only while something is in it).
+  let deleted = $derived(status.deletedCount ?? 0);
+  let deletedLine = $derived(deleted === 0 ? 'Nothing deleted in the last 30 days.'
+    : deleted === 1 ? '1 photo, kept for 30 days after it was deleted.' : `${deleted.toLocaleString()} photos, kept for 30 days after they were deleted.`);
 
   const THEMES = [{ value: DEVICE, label: MATCH_DEVICE }, { value: 'light', label: LIGHT }, { value: 'dark', label: DARK }];
   let themeSaving = $state(false);
@@ -179,6 +185,12 @@
     </div>
     <PastBackups past={backups.past ?? []} onRemoved={load} onCleared={load} fallbackFocus={() => backUpButton} />
   {/if}
+</section>
+
+<section class="sec set" aria-labelledby="{uid}-deleted">
+  <div class="sec-h"><h2 id="{uid}-deleted">Recently deleted</h2><span class="muted">Deleted photos can be restored from here</span></div>
+  <p class="set-note">{deletedLine}</p>
+  {#if deleted > 0}<p><a class="btn ghost" href="#/deleted">Open Recently deleted</a></p>{/if}
 </section>
 
 <LibraryFolder onGoToBackup={() => { backupHeading?.scrollIntoView?.({ block: 'start' }); backupHeading?.focus(); }} />

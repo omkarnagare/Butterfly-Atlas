@@ -86,15 +86,23 @@ export function exactBox(raw, heic) {
 /**
  * What a library viewer passes ZoomPan for a photo (spread into its props): for RAW, the turn, whether its preview can't
  * be shown at all, and the RAW note; for any other photo that can't be shown (`unreadable`), that it can't, said at once
- * with its own note (review fix U2), so ZoomPan's "showing a preview" never stands for it; nothing for the rest. A HEIC
+ * with its own note (review fix U2), so ZoomPan's "showing a preview" never stands for it; for HEIC and TIFF, the size of
+ * their 2560 px display copy (`shownLong`, 2026-11-14 design §3); nothing for the rest. A HEIC
  * photo's are chosen from the decoder's state `heic` (/api/status, Phase 7b; lib/heic.js).
  */
 export function viewerProps(photo, heic = null) {
-  if (isHeic(photo)) return heicViewerProps(photo, heic);
+  if (isHeic(photo)) {
+    const props = heicViewerProps(photo, heic);
+    return props.broken ? props : { ...props, shownLong: DISPLAY_LONG };
+  }
   if (isRaw(photo)) return { orientation: displayOrientation(photo), broken: rawBroken(photo), failedNote: RAW_UNREADABLE };
   if (photo?.unreadable) return { broken: true, failedNote: UNREADABLE };
+  if (photo?.fileType === 'tiff') return { shownLong: DISPLAY_LONG };
   return {};
 }
+
+/** The long side of the display copy made for HEIC and TIFF photos (the server's Thumbnails.DISPLAY_SIZE). */
+const DISPLAY_LONG = 2560;
 
 const REMOVE_APPLIES = 'Remove location applies only to JPEG, PNG, TIFF and WebP.';
 

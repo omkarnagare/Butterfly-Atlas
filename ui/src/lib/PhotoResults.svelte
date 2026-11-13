@@ -5,6 +5,7 @@
   import { rememberRect } from './flip.js';
   import { exportPhotoHref } from './route.js';
   import { thumbRetry } from './thumbRetry.js';
+  import { sharpen } from './sharpen.js';
   import { CANT_SHOW, typeBadge } from './raw.js';
   import HeicBar from './HeicBar.svelte';
   import { isHeic } from './heic.js';
@@ -134,7 +135,7 @@
             {#if photo.unreadable}
               <span class="cant" aria-hidden="true">{CANT_SHOW}</span>
             {:else}
-              <img src={photoThumb(photo)} alt="" loading="lazy" decoding="async" use:thumbRetry={() => ready.add(photo.id)} />
+              <img src={photoThumb(photo)} alt="" loading="lazy" decoding="async" use:thumbRetry={() => ready.add(photo.id)} use:sharpen={photo} />
             {/if}
             {#if typeBadge(photo)}<span class="tb"><span class={typeBadge(photo).toLowerCase()}>{typeBadge(photo)}</span></span>{/if}
             <span class="fcap" aria-hidden="true">{title(photo)}</span>

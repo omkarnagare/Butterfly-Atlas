@@ -63,6 +63,7 @@ POST /api/photos/tags | photos
 PATCH /api/photos/{id} | photos
 GET /api/photos/{id}/display | photos
 GET /api/photos/{id}/original | photos
+GET /api/photos/{id}/sharp | photos
 GET /api/photos/{id}/thumb | photos
 
 GET /api/tags | tags
