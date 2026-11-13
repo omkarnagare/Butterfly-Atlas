@@ -12,7 +12,7 @@
 
   /**
    * Choose a species by typing (the search API, species only): for moving photos and assigning import items. When
-   * nothing matches two words (a name like "Neptis sankara"), a row offers to add them as a custom species: the Add
+   * nothing matches two or three words (a name like "Neptis sankara" or "Papilio agenor polymnestor"), a row offers to add them as a custom species: the Add
    * dialog opens pre-filled over the picker, and the species added is picked at once as a search hit would be, with
    * `onPick(hit, { added: true })`. Not offered when the text is the name of the species the photos are on (`exclude`),
    * which the status then says. If the pick then throws, the message says the species was added (a host that shows its
@@ -76,10 +76,11 @@
     }
   }
 
-  // Shaped like genus and species (the server checks the rest, case included), spaces collapsed: what the add row offers.
-  const BINOMIAL = /^\p{L}+ \p{L}+(-\p{L}+)*$/u;
+  // Shaped like genus and species, with an optional subspecies (the server checks the rest, case included), spaces
+  // collapsed: what the add row offers.
+  const SPECIES_NAME = /^\p{L}+ \p{L}+(-\p{L}+)*( \p{L}+(-\p{L}+)*)?$/u;
   let spaced = $derived(searched.replace(/\s+/g, ' '));
-  let addable = $derived(status === 'done' && !results.length && !foundExcluded && BINOMIAL.test(spaced) ? spaced : null);
+  let addable = $derived(status === 'done' && !results.length && !foundExcluded && SPECIES_NAME.test(spaced) ? spaced : null);
   let count = $derived(results.length + (addable ? 1 : 0));
 
   $effect(() => {

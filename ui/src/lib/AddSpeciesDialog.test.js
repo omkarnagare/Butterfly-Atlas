@@ -99,9 +99,9 @@ test('a blocked name says why and offers to open the species already in the list
   await fireEvent.click(open);
   expect(onClose).toHaveBeenCalled();
 
-  checkCustomName.mockResolvedValue({ ok: false, code: 'invalid', message: 'Enter the scientific name as genus and species, e.g. Neptis sankara.', taxon: null });
+  checkCustomName.mockResolvedValue({ ok: false, code: 'invalid', message: 'Enter the scientific name as genus and species, with a subspecies if you like, e.g. Neptis sankara or Papilio agenor polymnestor.', taxon: null });
   await fireEvent.input(nameField(), { target: { value: 'Euploea' } });
-  expect(await screen.findByText('Enter the scientific name as genus and species, e.g. Neptis sankara.')).toBeTruthy();
+  expect(await screen.findByText('Enter the scientific name as genus and species, with a subspecies if you like, e.g. Neptis sankara or Papilio agenor polymnestor.')).toBeTruthy();
   expect(screen.queryByRole('link', { name: 'Open it' })).toBeNull();
 });
 
@@ -326,4 +326,9 @@ test('families that fail to load say why and offer Retry', async () => {
   await vi.waitFor(() => expect(document.activeElement).toBe(radios[0]));
   expect(within(group).queryByRole('alert')).toBeNull();
   expect(getChildren).toHaveBeenCalledTimes(3);
+});
+
+test('the scientific name field says a subspecies may follow', () => {
+  render(AddSpeciesDialog, { onAdded: vi.fn(), onClose: vi.fn() });
+  expect(nameField().placeholder).toBe('Genus and species (subspecies optional), e.g. Neptis sankara');
 });

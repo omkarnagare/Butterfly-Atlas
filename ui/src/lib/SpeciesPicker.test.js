@@ -113,7 +113,7 @@ test('a click on the add row opens the dialog too; Escape closes only it and foc
   await vi.waitFor(() => expect(document.activeElement).toBe(input));
 });
 
-test('no add row while something matches, or for one word or more than two', async () => {
+test('no add row while something matches, or for one word or more than three', async () => {
   search.mockResolvedValueOnce([hit('A6', 'species', 'Danaus genutia', 'Striped Tiger')]).mockResolvedValue([]);
   render(SpeciesPicker, { onPick: vi.fn(), onClose: vi.fn() });
   const input = screen.getByRole('combobox', { name: 'Species' });
@@ -121,7 +121,7 @@ test('no add row while something matches, or for one word or more than two', asy
   await fireEvent.input(input, { target: { value: 'striped tiger' } });
   await screen.findByRole('option', { name: /Striped Tiger/ });
   expect(screen.queryByRole('option', { name: /as a custom species/ })).toBeNull();
-  for (const text of ['xyzzy', 'a b c']) {
+  for (const text of ['xyzzy', 'a b c d']) {
     await fireEvent.input(input, { target: { value: text } });
     expect(await screen.findByText(`No species matches “${text}”.`)).toBeTruthy();
     expect(screen.queryByRole('option')).toBeNull();
@@ -169,11 +169,13 @@ test('the current species found by another word (its genus) does not hide the ad
   expect(screen.getByRole('status').textContent).toBe('No species matches “Danaus melanippus”.');
 });
 
-test('only a name shaped like genus and species is offered (letters, a hyphen in the second word)', async () => {
+test('only a name shaped like genus and species, with an optional subspecies, is offered (letters, hyphens after the genus)', async () => {
   search.mockResolvedValue([]);
   render(SpeciesPicker, { onPick: vi.fn(), onClose: vi.fn() });
   const input = screen.getByRole('combobox', { name: 'Species' });
-  for (const [text, offered] of [['Arhopala ace-ace', true], ['neptis sankara', true], ['Neptis 2', false], ['ne-ptis sankara', false], ['Neptis sankara.', false]]) {
+  for (const [text, offered] of [['Arhopala ace-ace', true], ['neptis sankara', true], ['Neptis 2', false], ['ne-ptis sankara', false], ['Neptis sankara.', false],
+    ['Papilio agenor polymnestor', true], ['papilio agenor poly-mnestor', true], ['Papilio agenor polymnestor major', false],
+    ['Papilio agenor p0lymnestor', false]]) {
     await fireEvent.input(input, { target: { value: text } });
     await screen.findByText(`No species matches “${text}”.`);
     expect(screen.queryByRole('option', { name: /as a custom species/ }) !== null).toBe(offered);
