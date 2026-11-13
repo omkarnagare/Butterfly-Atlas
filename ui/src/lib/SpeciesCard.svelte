@@ -8,6 +8,7 @@
   import { stagger } from './motion.js';
   import { thumbUrl } from './api.js';
   import { thumbRetry } from './thumbRetry.js';
+  import { sharpen } from './sharpen.js';
   import { splitBadge } from './updates.js';
   import { PHOTOGRAPHED } from './messages.js';
   import { meadow } from './meadow.js';
@@ -26,7 +27,7 @@
    onclick={(e) => rememberMorph(e.currentTarget.querySelector('[data-morph]'))}>
   <div class="cover" data-morph>
     {#if taxon.cover}
-      <img src={thumbUrl(taxon.cover.id, taxon.cover.v)} alt="" loading="lazy" decoding="async" use:thumbRetry />
+      <img src={thumbUrl(taxon.cover.id, taxon.cover.v)} alt="" loading="lazy" decoding="async" use:thumbRetry use:sharpen={taxon.cover} />
     {:else if got}<Butterfly />{:else}<Outline /><span class="lab">Not yet photographed</span>{@html grass}{/if}
   </div>
   <div class="meta">

@@ -36,6 +36,7 @@
   import LibraryMovedNote from '../lib/LibraryMovedNote.svelte';
   import SyncNote from '../lib/SyncNote.svelte';
   import { thumbRetry } from '../lib/thumbRetry.js';
+  import { sharpen } from '../lib/sharpen.js';
   import { PAUSED, PENDING, RUNNING, WAITING } from '../lib/states.js';
   import { IMPORTS_THAT_STOPPED, PAUSED_EXPORT } from '../lib/messages.js';
 
@@ -194,7 +195,7 @@
       {#if latest}
         <a class="latest photo" href={photoHref(latest.taxon.id, latest.photo.id)} style={famStyle(latest.taxon.family)} onclick={openPhoto}
            aria-label="Latest addition: {title(latest.taxon)}, {ago(latest.photo.addedAt)}">
-          {#if latest.photo.unreadable}<span class="cant">{CANT_SHOW}</span>{:else}<img src={photoThumb(latest.photo)} alt="" decoding="async" use:thumbRetry />{/if}
+          {#if latest.photo.unreadable}<span class="cant">{CANT_SHOW}</span>{:else}<img src={photoThumb(latest.photo)} alt="" decoding="async" use:thumbRetry use:sharpen={latest.photo} />{/if}
           <span class="eyebrow">Latest addition</span>
           <span class="cap">
             <span class="bn">{latest.taxon.name}</span>
@@ -237,7 +238,7 @@
           {#each summary.recent as item (item.photo.id)}
             <a class="thumb" href={hrefFor(item.taxon)} onclick={(e) => rememberMorph(e.currentTarget.querySelector('[data-morph]'))}>
               <div class="cover" data-morph>
-                {#if item.photo.unreadable}<span class="cant">{CANT_SHOW}</span>{:else}<img src={photoThumb(item.photo)} alt="" loading="lazy" decoding="async" use:thumbRetry />{/if}
+                {#if item.photo.unreadable}<span class="cant">{CANT_SHOW}</span>{:else}<img src={photoThumb(item.photo)} alt="" loading="lazy" decoding="async" use:thumbRetry use:sharpen={item.photo} />{/if}
                 {#if typeBadge(item.photo)}<span class="tb"><span class={typeBadge(item.photo).toLowerCase()}>{typeBadge(item.photo)}</span></span>{/if}
               </div>
               <span class="cnm">{title(item.taxon)}</span>

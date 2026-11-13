@@ -249,6 +249,8 @@ export async function uploadPhoto(taxonId, file, { tags = [], onProgress, signal
 /** Thumbnail URL. `v` (the file's modified time) changes whenever the photo does, so each version may be cached for good. */
 export const thumbUrl = (photoId, v) => `./api/photos/${id(photoId)}/thumb?v=${q(v ?? '')}`;
 export const photoThumb = (photo) => thumbUrl(photo.id, photo.v);
+/** A photo's sharp copy, kept on this device (2026-11-14 design §6): 200 the image, 204 with X-Atlas-Pending while it is made, 204 without when it can't be. */
+export const sharpUrl = (photoId, v) => `./api/photos/${id(photoId)}/sharp?v=${q(v ?? '')}`;
 /**
  * Full-size image for the viewer: the original, or for TIFF and HEIC (Phase 7b) a large JPEG copy every web view can
  * show.

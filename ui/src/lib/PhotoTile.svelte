@@ -4,6 +4,7 @@
   import { rememberRect } from './flip.js';
   import { noteViewerOpen } from './viewer.js';
   import { thumbRetry } from './thumbRetry.js';
+  import { sharpen } from './sharpen.js';
   import { CANT_SHOW, typeBadge } from './raw.js';
 
   /**
@@ -34,7 +35,7 @@
   {#if photo.unreadable}
     <span class="cant" aria-hidden="true">{CANT_SHOW}</span>
   {:else}
-    <img src={photoThumb(photo)} alt="" loading="lazy" decoding="async" width={photo.width} height={photo.height} use:thumbRetry={() => (ready = true)} />
+    <img src={photoThumb(photo)} alt="" loading="lazy" decoding="async" width={photo.width} height={photo.height} use:thumbRetry={() => (ready = true)} use:sharpen={photo} />
   {/if}
   {#if names.length}<span class="tt" aria-hidden="true">{#each names as name (name)}<span>{name}</span>{/each}</span>{/if}
   {#if fresh || badge}
