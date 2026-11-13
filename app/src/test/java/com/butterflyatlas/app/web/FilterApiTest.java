@@ -18,6 +18,7 @@ import java.net.http.HttpResponse;
 import java.nio.file.Path;
 import java.sql.PreparedStatement;
 import java.time.Duration;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -202,5 +203,58 @@ class FilterApiTest {
             assertThat(response.statusCode()).isEqualTo(409);
             assertThat(response.body()).contains("\"code\":\"setup_required\"");
         }
+    }
+
+    private HttpResponse<String> post(String path, String json) throws Exception {
+        return http.send(HttpRequest.newBuilder(server.baseUri().resolve(path)).timeout(Duration.ofSeconds(20))
+                .header("Origin", "http://127.0.0.1:" + server.port()).header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(json)).build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    private List<Long> live() {
+        return db.read(c -> {
+            List<Long> ids = new java.util.ArrayList<>();
+            try (var st = c.createStatement(); var rs = st.executeQuery("SELECT id FROM image WHERE deleted_at IS NULL ORDER BY id")) {
+                while (rs.next()) {
+                    ids.add(rs.getLong(1));
+                }
+            }
+            return ids;
+        });
+    }
+
+    @Test
+    void deleteTheseMovesEveryMatchingPhotoToRecentlyDeletedWhenTheCountIsStillTheOneConfirmed() throws Exception {
+        long a = photo("A5", null, 10, "male");
+        long b = photo("A5", "P4", 10);
+        long c = photo("A6", null, 10, "male");
+
+        answers(post("api/filter/delete?tags=male", "{\"expected\":2}"), 200, "{\"deleted\":2}");
+        assertThat(live()).containsExactly(b);
+        assertThat(JSON.readTree(get("api/deleted").body()).get("photos").size()).isEqualTo(2);
+        assertThat(a).isNotEqualTo(c);
+    }
+
+    @Test
+    void deleteTheseDeletesNothingWhenTheMatchingPhotosChangedSinceTheCountWasShown() throws Exception {
+        photo("A5", null, 10, "male");
+        photo("A6", null, 10, "male");
+
+        answers(post("api/filter/delete?tags=male", "{\"expected\":1}"), 409, "{\"error\":{\"code\":\"conflict\",\"message\":"
+                + "\"The photos matching this filter changed (2 now, not 1), so nothing was deleted. Check the count and try"
+                + " again.\"}}");
+        assertThat(live()).hasSize(2);
+    }
+
+    @Test
+    void deleteTheseIsRefusedWithoutAFilterOrACount() throws Exception {
+        photo("A5", null, 10);
+        refused(post("api/filter/delete", "{\"expected\":1}"),
+                "Choose a filter first: Delete these never deletes every photo at once.");
+        refused(post("api/filter/delete?status=all", "{\"expected\":1}"),
+                "Choose a filter first: Delete these never deletes every photo at once.");
+        refused(post("api/filter/delete?taxa=A5", "{}"), "Say how many photos you confirmed.");
+        refused(post("api/filter/delete?taxa=A6", "{\"expected\":0}"), "No photos match this filter, so there is nothing to delete.");
+        assertThat(live()).hasSize(1);
     }
 }

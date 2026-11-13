@@ -83,6 +83,7 @@ PATCH /api/places/{id} | places
 GET /api/filter/count | filter
 GET /api/filter/photos | filter
 GET /api/filter/places | filter
+POST /api/filter/delete | filter
 GET /api/filter/species | filter
 
 GET /api/fs/list | folders

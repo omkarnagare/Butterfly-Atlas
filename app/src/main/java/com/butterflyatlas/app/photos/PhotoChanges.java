@@ -1,7 +1,9 @@
 package com.butterflyatlas.app.photos;
 
 import com.butterflyatlas.app.AtlasException;
+import com.butterflyatlas.app.ErrorCodes;
 import com.butterflyatlas.app.db.ChangeLog;
+import com.butterflyatlas.app.db.Database;
 import com.butterflyatlas.app.library.Library;
 import com.butterflyatlas.app.taxa.TaxonSnapshot;
 
@@ -87,9 +89,33 @@ final class PhotoChanges {
      */
     int delete(List<Long> rawIds) {
         List<Long> ids = ids(rawIds);
+        return delete(c -> ids, null);
+    }
+
+    /**
+     * Explore's Delete these (2026-11-13 design, addendum §2): deletes, as {@link #delete}, the photos {@code idsOf} reads
+     * in the same transaction, only when they are still the {@code expected} many the user confirmed; otherwise nothing
+     * is deleted (409 {@code conflict}). None matching is 400 {@code invalid}.
+     */
+    int deleteMatching(Database.Work<List<Long>> idsOf, int expected) {
+        return delete(idsOf, expected);
+    }
+
+    private int delete(Database.Work<List<Long>> idsOf, Integer expected) {
         Library lib = library.get();
         FileMoves moves = new FileMoves();
         return deleted.change(lib.database(), c -> {
+            List<Long> ids = idsOf.apply(c);
+            if (expected != null) {
+                if (ids.isEmpty()) {
+                    throw new AtlasException(AtlasException.Kind.INVALID, ErrorCodes.INVALID,
+                            "No photos match this filter, so there is nothing to delete.");
+                }
+                if (ids.size() != expected) {
+                    throw new AtlasException(AtlasException.Kind.CONFLICT, "The photos matching this filter changed ("
+                            + ids.size() + " now, not " + expected + "), so nothing was deleted. Check the count and try again.");
+                }
+            }
             Instant now = clock.instant();
             int deleted = 0;
             for (long id : ids) {

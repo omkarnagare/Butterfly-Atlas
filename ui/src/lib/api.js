@@ -377,6 +377,10 @@ export const setAppearance = (theme) => request('appearance', { method: 'PUT', b
 /* ---------- the filter (Phase 4a) ---------- */
 
 // `query` is the filter as lib/filter.js prints it (contract §1), '' for no filter.
+/** Explore's Delete these: the photos the filter matches, when they are still the `expected` many; how many were deleted. */
+export const deleteMatching = (query, expected) =>
+  request(withFilter('filter/delete', query), { method: 'POST', body: { expected } }).then((r) => r.deleted);
+
 const withFilter = (path, query, more = '') => {
   const all = [query, more].filter(Boolean).join('&');
   return all ? `${path}?${all}` : path;

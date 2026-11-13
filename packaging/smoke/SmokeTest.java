@@ -646,6 +646,8 @@ public final class SmokeTest {
             http.call("GET /api/filter/species", "/api/filter/species?" + filter, null, 200);
             http.call("GET /api/filter/photos", "/api/filter/photos?" + filter, null, 200);
             http.call("GET /api/filter/places", "/api/filter/places?" + filter, null, 200);
+            // Delete these without a filter is refused (and so deletes nothing the later steps need).
+            http.call("POST /api/filter/delete", "/api/filter/delete", "{\"expected\":1}", 400);
 
             // the folder browser
             http.call("GET /api/fs/roots", "/api/fs/roots", null, 200);

@@ -84,6 +84,12 @@ public record Filter(List<String> taxa, List<String> tags, String tagMode, List<
      * plus, as in the UI. A value outside its list (a file type among them: "Unknown file type “x”."), or more than
      * {@value #MAX_IDS} taxa or places, is refused (400 {@code invalid}). The UI reads a query string alike (shared cases: {@code fixtures/filter-parity.json}).
      */
+    /** True when nothing narrows the photos: every live photo matches (Delete these refuses it). */
+    public boolean matchesEverything() {
+        return taxa.isEmpty() && tags.isEmpty() && places.isEmpty() && ALL.equals(status) && ALL.equals(source)
+                && stages == null && types.isEmpty();
+    }
+
     public static Filter parse(String rawQuery) {
         Map<String, String> values = new HashMap<>(); // still encoded
         if (rawQuery != null) {

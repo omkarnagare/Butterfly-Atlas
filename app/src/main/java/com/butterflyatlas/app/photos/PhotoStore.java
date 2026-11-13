@@ -404,6 +404,11 @@ public final class PhotoStore {
         return changed(held(() -> changes.delete(rawIds)));
     }
 
+    /** See {@link PhotoChanges#deleteMatching}; refused while a taxonomy update runs, waits or is paused. */
+    public int deleteMatching(Database.Work<List<Long>> idsOf, int expected) {
+        return changed(held(() -> changes.deleteMatching(idsOf, expected)));
+    }
+
     /** See {@link PhotoChanges#restore}; refused while a taxonomy update runs, waits or is paused. */
     public List<Photo> restore(List<Long> rawIds) {
         return changed(held(() -> changes.restore(rawIds)));
