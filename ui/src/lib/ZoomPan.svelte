@@ -18,9 +18,14 @@
    * first error the address is fetched once and the server's own words are said; a refusal because Butterfly Atlas is
    * busy (`busy`, still checking for a decoder, or a decode taking too long) gets Try again, which loads it afresh; so
    * does no answer at all, or one without the server's words ("Butterfly Atlas isn't answering. Try again.", review fix U7).
+   * 2026-11-14 design §3–§4: fitted, a photo is never drawn larger than one photo pixel per screen pixel (the size of the
+   * image actually loaded, once it has, over the screen's density), so a small photo or a small RAW preview is not
+   * stretched; zoom still goes further. Until the full size comes the note says "Loading full size…" on the photo (the
+   * caller's `loadingNote` when given); if it has not come after 10 s, or failed after its retries, Try again asks for
+   * it afresh (not for a photo the caller knows is `broken`, nor a refusal the server explained as not busy).
    */
   let {
-    src, placeholder, width, height, alt = '', onSwipe = () => {}, loadingNote = '',
+    src, placeholder, width, height, alt = '', onSwipe = () => {}, loadingNote = 'Loading full size…',
     failedNote = 'This photo could not be opened at full size; showing a preview.', broken = false, orientation = 1, explain = false,
   } = $props();
 
@@ -42,13 +47,23 @@
   let swipeFrom = null;
   let retryTimer = 0;
   let lastScale = 1;
+  const SLOW_MS = 10000;
+  // The full size has not come in SLOW_MS: Try again is offered.
+  let slow = $state(false);
+  let slowTimer = 0;
+  // Screen pixels per page pixel (2 on most Mac screens), read again when the window changes size or screen.
+  let density = $state(typeof window !== 'undefined' && window.devicePixelRatio > 0 ? window.devicePixelRatio : 1);
 
   // Without a size from the library, the loaded image's own size is used (turned, when it is shown turned).
   let quarter = $derived(turned(orientation));
-  let natural = $derived(width && height ? { w: width, h: height } : seen.w ? (quarter ? { w: seen.h, h: seen.w } : seen) : { w: 1600, h: 1200 });
+  let natural = $derived(loaded && seen.w ? (quarter ? { w: seen.h, h: seen.w } : seen)
+    : width && height ? { w: width, h: height } : seen.w ? (quarter ? { w: seen.h, h: seen.w } : seen) : { w: 1600, h: 1200 });
+  // The photo's size in page pixels at one photo pixel per screen pixel: the most it is drawn at when fitted.
+  let capped = $derived({ w: natural.w / density, h: natural.h / density });
   let shownSrc = $derived(attempt ? `${src}${src.includes('?') ? '&' : '?'}retry=${attempt}` : src);
   let stage = $derived({ w: stageW, h: stageH });
-  let fit = $derived(fitSize(natural, stage));
+  let fit = $derived(fitSize(capped, stage));
+  // Zoom goes as deep as before (4×, or the photo's own pixels at one per page pixel).
   let max = $derived(maxScale(natural, fit));
   let placed = $derived(placement(view, fit));
   let gone = $derived(broken || failed);
@@ -75,6 +90,18 @@
     return () => clearTimeout(retryTimer);
   });
 
+  // Each try of the full size (a new photo, a retry, Try again) gets SLOW_MS before Try again is offered.
+  $effect(() => {
+    shownSrc;
+    if (broken) return undefined;
+    untrack(() => (slow = false));
+    clearTimeout(slowTimer);
+    slowTimer = setTimeout(() => {
+      if (!loaded) slow = true;
+    }, SLOW_MS);
+    return () => clearTimeout(slowTimer);
+  });
+
   // Keep the view inside the edges when the window changes size.
   $effect(() => {
     const [f, s, m] = [fit, stage, max];
@@ -89,6 +116,7 @@
     const measure = () => {
       stageW = stageEl.clientWidth;
       stageH = stageEl.clientHeight;
+      density = window.devicePixelRatio > 0 ? window.devicePixelRatio : 1;
     };
     measure();
     if (typeof ResizeObserver !== 'function') {
@@ -202,6 +230,8 @@
     if (wanted !== shownSrc) return;
     if (img.naturalWidth) seen = { w: img.naturalWidth, h: img.naturalHeight };
     loaded = true;
+    slow = false;
+    clearTimeout(slowTimer);
   }
 
   // A failed download is tried again twice (after 2 s and 4 s) before the preview is all there is.
@@ -248,6 +278,8 @@
   function tryAgain() {
     why = null;
     failed = false;
+    slow = false;
+    clearTimeout(retryTimer);
     attempt += 1;
   }
 
@@ -271,5 +303,5 @@
     {/if}
   </div>
   <p class={gone || (loadingNote && !loaded) ? 'zp-note' : 'sr-only'} role="status">{gone ? why?.message || failedNote : !loaded ? loadingNote : ''}</p>
-  {#if gone && why?.busy}<button class="btn ghost zp-again" type="button" onclick={tryAgain}>Try again</button>{/if}
+  {#if !broken && ((failed && (!why || why.busy)) || (slow && !loaded && !failed))}<button class="btn ghost zp-again" type="button" onclick={tryAgain}>Try again</button>{/if}
 </div>
