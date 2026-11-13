@@ -28,11 +28,16 @@
   let remove = $derived(tags.map((t) => t.key).filter((key) => states[key] === 'none' && initial[key] !== 'none'));
   const PICKER = { all: 'on', some: 'some', none: 'off' };
 
-  function toggle(key) {
+  /** `also`: tags that go the same way (mating's male and female, lib/tags.js alsoChanging). */
+  function toggle(key, also = []) {
     if (busy) return;
     if (!(key in initial)) initial[key] = stateOf(key);
     const now = states[key] ?? initial[key];
-    states[key] = now === 'all' ? 'none' : 'all';
+    const next = now === 'all' ? 'none' : 'all';
+    for (const each of [key, ...also]) {
+      if (!(each in initial)) initial[each] = stateOf(each);
+      states[each] = next;
+    }
   }
 
   async function apply() {

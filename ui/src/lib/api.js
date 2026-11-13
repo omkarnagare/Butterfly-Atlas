@@ -272,7 +272,13 @@ export const emptyDeleted = (ids) =>
 export const placePhotos = (ids, placeId) => request('photos/place', { method: 'POST', body: { ids, placeId } }).then((r) => r.photos);
 /** Takes the place off every listed photo (it becomes Unknown place, as the user's choice). */
 export const unplacePhotos = (ids) => request('photos/place', { method: 'POST', body: { ids, remove: true } }).then((r) => r.photos);
-export const getTags = ({ signal } = {}) => request('tags', { signal }).then((r) => r.tags);
+/**
+ * Every tag; the user's tags used last (the tag pickers' Recent row, newest first) carry `recent`, their place in it.
+ */
+export const getTags = ({ signal } = {}) => request('tags', { signal }).then((r) => {
+  const at = new Map((r.recent ?? []).map((key, i) => [key, i]));
+  return r.tags.map((tag) => (at.has(tag.key) ? { ...tag, recent: at.get(tag.key) } : tag));
+});
 export const createTag = (label) => request('tags', { method: 'POST', body: { label } });
 export const renameTag = (tagId, label) => request(`tags/${id(tagId)}`, { method: 'PATCH', body: { label } });
 export const deleteTag = (tagId) => request(`tags/${id(tagId)}`, { method: 'DELETE' }).then((r) => r.removedFromPhotos);
@@ -303,6 +309,8 @@ export const searchPlaces = (query, { level, signal } = {}) =>
     .then((r) => Object.assign(r.places, { formerMatches: r.formerMatches ?? [] }));
 /** The last five places applied, newest first. */
 export const getRecentPlaces = () => request('places/recent').then((r) => r.places);
+/** The places the live photos use, the most photos first (at most 20), each with `photos`, its count. */
+export const getPlacesInUse = () => request('places/in-use').then((r) => r.places);
 /** The places the user added, by name, each with `photos` (how many live photos use it). */
 export const getMyPlaces = () => request('places/mine').then((r) => r.places);
 /** Adds a district of the user's inside the state `parentId`. */
@@ -369,6 +377,10 @@ export const setAppearance = (theme) => request('appearance', { method: 'PUT', b
 /* ---------- the filter (Phase 4a) ---------- */
 
 // `query` is the filter as lib/filter.js prints it (contract §1), '' for no filter.
+/** Explore's Delete these: the photos the filter matches, when they are still the `expected` many; how many were deleted. */
+export const deleteMatching = (query, expected) =>
+  request(withFilter('filter/delete', query), { method: 'POST', body: { expected } }).then((r) => r.deleted);
+
 const withFilter = (path, query, more = '') => {
   const all = [query, more].filter(Boolean).join('&');
   return all ? `${path}?${all}` : path;

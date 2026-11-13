@@ -1,7 +1,7 @@
 <script>
-  import { onDestroy } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import Popover from './Popover.svelte';
-  import { searchPlaces } from './api.js';
+  import { getPlacesInUse, searchPlaces } from './api.js';
   import { MAX_IDS, placeName, UNNAMED } from './filter.js';
   import { liveCount } from './liveCount.js';
   import { placeWhere } from './places.js';
@@ -9,8 +9,10 @@
 
   /**
    * The Place popover (contract §4): the place search of the place picker (150 ms after typing pauses, from 2 letters,
-   * /api/places/search) under a first row "Unknown place"; choosing a row (Enter or a click) adds it to the filter's
-   * places (`onChange(filter, { places: [place] })`). The chosen places are listed with remove buttons.
+   * /api/places/search) under a first row "Unknown place"; until 2 letters are typed, the places the photos use are
+   * listed there instead, with their photo counts (2026-11-13 design, addendum §3), so the user sees which places are in
+   * the atlas. Choosing a row (Enter or a click) adds it to the filter's places (`onChange(filter, { places: [place] })`).
+   * The chosen places are listed with remove buttons.
    */
   let { filter, names, anchor = null, returnFocus, onChange, onClose } = $props();
 
@@ -22,7 +24,18 @@
   let selected = $state(0);
   let error = $state('');
 
-  let options = $derived([{ id: 'unknown' }, ...results]);
+  let inUse = $state([]);
+  let typing = $derived(query.trim().length >= 2);
+  let options = $derived([{ id: 'unknown' }, ...(typing ? results : inUse)]);
+  const photos = (n) => `${n.toLocaleString()} ${n === 1 ? 'photo' : 'photos'}`;
+
+  onMount(async () => {
+    try {
+      inUse = await getPlacesInUse();
+    } catch (e) {
+      error = `Your photos' places could not be listed: ${e.message}`;
+    }
+  });
 
   const live = liveCount(searchPlaces, {
     delay: 150,
@@ -101,7 +114,8 @@
   <input class="field" bind:this={input} data-autofocus value={query} oninput={onInput} onkeydown={onKeydown} autocomplete="off" spellcheck="false"
          placeholder={PLACE_PROMPT} aria-label="Place" role="combobox" aria-autocomplete="list" aria-expanded="true"
          aria-controls="{uid}-list" aria-activedescendant="{uid}-{selected}" />
-  <div class="pick-list" id="{uid}-list" role="listbox" aria-label="Places">
+  {#if !typing && inUse.length}<p class="muted fp-head" id="{uid}-head">Places in your photos</p>{/if}
+  <div class="pick-list" id="{uid}-list" role="listbox" aria-label="Places" aria-describedby={!typing && inUse.length ? `${uid}-head` : undefined}>
     {#each options as place, k (place.id)}
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div class="res" id="{uid}-{k}" tabindex="-1" role="option" aria-selected={k === selected} aria-disabled={chosen(place) ? 'true' : undefined}
@@ -110,7 +124,7 @@
           <span class="tx"><span class="pl-line"><b>{UNKNOWN_PLACE}</b></span></span>
         {:else}
           <span class="tx"><span class="pl-line"><b>{place.name}</b>{#if place.path.length > 1}<span class="muted">{` · ${placeWhere(place)}`}</span>{/if}</span></span>
-          <span class="rk2">{place.level}</span>
+          <span class="rk2">{place.photos != null ? photos(place.photos) : place.level}</span>
         {/if}
       </div>
     {/each}

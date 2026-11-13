@@ -343,7 +343,7 @@ public final class Main {
         // A library in a cloud folder isn't walked in Settings (cloud-library-folder design §2–§4).
         change.cloudFolders(com.butterflyatlas.app.imports.CloudFolders::service);
         AtlasServices services = new AtlasServices(setup, taxa, new SearchWordService(holder, clock),
-                search, photos, photoQueries, new TagService(holder::library),
+                search, photos, photoQueries, new TagService(holder::library, clock),
                 thumbnails, rescan, processing, new FolderBrowser(holder::current, imports.store(), home), imports,
                 placeSearch, new UserPlaces(() -> holder.library().database(), clock, placeSearch,
                         new ImportPlaceChoices(holder::library)),

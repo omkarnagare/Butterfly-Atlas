@@ -408,3 +408,36 @@ test('filter mode: "Find a tag", and no Create', async () => {
   await type('mud puddling on sand');
   expect(screen.queryByText(TAG_NAME_TOO_MANY_WORDS)).toBeNull();
 });
+
+test('a Recent row lists the user\'s tags used last, in that order, leaving out those already shown; in filters too', async () => {
+  const tags = TAGS.map((tag) => ({ ...tag, recent: { wet_sand: 0, basking: 1, on_lantana: 2 }[tag.key] }));
+  const { unmount } = setup({ tags, chosen: ['basking'] });
+  const recent = () => within(screen.getByRole('group', { name: 'Recent tags' }));
+  expect(recent().getAllByRole('button').map((b) => b.textContent)).toEqual(['wet_sand', 'on_lantana']);
+  await fireEvent.click(recent().getByRole('button', { name: 'wet_sand' }));
+  expect(chips().getByRole('button', { name: 'wet_sand' }).getAttribute('aria-pressed')).toBe('true');
+  expect(recent().getAllByRole('button').map((b) => b.textContent)).toEqual(['on_lantana']);
+  unmount();
+
+  setup({ tags, mode: 'filter' });
+  expect(recent().getAllByRole('button').map((b) => b.textContent)).toEqual(['wet_sand', 'basking', 'on_lantana']);
+});
+
+test('no Recent row when none of the user\'s tags has been used', () => {
+  setup();
+  expect(screen.queryByRole('group', { name: 'Recent tags' })).toBeNull();
+});
+
+test('while tagging, pressing mating says male and female change with it; a filter is left alone', async () => {
+  const tags = [builtin('male'), builtin('female'), builtin('mating'), ...TAGS];
+  const { onToggle, unmount } = setup({ tags, chosen: ['female'] });
+  await fireEvent.click(chips().getByRole('button', { name: 'mating' }));
+  expect(onToggle).toHaveBeenLastCalledWith('mating', ['male']);
+  await fireEvent.click(chips().getByRole('button', { name: 'mating' }));
+  expect(onToggle).toHaveBeenLastCalledWith('mating', ['female']);
+  unmount();
+
+  const filter = setup({ tags, mode: 'filter' });
+  await fireEvent.click(chips().getByRole('button', { name: 'mating' }));
+  expect(filter.onToggle).toHaveBeenLastCalledWith('mating');
+});

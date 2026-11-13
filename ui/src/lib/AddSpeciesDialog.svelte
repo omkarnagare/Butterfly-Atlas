@@ -190,7 +190,7 @@
     {/if}
     <label class="lbl2" for="{uid}-name">Scientific name</label>
     <input class="field bn" id="{uid}-name" bind:this={nameInput} value={name} oninput={onNameInput} data-autofocus maxlength="200" readonly={busy}
-           autocomplete="off" spellcheck="false" placeholder="Genus and species, e.g. Neptis sankara" aria-describedby="{uid}-check" />
+           autocomplete="off" spellcheck="false" placeholder="Genus and species (subspecies optional), e.g. Neptis sankara" aria-describedby="{uid}-check" />
     <div id="{uid}-check" role="status" class="as-check">
       {#if blocked}
         <p class="problem">{blocked.message}{#if blocked.taxon}{' '}<a href={hrefFor({ ...blocked.taxon, rank: 'species' })} onclick={onClose}>Open it</a>{/if}</p>

@@ -39,11 +39,11 @@ class TagServiceTest {
     @Test
     void listsTheBuiltInTagsInOrder() {
         assertThat(tags.list()).extracting(Tag::key).containsExactly(
-                "egg", "larva", "pupa", "upper_wing", "under_wing", "male", "female", "dsf", "wsf", "mating", "nectaring",
-                "puddling", "predated", "unconfirmed");
+                "egg", "larva", "pupa", "upper_wing", "under_wing", "male", "female", "dsf", "wsf", "mating", "resting",
+                "basking", "nectaring", "puddling", "predated", "unconfirmed");
         assertThat(tags.list()).extracting(Tag::label).containsExactly(
-                "egg", "larva", "pupa", "upper_wing", "under_wing", "male", "female", "DSF", "WSF", "mating", "nectaring",
-                "puddling", "predated", "unconfirmed");
+                "egg", "larva", "pupa", "upper_wing", "under_wing", "male", "female", "DSF", "WSF", "mating", "resting",
+                "basking", "nectaring", "puddling", "predated", "unconfirmed");
         assertThat(tags.list()).allSatisfy(t -> {
             assertThat(t.source()).isEqualTo("builtin");
             assertThat(t.photoCount()).isZero();
@@ -65,13 +65,14 @@ class TagServiceTest {
     @Test
     void createsUserTagsWithTheNameInItsFormAndAKeyMadeFromIt() {
         Tag created = tags.create("  Mud-puddling  ");
-        tags.create("basking");
+        tags.create("roosting");
 
         assertThat(created.key()).isEqualTo("mud_puddling");
         assertThat(created.label()).isEqualTo("mud_puddling");
         assertThat(created.source()).isEqualTo("user");
         assertThat(tags.list()).extracting(Tag::key)
-                .endsWith("wsf", "mating", "nectaring", "puddling", "predated", "unconfirmed", "basking", "mud_puddling");
+                .endsWith("wsf", "mating", "resting", "basking", "nectaring", "puddling", "predated", "unconfirmed", "mud_puddling",
+                        "roosting");
     }
 
     @Test
@@ -90,7 +91,7 @@ class TagServiceTest {
 
     @Test
     void labelsAreTidiedAndChecked() {
-        assertThat(tags.create("  Basking \t in   sun ").label()).isEqualTo("basking_in_sun");
+        assertThat(tags.create("  Roosting \t in   sun ").label()).isEqualTo("roosting_in_sun");
         assertThat(tags.create("UV light").label()).isEqualTo("UV_light");
         for (String empty : List.of("   ", "!!!")) {
             assertThatThrownBy(() -> tags.create(empty)).isInstanceOfSatisfying(AtlasException.class,
@@ -118,15 +119,15 @@ class TagServiceTest {
 
     @Test
     void deletingAUserTagTakesItOffItsPhotos() {
-        Tag basking = tags.create("basking");
+        Tag roosting = tags.create("roosting");
         long a = photo("A5");
         long b = photo("A5");
-        tags.setPhotoTags(a, List.of("basking", "male"));
-        tags.setPhotoTags(b, List.of("basking"));
+        tags.setPhotoTags(a, List.of("roosting", "male"));
+        tags.setPhotoTags(b, List.of("roosting"));
 
-        assertThat(tags.delete(basking.id())).isEqualTo(2);
+        assertThat(tags.delete(roosting.id())).isEqualTo(2);
 
-        assertThat(tags.list()).extracting(Tag::key).doesNotContain("basking");
+        assertThat(tags.list()).extracting(Tag::key).doesNotContain("roosting");
         assertThat(tags.setPhotoTags(a, List.of("male")).tags()).containsExactly("male");
     }
 
@@ -222,14 +223,14 @@ class TagServiceTest {
 
     @Test
     void renamingToAnotherTagsLabelIsRefusedButACaseOnlyRenameWorks() {
-        Tag basking = tags.create("basking");
+        Tag roosting = tags.create("roosting");
         Tag mud = tags.create("mud puddling");
 
         assertThatThrownBy(() -> tags.rename(mud.id(), "BASKING")).isInstanceOfSatisfying(AtlasException.class,
                 e -> assertThat(e.kind()).isEqualTo(AtlasException.Kind.INVALID));
-        assertThat(tags.rename(basking.id(), "Basking").label()).isEqualTo("basking");
-        assertThat(tags.rename(basking.id(), "SUN").label()).isEqualTo("SUN");
-        assertThat(tags.rename(basking.id(), "sun").label()).isEqualTo("sun");
+        assertThat(tags.rename(roosting.id(), "Roosting").label()).isEqualTo("roosting");
+        assertThat(tags.rename(roosting.id(), "SUN").label()).isEqualTo("SUN");
+        assertThat(tags.rename(roosting.id(), "sun").label()).isEqualTo("sun");
         assertThat(tags.rename(mud.id(), "Mud Puddling").key()).isEqualTo("mud_puddling");
     }
 

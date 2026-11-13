@@ -65,7 +65,7 @@ public final class Api {
         new PhotoRoutes(services.photos(), services.photoQueries(), services.tags(), services.photoPlaces()).register(app);
         new TagRoutes(services.tags()).register(app);
         new PlaceRoutes(services.placeSearch(), services.places()).register(app);
-        new FilterRoutes(services.filters()).register(app);
+        new FilterRoutes(services.filters(), services.photos()).register(app);
         new DeletedRoutes(services.photos(), services.photoQueries()).register(app);
         new ImageRoutes(services.thumbnails(), services.photoQueries()).register(app);
         new FsRoutes(services.folders()).register(app);

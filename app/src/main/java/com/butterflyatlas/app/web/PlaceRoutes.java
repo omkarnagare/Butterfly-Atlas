@@ -10,6 +10,9 @@ import java.util.List;
 /** Places (3c-2 contract §1): search, recent, the user's own, and adding, renaming and deleting user districts. */
 final class PlaceRoutes {
 
+    record InUse(List<UserPlaces.InUse> places) {
+    }
+
     record Places(List<PlaceSearch.Place> places) {
     }
 
@@ -43,6 +46,7 @@ final class PlaceRoutes {
         app.get("/api/places/search", ctx -> ctx.json(new Found(search.search(ctx.queryParam("q"), ctx.queryParam("level")),
                 search.formerMatches(ctx.queryParam("q"), ctx.queryParam("level")))));
         app.get("/api/places/recent", ctx -> ctx.json(new Places(places.recent())));
+        app.get("/api/places/in-use", ctx -> ctx.json(new InUse(places.inUse())));
         app.get("/api/places/mine", ctx -> ctx.json(new MyPlaces(places.mine())));
         app.post("/api/places", ctx -> {
             AddRequest request = Json.body(ctx, AddRequest.class);

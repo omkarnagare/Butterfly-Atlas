@@ -10,7 +10,8 @@ import java.util.List;
 /** The user's tags and the built-in ones. */
 final class TagRoutes {
 
-    record Tags(List<TagService.Tag> tags) {
+    /** Every tag, and the keys of the user's own tags used last (the tag pickers' Recent row), newest first. */
+    record Tags(List<TagService.Tag> tags, List<String> recent) {
     }
 
     record Removed(int removedFromPhotos) {
@@ -35,7 +36,7 @@ final class TagRoutes {
     }
 
     void register(Javalin app) {
-        app.get("/api/tags", ctx -> ctx.json(new Tags(tags.list())));
+        app.get("/api/tags", ctx -> ctx.json(new Tags(tags.list(), tags.recent())));
         app.post("/api/tags", ctx -> ctx.json(tags.create(Json.body(ctx, LabelRequest.class).label())));
         app.patch("/api/tags/{id}", ctx -> ctx.json(tags.rename(PhotoIds.tag(ctx), Json.body(ctx, LabelRequest.class).label())));
         app.delete("/api/tags/{id}", ctx -> ctx.json(new Removed(tags.delete(PhotoIds.tag(ctx)))));

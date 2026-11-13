@@ -15,6 +15,7 @@
    *
    * Keys on a tile: arrows (Up/Down keep the column), Home and End move focus (`onMove(id, shift)`); Space
    * toggles it (`onSpace`); Enter or a double-click opens it (`onOpen`). Clicks go to `onTileClick(item, event)`.
+   * While any photo is selected the grid is marked `picking`, so every tile shows its tick, not only on hover.
    * The page owns the selection and the actions; `focusItem(id)` moves focus to a tile, scrolling it into view.
    *
    * For screen readers it is a grid named `label` (aria-multiselectable): every row of the layout is a row with
@@ -160,7 +161,7 @@
   const heightOf = (row) => (row.kind === 'tiles' ? tile + GAP : HEIGHTS[row.kind]);
 </script>
 
-<div class="ig" bind:this={el} role="grid" aria-label={label} aria-multiselectable="true" aria-rowcount={rows.length} aria-colcount={cols}
+<div class="ig" class:picking={selected.size > 0} bind:this={el} role="grid" aria-label={label} aria-multiselectable="true" aria-rowcount={rows.length} aria-colcount={cols}
      style="height:{measured.total}px;--tile:{tile}px;--gap:{GAP}px">
   {#each shown as index (rows[index].key)}
     {@const row = rows[index]}

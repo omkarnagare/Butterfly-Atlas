@@ -3,6 +3,7 @@ package com.butterflyatlas.app.imports;
 import com.butterflyatlas.app.AtlasException;
 import com.butterflyatlas.app.db.SqlLists;
 import com.butterflyatlas.app.library.Library;
+import com.butterflyatlas.app.photos.TagService;
 import com.butterflyatlas.app.places.PlaceRules;
 import com.butterflyatlas.app.places.UserPlaces;
 
@@ -114,6 +115,9 @@ public final class ImportEdits {
                     bindIds(ps, 2, runId, chunk);
                     ps.executeUpdate();
                 }
+            }
+            if (!editable.isEmpty()) {
+                TagService.used(c, add, clock.instant()); // the Recent row of the tag pickers
             }
             return answer(c, runId, seq, changed.size());
         });

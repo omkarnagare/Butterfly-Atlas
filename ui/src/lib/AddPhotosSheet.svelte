@@ -10,6 +10,7 @@
   import { DECODER_CHECKING } from './states.js';
   import { BACKUP_COPYING } from './codes.js';
   import TagPicker from './TagPicker.svelte';
+  import { toggled } from './tags.js';
 
   const PREVIEWS = 30;
 
@@ -99,8 +100,8 @@
     if (next && !next.url) next.url = preview(next.file);
   }
 
-  function toggleTag(key) {
-    chosen = chosen.includes(key) ? chosen.filter((k) => k !== key) : [...chosen, key];
+  function toggleTag(key, also = []) {
+    chosen = toggled(chosen, key, also);
   }
 
   async function send() {

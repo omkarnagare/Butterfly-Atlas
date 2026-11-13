@@ -1,12 +1,12 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { beforeEach, expect, test, vi } from 'vitest';
 import Explore from './Explore.svelte';
-import { addCustomSpecies, checkCustomName, filterCount, filterPhotos, filterPlaces, filterSpecies, getChildren, getTags, getTaxon, getTree } from '../lib/api.js';
+import { addCustomSpecies, checkCustomName, deleteMatching, filterCount, filterPhotos, filterPlaces, filterSpecies, getChildren, getTags, getTaxon, getTree } from '../lib/api.js';
 import { EMPTY } from '../lib/filter.js';
 
 vi.mock('../lib/api.js', () => ({
   getTaxon: vi.fn(), getChildren: vi.fn(), getTree: vi.fn(), addSearchWord: vi.fn(), removeSearchWord: vi.fn(), getStatus: vi.fn(),
-  addCustomSpecies: vi.fn(), checkCustomName: vi.fn(), renameCustomSpecies: vi.fn(),
+  addCustomSpecies: vi.fn(), checkCustomName: vi.fn(), renameCustomSpecies: vi.fn(), deleteMatching: vi.fn(),
   filterCount: vi.fn(), filterSpecies: vi.fn(), filterPhotos: vi.fn(), filterPlaces: vi.fn(), getTags: vi.fn(), search: vi.fn(), searchPlaces: vi.fn(),
   photoThumb: (photo) => `./api/photos/${photo.id}/thumb?v=1`,
   displayUrl: (id) => `./api/photos/${id}/display`,
@@ -344,4 +344,31 @@ test('a filtered group page\'s photos open in its own viewer address, which can 
   await rerender({ id: 'A1', query: 'tags=female', view: 'photos', photoId: 5, delay: 0 });
   expect(await screen.findByRole('button', { name: 'Delete' })).toBeTruthy();
   expect(within(screen.getByRole('dialog')).getByRole('link', { name: /Striped Tiger/ }).getAttribute('href')).toBe('#/species/A9');
+});
+
+test('Delete these… asks first, with the count, then deletes what the filter matches and reads the results again', async () => {
+  getTaxon.mockResolvedValue(top());
+  getChildren.mockResolvedValue([]);
+  deleteMatching.mockResolvedValue(12);
+  render(Explore, { id: 'G:butterflies', query: 'tags=female', view: 'photos', delay: 0 });
+
+  const button = await screen.findByRole('button', { name: 'Delete these…' });
+  await vi.waitFor(() => expect(button.getAttribute('aria-disabled')).toBe('false'));
+  await fireEvent.click(button);
+  const dialog = screen.getByRole('dialog', { name: 'Move 12 photos of 2 species to Recently deleted?' });
+  const before = filterCount.mock.calls.length;
+  await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete 12 photos' }));
+
+  expect(deleteMatching).toHaveBeenCalledWith('tags=female', 12);
+  await vi.waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  await vi.waitFor(() => expect(filterCount.mock.calls.length).toBeGreaterThan(before));
+});
+
+test('no Delete these… while nothing narrows the photos, so one click can never empty the atlas', async () => {
+  getTaxon.mockResolvedValue(top());
+  getChildren.mockResolvedValue([]);
+  render(Explore, { id: 'G:butterflies', query: null, view: 'photos', delay: 0 });
+
+  await screen.findByRole('link', { name: 'Export these…' });
+  expect(screen.queryByRole('button', { name: 'Delete these…' })).toBeNull();
 });

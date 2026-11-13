@@ -116,6 +116,17 @@ class PhotoQueriesTest {
     }
 
     @Test
+    void restingAndBaskingAreAdultsForTheCover() {
+        for (String key : List.of("resting", "basking")) {
+            String species = key.equals("resting") ? "A5" : "A6";
+            Photo adult = add(species, key);
+            Photo predated = add(species, "predated");
+            assertThat(queries.photo(adult.id()).isCover()).as(key).isTrue();
+            assertThat(queries.photo(predated.id()).isCover()).isFalse();
+        }
+    }
+
+    @Test
     void recentlyDeletedShowsSpeciesAndDaysLeft() {
         Photo older = add("A5", "male");
         Photo newer = add("A6");

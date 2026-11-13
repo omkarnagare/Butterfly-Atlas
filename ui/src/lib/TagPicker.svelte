@@ -1,9 +1,9 @@
 <script>
   import { onDestroy, tick } from 'svelte';
   import { createTag } from './api.js';
-  import { checkTagName, matchTags, tagNamed } from './tags.js';
+  import { alsoChanging, checkTagName, matchTags, tagNamed } from './tags.js';
   import {
-    FIND_A_TAG, FIND_OR_ADD_A_TAG, MATCHING_TAGS, alreadyChosen, createTag as createWords, moreTags, noTagCalled,
+    FIND_A_TAG, FIND_OR_ADD_A_TAG, MATCHING_TAGS, RECENT_TAGS, alreadyChosen, createTag as createWords, moreTags, noTagCalled,
   } from './messages.js';
 
   const SHOWN_MATCHES = 12;
@@ -14,7 +14,12 @@
    * chosen; the user's other tags are found only by typing. A user tag unchosen here stays (unpressed) until `scope`
    * changes (a photo viewer passes the photo's id), so a slip is undone with one click. Chips never move when pressed.
    *
-   * `stateOf(key)` is 'on', 'some' or 'off'; `onToggle(key)` is what pressing a chip or choosing a match does. With
+   * Under them, a "Recent tags" row: the user's tags that carry `recent` (getTags, used last first), those not shown
+   * above, so the tags in use are a click away without typing (2026-11-13 design, addendum §6).
+   *
+   * `stateOf(key)` is 'on', 'some' or 'off'; `onToggle(key)` is what pressing a chip or choosing a match does. In 'tag'
+   * mode a press of mating is `onToggle('mating', also)`, `also` the tags that change with it (male and female, lib/tags.js
+   * alsoChanging): the screen sets each of them as it sets mating, in the same change. With
    * `tristate` (Tag photos) the chips are checkboxes (all / some / none); otherwise they are toggle buttons.
    * In `mode` 'tag' a name no tag has can be created: `createTag`, then `await onCreated(tag)` (the screen reads its
    * tags again), then `onToggle(tag.key)`; a refusal shows under the box and `onCreated(null)` still re-reads (another
@@ -60,6 +65,9 @@
     return shown;
   });
 
+  let recent = $derived(tags.filter((tag) => tag.source !== 'builtin' && tag.recent != null && !mine.includes(tag))
+    .sort((a, b) => a.recent - b.recent));
+
   let typed = $derived(query.trim());
   let found = $derived(matchTags(tags, query));
   let open = $derived(found.filter((tag) => stateOf(tag.key) === 'off'));
@@ -74,7 +82,9 @@
 
   function press(key) {
     if (disabled) return;
-    onToggle(key);
+    const also = mode === 'tag' ? alsoChanging(key, stateOf) : [];
+    if (also.length) onToggle(key, also);
+    else onToggle(key);
   }
 
   function clear() {
@@ -85,7 +95,7 @@
   /** A match chosen (from the list or with Enter): the box clears, and keyboard focus stays in it. */
   function choose(tag) {
     if (disabled) return;
-    if (stateOf(tag.key) !== 'on') onToggle(tag.key);
+    if (stateOf(tag.key) !== 'on') press(tag.key);
     clear();
     box?.focus();
   }
@@ -157,6 +167,14 @@
       {@render chip(tag, stateOf(tag.key), () => press(tag.key))}
     {/each}
   </div>
+  {#if recent.length}
+    <div class="chips tp-recent" role="group" aria-label={RECENT_TAGS}>
+      <span class="muted tp-label" aria-hidden="true">Recent</span>
+      {#each recent as tag (tag.key)}
+        {@render chip(tag, stateOf(tag.key), () => press(tag.key))}
+      {/each}
+    </div>
+  {/if}
   <input class="field tp-find" type="search" bind:this={box} bind:value={query} maxlength="60" placeholder={boxWords} aria-label={boxWords}
          aria-describedby={refusal ? `${uid}-refusal` : problem ? `${uid}-problem` : undefined}
          oninput={() => (refusal = '')} onkeydown={onKey} />
@@ -184,6 +202,8 @@
   .tag-picker { display: grid; gap: 10px; }
   .tp-find { padding: 6px 10px; font-size: 14px; }
   .tag-picker p { margin: 0; }
+  .tp-recent { align-items: center; }
+  .tp-label { font-size: 12px; margin-right: 2px; }
   :global(.lb) .tp-find { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.16); color: #eaf1ed; }
   :global(.lb) .tp-find::placeholder { color: #9fb1a9; }
 </style>

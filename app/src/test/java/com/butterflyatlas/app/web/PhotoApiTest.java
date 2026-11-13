@@ -211,8 +211,8 @@ class PhotoApiTest {
     @Test
     void tagsCanBeListedCreatedRenamedAndDeleted() throws Exception {
         JsonNode list = get("api/tags").get("tags");
-        assertThat(list.size()).isEqualTo(14);
-        assertThat(list.get(13).toString())
+        assertThat(list.size()).isEqualTo(16);
+        assertThat(list.get(15).toString())
                 .isEqualTo("{\"id\":10,\"key\":\"unconfirmed\",\"label\":\"unconfirmed\",\"source\":\"builtin\",\"photoCount\":0}");
         assertThat(list.get(3).toString())
                 .isEqualTo("{\"id\":4,\"key\":\"upper_wing\",\"label\":\"upper_wing\",\"source\":\"builtin\",\"photoCount\":0}");
@@ -231,6 +231,15 @@ class PhotoApiTest {
         assertThat(JSON.readTree(builtIn.body()).at("/error/message").asText())
                 .isEqualTo("Built-in tags can be renamed but not deleted.");
         assertThat(send("PATCH", "api/tags/abc", "{\"label\":\"x\"}").statusCode()).isEqualTo(404);
+    }
+
+    @Test
+    void theTagListSaysWhichOfTheUsersOwnTagsWereUsedLast() throws Exception {
+        assertThat(get("api/tags").get("recent").toString()).isEqualTo("[]");
+        ok(send("POST", "api/tags", "{\"label\":\"roosting\"}"));
+        ok(send("POST", "api/tags", "{\"label\":\"on dung\"}"));
+        // The test clock stands still: same time, the later tag first.
+        assertThat(get("api/tags").get("recent").toString()).isEqualTo("[\"on_dung\",\"roosting\"]");
     }
 
     @Test

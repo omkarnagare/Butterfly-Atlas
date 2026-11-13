@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import {
   ApiError, addSearchWord, createTag, deletePhotos, deleteTag, dismissTagNames, getTagNames, editTags, emptyDeleted, fetchHealth, getDeleted, getPhotos,
-  getStatus, getTags, movePhotos, photoThumb, removeSearchWord, renameTag, restorePhotos, search, setCover, setPhotoTags,
+  deleteMatching, getStatus, getTags, movePhotos, photoThumb, removeSearchWord, renameTag, restorePhotos, search, setCover, setPhotoTags,
   thumbUrl, uploadPhoto, PHOTO_ACCEPT, photoType, putImportPairs,
   acceptSuggestions, assignItems, discardImport, fileImport, finishImport, getFsRoots, getImport, getImportItems, getImportResult,
   getImports, importDisplayUrl, importPreviewUrl, listFolder, pauseImport, relocateImport, skipItems, startImport, tagItems,
@@ -791,4 +791,19 @@ test('a request refused because the library was opened on another device tells t
   expect(heard).toHaveBeenCalledTimes(1);
   expect(heard.mock.calls[0][0].detail.code).toBe('library_opened_elsewhere');
   window.removeEventListener('atlas:library-problem', heard);
+});
+
+test('getTags marks the user\'s tags used last with their place in the Recent row', async () => {
+  vi.stubGlobal('fetch', ok({ tags: [{ key: 'male', source: 'builtin' }, { key: 'on_dung', source: 'user' },
+    { key: 'roosting', source: 'user' }], recent: ['roosting', 'on_dung'] }));
+  expect(await getTags()).toEqual([{ key: 'male', source: 'builtin' }, { key: 'on_dung', source: 'user', recent: 1 },
+    { key: 'roosting', source: 'user', recent: 0 }]);
+});
+
+test('deleteMatching posts the filter and the confirmed count, and answers how many were deleted', async () => {
+  const fetchMock = ok({ deleted: 3 });
+  vi.stubGlobal('fetch', fetchMock);
+  await expect(deleteMatching('tags=male&taxa=A5', 3)).resolves.toBe(3);
+  expect(fetchMock).toHaveBeenCalledWith('./api/filter/delete?tags=male&taxa=A5',
+    expect.objectContaining({ method: 'POST', body: JSON.stringify({ expected: 3 }) }));
 });

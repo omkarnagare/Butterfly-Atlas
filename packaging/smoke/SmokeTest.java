@@ -479,6 +479,7 @@ public final class SmokeTest {
             Json places = Json.parse(http.call("GET /api/places/search", "/api/places/search?q=Pune", null, 200).text());
             expect(places.list("places").size() > 0, "searching the place list for Pune found nothing (place bundle)");
             http.call("GET /api/places/recent", "/api/places/recent", null, 200);
+            http.call("GET /api/places/in-use", "/api/places/in-use", null, 200);
             expect(Files.isRegularFile(config.resolve("logs").resolve("atlas.log")), "no log file at " + config.resolve("logs/atlas.log"));
         }
 
@@ -645,6 +646,8 @@ public final class SmokeTest {
             http.call("GET /api/filter/species", "/api/filter/species?" + filter, null, 200);
             http.call("GET /api/filter/photos", "/api/filter/photos?" + filter, null, 200);
             http.call("GET /api/filter/places", "/api/filter/places?" + filter, null, 200);
+            // Delete these without a filter is refused (and so deletes nothing the later steps need).
+            http.call("POST /api/filter/delete", "/api/filter/delete", "{\"expected\":1}", 400);
 
             // the folder browser
             http.call("GET /api/fs/roots", "/api/fs/roots", null, 200);
@@ -1255,9 +1258,9 @@ public final class SmokeTest {
                         expect(r.next() && "ok".equals(r.getString(1)), "the copied " + db + " fails integrity_check");
                     }
                     try (ResultSet r = s.executeQuery("SELECT MAX(CAST(version AS INTEGER)) FROM flyway_schema_history WHERE success = 1")) {
-                        // The newest migration (V17, behaviour tags): raise this with every new migration.
-                        expect(r.next() && r.getInt(1) == 17, "the copied database is at schema version "
-                                + (r.getInt(1)) + ", not 17");
+                        // The newest migration (V18, resting and basking, tag last used): raise this with every new migration.
+                        expect(r.next() && r.getInt(1) == 18, "the copied database is at schema version "
+                                + (r.getInt(1)) + ", not 18");
                     }
                     try (ResultSet r = s.executeQuery("SELECT COUNT(*) FROM image")) {
                         expect(r.next() && r.getInt(1) == 4, "the copied database has " + r.getInt(1) + " photos, not 4");

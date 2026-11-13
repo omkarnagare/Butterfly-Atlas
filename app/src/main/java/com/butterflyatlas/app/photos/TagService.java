@@ -12,8 +12,12 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -39,6 +43,13 @@ public final class TagService {
     public static final Set<String> ADULT_KEYS = PhotoRows.ADULT_KEYS;
 
     private static final int USER_SORT_ORDER = 1000;
+
+    /** How many of the user's own tags the tag pickers' Recent row lists (addendum §6 of the 2026-11-13 design). */
+    public static final int RECENT_LIMIT = 8;
+
+    /** {@code last_used_at}: a fixed width (microseconds always written), so the text sorts as the time does. */
+    private static final DateTimeFormatter USED_AT = DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss.SSSSSS'Z'")
+            .withZone(ZoneOffset.UTC);
     private static final Pattern NOT_ALPHANUMERIC = Pattern.compile("[^\\p{L}\\p{N}]+");
 
     /** {@code photoCount} counts live photos (not those in Recently deleted). */
@@ -61,8 +72,48 @@ public final class TagService {
 
     private final Supplier<Library> library;
 
+    private final Clock clock;
+
     public TagService(Supplier<Library> library) {
+        this(library, Clock.systemUTC());
+    }
+
+    public TagService(Supplier<Library> library, Clock clock) {
         this.library = library;
+        this.clock = clock;
+    }
+
+    /** The keys of the user's own tags last used, the most recent first, at most {@value #RECENT_LIMIT}. */
+    public List<String> recent() {
+        return library.get().database().read(c -> {
+            List<String> keys = new ArrayList<>();
+            try (PreparedStatement ps = c.prepareStatement("SELECT key FROM tag WHERE source = 'user'"
+                    + " AND last_used_at IS NOT NULL ORDER BY last_used_at DESC, id DESC LIMIT " + RECENT_LIMIT);
+                 ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    keys.add(rs.getString(1));
+                }
+            }
+            return keys;
+        });
+    }
+
+    /**
+     * Notes that the user's own tags among {@code keys} were used at {@code at} (made, or added to photos or import items),
+     * for {@link #recent()}. Built-in tags and unknown keys are left alone.
+     */
+    public static void used(Connection c, Collection<String> keys, Instant at) throws SQLException {
+        if (keys.isEmpty()) {
+            return;
+        }
+        try (PreparedStatement ps = c.prepareStatement("UPDATE tag SET last_used_at = ? WHERE source = 'user' AND key = ?")) {
+            for (String key : keys) {
+                ps.setString(1, USED_AT.format(at));
+                ps.setString(2, key);
+                ps.addBatch();
+            }
+            ps.executeBatch();
+        }
     }
 
     /** Built-in tags in their order, then the user's by label. */
@@ -87,6 +138,7 @@ public final class TagService {
                     id = keys.getLong(1);
                 }
             }
+            used(c, List.of(key), clock.instant());
             return tag(c, id);
         });
     }
@@ -199,6 +251,7 @@ public final class TagService {
                 ps.executeUpdate();
             }
             PhotoRows.addTags(c, photoId, keys);
+            used(c, keys, clock.instant());
             return PhotoRows.live(c, photoId);
         });
     }
@@ -242,6 +295,7 @@ public final class TagService {
                     removing.executeBatch();
                 }
             }
+            used(c, add, clock.instant());
             return PhotoRows.live(c, ids);
         });
     }

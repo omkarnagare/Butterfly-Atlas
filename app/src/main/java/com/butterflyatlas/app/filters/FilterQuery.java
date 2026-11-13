@@ -189,6 +189,11 @@ public final class FilterQuery {
         });
     }
 
+    /** The ids of every photo the filter matches, read on {@code c} (Delete these reads them in its own transaction). */
+    public static List<Long> photoIds(Connection c, Filter filter) throws SQLException {
+        return FilterPhotos.all(c, result(c, filter)).stream().map(ExportPhoto::id).toList();
+    }
+
     /** Every species of the result, in taxonomic order. */
     public List<SpeciesRow> species(Filter filter) {
         return database.get().snapshot(c -> {

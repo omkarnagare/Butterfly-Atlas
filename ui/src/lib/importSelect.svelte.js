@@ -3,7 +3,8 @@ import { selectOnly } from './selection.js';
 import { anyModalOpen } from './modal.js';
 
 /**
- * Selecting an import's photos (design B7), for screens/ImportRun.svelte: click, Shift, Ctrl/Cmd, a section or a
+ * Selecting an import's photos (design B7), for screens/ImportRun.svelte: click, Shift, Ctrl/Cmd, a tile's tick (adds
+ * or removes that photo, as Ctrl/Cmd-click does, so the mouse alone can pick several), a section or a
  * burst, arrows and Space, and the page's keys (A selects all, S T X start the bar's actions, Escape clears). Only
  * photos that can still be changed are selected. `run` is the page's state, read and written through accessors;
  * `run.startAction` comes from importEdits.svelte.js.
@@ -27,7 +28,8 @@ export function importSelect(run) {
   function onTileClick(item, event) {
     run.focusId = item.id;
     const shift = event.shiftKey && run.sel.anchor != null;
-    if (editable(item) || shift) pick(run.sel, item.id, { shift: event.shiftKey, toggle: event.ctrlKey || event.metaKey });
+    const onTick = Boolean(event.target?.closest?.('[data-tick]'));
+    if (editable(item) || shift) pick(run.sel, item.id, { shift: event.shiftKey, toggle: onTick || event.ctrlKey || event.metaKey });
   }
 
   function onSpace(item, shift) {

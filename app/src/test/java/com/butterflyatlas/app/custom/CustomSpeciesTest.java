@@ -129,16 +129,31 @@ class CustomSpeciesTest {
     }
 
     @Test
-    void theScientificNameMustBeABinomial() {
-        for (String bad : List.of("", "   ", "Neptis", "Neptis sankara major", "N sankara", "Neptis s4nkara", "Neptis sankara-",
-                "Neptis -sankara", "Neptis sank ara", "Néptis sankara", "Neptis sankara." , "Ne" + "p".repeat(95) + " sankara")) {
+    void theScientificNameMustBeGenusAndSpeciesWithAnOptionalSubspecies() {
+        for (String bad : List.of("", "   ", "Neptis", "Papilio agenor polymnestor major", "Papilio agenor p0lymnestor",
+                "Papilio agenor polymnestor-", "Papilio agenor -polymnestor", "N sankara", "Neptis s4nkara", "Neptis sankara-",
+                "Neptis -sankara", "Neptis sank a ra", "Néptis sankara", "Neptis sankara." , "Ne" + "p".repeat(95) + " sankara")) {
             AtlasException e = invalid(() -> custom.add("A1", bad, null));
             assertThat(e.code()).as(bad).isEqualTo("invalid");
-            assertThat(e.getMessage()).isEqualTo("Enter the scientific name as genus and species, e.g. Neptis sankara.");
+            assertThat(e.getMessage()).isEqualTo("Enter the scientific name as genus and species, with a subspecies if you like, e.g. Neptis sankara or Papilio agenor polymnestor.");
         }
         assertThat(custom.add("A1", "neptis sankara-major", null).name()).isEqualTo("Neptis sankara-major");
         assertThat(custom.add("A1", "NEPTIS\tSOMA", null).name()).isEqualTo("Neptis soma");
         assertThat(custom.add("A1", "Ab " + "c".repeat(97), null).name()).hasSize(100);
+        assertThat(custom.add("A1", "Ab c " + "d".repeat(95), null).name()).hasSize(100);
+        AtlasException tooLong = invalid(() -> custom.add("A1", "Ab c " + "d".repeat(96), null));
+        assertThat(tooLong.getMessage()).isEqualTo("Enter the scientific name as genus and species, with a subspecies if you like, e.g. Neptis sankara or Papilio agenor polymnestor.");
+    }
+
+    @Test
+    void aSubspeciesNameIsItsOwnSpeciesWithItsOwnFolder() {
+        TaxonDetail added = custom.add("A1", "  papilio  AGENOR polymnestor-x ", "Blue Mormon");
+        assertThat(added.name()).isEqualTo("Papilio agenor polymnestor-x");
+        assertThat(added.rank()).isEqualTo("species");
+        assertThat(added.folder()).isEqualTo("images/Custom_additions/Papilio_agenor_polymnestor-x_[U1]/");
+        assertThat(custom.check("Papilio agenor polymnestor-x", null).code()).isEqualTo("name_exists");
+        assertThat(custom.check("Papilio agenor polymnestor", null))
+                .isEqualTo(new CustomSpecies.Check(true, "Papilio agenor polymnestor", null, null, null));
     }
 
     @Test
@@ -221,7 +236,7 @@ class CustomSpeciesTest {
 
         assertThat(custom.check(" neptis  soma ", null)).isEqualTo(new CustomSpecies.Check(true, "Neptis soma", null, null, null));
         assertThat(custom.check("Neptis", null)).isEqualTo(new CustomSpecies.Check(false, null, "invalid",
-                "Enter the scientific name as genus and species, e.g. Neptis sankara.", null));
+                "Enter the scientific name as genus and species, with a subspecies if you like, e.g. Neptis sankara or Papilio agenor polymnestor.", null));
         assertThat(custom.check(null, null).code()).isEqualTo("invalid");
         assertThat(custom.check("danaus chrysippus", null)).isEqualTo(new CustomSpecies.Check(false, null, "in_list",
                 "Danaus chrysippus is already in the list as Plain Tiger.", new TaxonRef("A5", "Danaus chrysippus", "Plain Tiger")));

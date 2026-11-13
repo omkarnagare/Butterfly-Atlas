@@ -13,17 +13,19 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
- * The name rules of a custom species (5a contract §2; design D6): a strict binomial, an optional common name, and the
+ * The name rules of a custom species (5a contract §2; design D6): a strict binomial, or a trinomial (genus, species and
+ * subspecies, e.g. Papilio agenor polymnestor, which stands as a species of its own), an optional common name, and the
  * names it may not take (an active official species' name or bundled synonym, another custom species' name).
  */
 final class CustomNames {
 
     static final int MAX_LENGTH = 100;
-    static final String BAD_NAME = "Enter the scientific name as genus and species, e.g. Neptis sankara.";
+    static final String BAD_NAME = "Enter the scientific name as genus and species, with a subspecies if you like,"
+            + " e.g. Neptis sankara or Papilio agenor polymnestor.";
     static final String BAD_COMMON = "The common name can be at most " + MAX_LENGTH + " characters.";
 
     private static final Pattern WHITESPACE = Pattern.compile("\\s+", Pattern.UNICODE_CHARACTER_CLASS);
-    private static final Pattern BINOMIAL = Pattern.compile("^[A-Z][a-z]+ [a-z]+(-[a-z]+)*$");
+    private static final Pattern NAME = Pattern.compile("^[A-Z][a-z]+ [a-z]+(-[a-z]+)*( [a-z]+(-[a-z]+)*)?$");
 
     private CustomNames() {
     }
@@ -40,13 +42,13 @@ final class CustomNames {
 
     /**
      * The scientific name as stored: tidied, the genus's first letter upper case and everything else lower case
-     * ({@code "neptis  Sankara"} → {@code "Neptis sankara"}); 400 {@code invalid} unless it is then a binomial of at most
+     * ({@code "neptis  Sankara"} → {@code "Neptis sankara"}); 400 {@code invalid} unless it is then a binomial or trinomial of at most
      * {@value #MAX_LENGTH} characters.
      */
     static String name(String raw) {
         String tidy = tidy(raw);
         String name = tidy.isEmpty() ? tidy : tidy.substring(0, 1).toUpperCase(Locale.ROOT) + tidy.substring(1).toLowerCase(Locale.ROOT);
-        if (name.length() > MAX_LENGTH || !BINOMIAL.matcher(name).matches()) {
+        if (name.length() > MAX_LENGTH || !NAME.matcher(name).matches()) {
             throw invalid(BAD_NAME);
         }
         return name;

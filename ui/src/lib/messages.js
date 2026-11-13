@@ -10,6 +10,7 @@ export const ABOUT_THIS_PHOTO = 'About this photo';
 export const CLOSE = 'Close';
 export const viewerLabel = (title) => `Photo viewer: ${title}`;
 export const UNKNOWN_PLACE = 'Unknown place';
+export const RECENT_TAGS = 'Recent tags';
 
 // Search results (the top bar's search and the Taxa filter): a hit found by an older or the user's own name.
 export const ALSO_KNOWN_AS = 'also known as';

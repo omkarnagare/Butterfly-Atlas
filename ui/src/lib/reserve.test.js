@@ -21,3 +21,8 @@ test('both selection bars note their height', () => {
     expect(readFileSync(`${process.cwd()}/src/lib/${file}`, 'utf8')).toContain('<div class="selbar" use:reserveBelow');
   }
 });
+
+test('a toast sits above a selection bar, so the bar\'s buttons are never covered', () => {
+  const css = readFileSync(`${process.cwd()}/src/styles/atlas.css`, 'utf8');
+  expect(css).toMatch(/html:has\(\.selbar\) \.toast \{ bottom: calc\(18px \+ var\(--selbar-h, 72px\) \+ 12px \+ env\(safe-area-inset-bottom, 0px\)\); \}/);
+});

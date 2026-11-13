@@ -9,7 +9,8 @@
   import AdditionsCard from '../lib/AdditionsCard.svelte';
   import AddSpeciesDialog from '../lib/AddSpeciesDialog.svelte';
   import FilterResults from '../lib/FilterResults.svelte';
-  import { parseFilter, printFilter } from '../lib/filter.js';
+  import DeleteTheseDialog from '../lib/DeleteTheseDialog.svelte';
+  import { EMPTY, parseFilter, printFilter } from '../lib/filter.js';
   import { exploreAddress, pageFilter, startsFiltered } from '../lib/exploreFilter.js';
   import { exploreHref, explorePhotoHref, exportHref, hrefFor } from '../lib/route.js';
   import { loadViewMode, saveViewMode } from '../lib/viewMode.js';
@@ -23,7 +24,9 @@
    * Source: Custom; nothing on the top page) is in its path; `query` is the rest, `view` and `photoId` as on Export.
    * With no filter of its own the page is as it was, with the filter row and presets above the cards; with one, the
    * cards and the Cards/Map switch give way to the filter's Species · Photos · Places views (lib/FilterResults), where
-   * photos can be edited, and Export these… opens Export with the same filter and view.
+   * photos can be edited, and Export these… opens Export with the same filter and view. Delete these… (when something
+   * narrows the photos, so one click can never empty the atlas) asks first, then moves every matching photo to
+   * Recently deleted (lib/DeleteTheseDialog).
    * @type {{ id: string, query?: string | null, view?: string, photoId?: number | null, delay?: number }}
    */
   let { id, query = null, view = 'species', photoId = null, delay = 200 } = $props();
@@ -32,6 +35,13 @@
   // The full filter, printed: the page's part and the rest from the address.
   let full = $derived(printFilter(pageFilter(id, query ?? '')));
   let printed = $state('');
+  let count = $state(null);
+  let pending = $state(true);
+  let deleting = $state(false);
+  let deleteButton = $state(null);
+  // Something narrows the photos: never everything (the server refuses that too).
+  let narrows = $derived(printFilter({ ...parseFilter(printed), tagMode: EMPTY.tagMode }) !== '');
+  let canDelete = $derived(!pending && Boolean(count?.photos));
   // A filter's address: on this page while it still has the page's part, else on the top page.
   function resultsHref(text, which) {
     const at = exploreAddress(id, parseFilter(text));
@@ -133,12 +143,20 @@
   {/key}
   <div class="xf">
     <FilterResults query={full} view={filtered ? view : 'species'} photoId={filtered ? photoId : null} {delay} results={filtered} editable
-                   seed={taxon.rank === 'group' || taxon.rank === 'additions' ? null : { taxa: [taxon] }} {resultsHref} {photoHref} bind:printed>
+                   seed={taxon.rank === 'group' || taxon.rank === 'additions' ? null : { taxa: [taxon] }} {resultsHref} {photoHref} bind:printed bind:count bind:pending>
       {#snippet actions()}
         <a class="btn ghost" href={exportHref(printed, view)}>Export these…</a>
+        {#if narrows}
+          <button class="btn ghost" type="button" bind:this={deleteButton} aria-disabled={!canDelete}
+                  onclick={() => { if (canDelete) deleting = true; }}>Delete these…</button>
+        {/if}
       {/snippet}
     </FilterResults>
   </div>
+  {#if deleting && count}
+    <DeleteTheseDialog query={printed} {count} onDone={() => (deleting = false)} onClose={() => (deleting = false)}
+                       returnFocus={() => deleteButton} />
+  {/if}
   {#if filtered}
     <!-- the filter's views are above -->
   {:else if mode === 'map'}
