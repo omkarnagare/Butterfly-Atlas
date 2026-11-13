@@ -4,10 +4,12 @@ import { sharpUrl } from './api.js';
  * Svelte action for an <img> showing a 480 px thumbnail (2026-11-14 design §6): when the image is drawn larger than its
  * thumbnail's pixels on this screen (its size in page pixels × the screen's density, against the thumbnail's own size,
  * as a cropped tile covers it), it asks for the photo's sharp copy (GET /api/photos/{id}/sharp, made and kept on this
- * device) and, once it is there, adds it as the image's `srcset` for this density, so the browser swaps it in when
- * loaded and the thumbnail stays the image's `src` meanwhile. Only an image on screen asks (IntersectionObserver, where
+ * device) and, once it is there, adds it as the image's `srcset` for this density (as an object URL of the answer
+ * read: one download, and no connection left holding an unread answer; revoked when the image changes or goes), so the
+ * browser swaps it in and the thumbnail stays the image's `src`. Only an image on screen asks (IntersectionObserver, where
  * there is one), and only once its real thumbnail has arrived (a placeholder is 1×1). A copy still being made (204 with
- * X-Atlas-Pending) is asked for again after 2, 4, 8, 16 and 32 s; one that can't be made (204 without it), or any
+ * X-Atlas-Pending) is asked for again after 2, 4, 8, 16 and 32 s, then every 30 s while the image is shown (thumbnails
+ * go first, so during an import it can wait a while); one that can't be made (204 without it), or any
  * failure, leaves the thumbnail as it is. At most two copies are asked for at once across the page, so the browser's
  * few connections stay free for thumbnails and the page's own requests. `photo` is `{ id, v }`; another photo starts
  * again.
@@ -17,6 +19,7 @@ const NEEDS = 1.15; // drawn more than 15% larger than the thumbnail's pixels
 const THUMB = 480;
 const TRIES = 5;
 const FIRST_WAIT = 2000;
+const SLOW_WAIT = 30000;
 const PENDING = 'X-Atlas-Pending';
 
 let running = 0;
@@ -54,6 +57,13 @@ export function sharpen(img, photo) {
   let timer = 0;
   let visible = typeof IntersectionObserver !== 'function';
   let asked = false;
+  let objectUrl = null;
+
+  function forgetCopy() {
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+    objectUrl = null;
+    img.removeAttribute('srcset');
+  }
 
   const density = () => (window.devicePixelRatio > 0 ? window.devicePixelRatio : 1);
 
@@ -79,16 +89,20 @@ export function sharpen(img, photo) {
     job = enqueue(async () => {
       if (mine !== generation) return;
       let response;
+      let blob = null;
       try {
         response = await fetch(url);
+        if (response.status === 200) blob = await response.blob();
       } catch {
         return;
       }
       if (mine !== generation) return;
-      if (response.status === 200) {
-        img.setAttribute('srcset', `${url} ${d}x`);
-      } else if (response.status === 204 && response.headers.get(PENDING) && tries < TRIES) {
-        timer = setTimeout(() => ask(tries + 1), FIRST_WAIT * 2 ** tries);
+      if (blob) {
+        forgetCopy();
+        objectUrl = URL.createObjectURL(blob);
+        img.setAttribute('srcset', `${objectUrl} ${d}x`);
+      } else if (response.status === 204 && response.headers.get(PENDING)) {
+        timer = setTimeout(() => ask(tries + 1), tries < TRIES ? FIRST_WAIT * 2 ** tries : SLOW_WAIT);
       }
     });
   }
@@ -119,11 +133,12 @@ export function sharpen(img, photo) {
       stop();
       current = nextPhoto;
       asked = false;
-      img.removeAttribute('srcset');
+      forgetCopy();
       if (img.complete) consider();
     },
     destroy() {
       stop();
+      forgetCopy();
       img.removeEventListener('load', onLoad);
       intersection?.disconnect();
       resize?.disconnect();

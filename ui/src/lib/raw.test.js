@@ -110,3 +110,11 @@ test('the exported line counts RAW and HEIC photos (contract §1)', () => {
   expect(exactExportedLine(12, undefined)).toBe('12 RAW photos exported with their location.');
   expect(exactExportedLine(0, 0)).toBe('');
 });
+
+test('HEIC and TIFF photos tell the viewer their display copy is 2560 px on its long side (fitted at that size from the start)', () => {
+  expect(viewerProps({ fileType: 'tiff', rawPreview: null, unreadable: false })).toEqual({ shownLong: 2560 });
+  expect(viewerProps({ fileType: 'heic', rawPreview: null, unreadable: false }, { state: 'available' })).toMatchObject({ explain: true, shownLong: 2560 });
+  // one that can't be shown loads nothing, so it has no display size
+  expect(viewerProps({ fileType: 'heic', rawPreview: null, unreadable: true }, { state: 'available' })).not.toHaveProperty('shownLong');
+  expect(viewerProps({ fileType: 'tiff', rawPreview: null, unreadable: true })).not.toHaveProperty('shownLong');
+});

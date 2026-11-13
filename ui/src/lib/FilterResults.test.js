@@ -219,3 +219,18 @@ test('a view that fails to load replaces the old one with its problem and Try ag
   expect(await screen.findByRole('button', { name: 'Try again' })).toBeTruthy();
   expect(container.querySelector('.flist')).toBeNull();
 });
+
+test('back to Photos before Places has answered: the photos on screen stay until their new first page comes', async () => {
+  const { container, rerender } = render(FilterResults, { query: 'tags=female', view: 'photos', delay: 0, resultsHref, photoHref });
+  await vi.waitFor(() => expect(container.querySelectorAll('.fgrid a')).toHaveLength(2));
+
+  filterPlaces.mockReturnValue(new Promise(() => {}));
+  await rerender({ query: 'tags=female', view: 'places' });
+  const page = deferred();
+  filterPhotos.mockReturnValue(page.promise);
+  await rerender({ query: 'tags=female', view: 'photos' });
+
+  expect(container.querySelectorAll('.fgrid a')).toHaveLength(2);
+  page.resolve({ photos: [photo(3)], next: null });
+  await vi.waitFor(() => expect(container.querySelectorAll('.fgrid a')).toHaveLength(1));
+});

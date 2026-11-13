@@ -228,8 +228,9 @@
     if (which === 'species') speciesLive.ask(query, { now: keepShown });
     else if (which === 'places') placesLive.ask(query, { now: keepShown });
     else if (keepShown) {
+      // The photos already on screen (back to Photos before another view answered) stay until the first page comes.
       pages.forget();
-      loadPhotos(true);
+      pages.load(query, true, { keep: onScreen === 'photos' });
     } else {
       pages.forget();
       photoTimer = setTimeout(() => loadPhotos(true), wait);

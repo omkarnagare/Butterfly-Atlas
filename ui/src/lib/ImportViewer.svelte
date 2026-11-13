@@ -117,7 +117,7 @@
       {#if viewable}
         {#key viewed.id}
           <ZoomPan bind:this={zoompan} src={importDisplayUrl(importId, viewed)} placeholder={preview} width={viewed.width} height={viewed.height} alt={viewed.name} onSwipe={go}
-                   loadingNote="Loading the photo…"
+                   loadingNote="Loading the photo…" offerRetry={false}
                    {...shown} failedNote={shown.broken ? shown.failedNote : MOVED_NOTE} />
         {/key}
       {:else}

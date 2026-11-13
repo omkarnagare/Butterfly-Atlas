@@ -22,11 +22,15 @@
    * image actually loaded, once it has, over the screen's density), so a small photo or a small RAW preview is not
    * stretched; zoom still goes further. Until the full size comes the note says "Loading full size…" on the photo (the
    * caller's `loadingNote` when given); if it has not come after 10 s, or failed after its retries, Try again asks for
-   * it afresh (not for a photo the caller knows is `broken`, nor a refusal the server explained as not busy).
+   * it afresh (not for a photo the caller knows is `broken`, nor a refusal the server explained as not busy; and not at
+   * all with `offerRetry` false, the import viewer, whose previews keep their own loading). `shownLong`: the long side
+   * of the display copy when it is smaller than the photo (HEIC and TIFF: 2560), so the photo is fitted at that size
+   * from the start and does not shrink when the copy arrives.
    */
   let {
     src, placeholder, width, height, alt = '', onSwipe = () => {}, loadingNote = 'Loading full size…',
     failedNote = 'This photo could not be opened at full size; showing a preview.', broken = false, orientation = 1, explain = false,
+    shownLong = 0, offerRetry = true,
   } = $props();
 
   let stageEl = $state(null);
@@ -56,8 +60,14 @@
 
   // Without a size from the library, the loaded image's own size is used (turned, when it is shown turned).
   let quarter = $derived(turned(orientation));
+  // The library's size, made no bigger than the display copy when that is known to be smaller.
+  let expected = $derived.by(() => {
+    if (!width || !height) return null;
+    const k = shownLong > 0 ? Math.min(1, shownLong / Math.max(width, height)) : 1;
+    return { w: Math.round(width * k), h: Math.round(height * k) };
+  });
   let natural = $derived(loaded && seen.w ? (quarter ? { w: seen.h, h: seen.w } : seen)
-    : width && height ? { w: width, h: height } : seen.w ? (quarter ? { w: seen.h, h: seen.w } : seen) : { w: 1600, h: 1200 });
+    : expected ?? (seen.w ? (quarter ? { w: seen.h, h: seen.w } : seen) : { w: 1600, h: 1200 }));
   // The photo's size in page pixels at one photo pixel per screen pixel: the most it is drawn at when fitted.
   let capped = $derived({ w: natural.w / density, h: natural.h / density });
   // The address as a value (see the new-photo effect below).
@@ -66,7 +76,7 @@
   let stage = $derived({ w: stageW, h: stageH });
   let fit = $derived(fitSize(capped, stage));
   // Zoom goes as deep as before (4×, or the photo's own pixels at one per page pixel).
-  let max = $derived(maxScale(natural, fit));
+  let max = $derived(maxScale(width && height ? { w: width, h: height } : natural, fit));
   let placed = $derived(placement(view, fit));
   let gone = $derived(broken || failed);
   // A quarter turn lays the image out at the frame's height by its width, centred, then turns it.
@@ -307,5 +317,5 @@
     {/if}
   </div>
   <p class={gone || (loadingNote && !loaded) ? 'zp-note' : 'sr-only'} role="status">{gone ? why?.message || failedNote : !loaded ? loadingNote : ''}</p>
-  {#if !broken && ((failed && (!why || why.busy)) || (slow && !loaded && !failed))}<button class="btn ghost zp-again" type="button" onclick={tryAgain}>Try again</button>{/if}
+  {#if offerRetry ? !broken && ((failed && (!why || why.busy)) || (slow && !loaded && !failed)) : gone && why?.busy}<button class="btn ghost zp-again" type="button" onclick={tryAgain}>Try again</button>{/if}
 </div>

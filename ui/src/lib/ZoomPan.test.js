@@ -347,3 +347,36 @@ test('the same photo given again (the page read its photos again) keeps the full
   expect(screen.getByRole('status').textContent).toBe('');
   expect(scaleOf(container)).toBeGreaterThan(1);
 });
+
+test('a photo whose display copy is smaller than the photo (HEIC, TIFF: 2560 px) is fitted at that size from the start, so it does not shrink when the copy arrives', async () => {
+  screenDensity(2);
+  try {
+    const { container } = render(ZoomPan, { ...props, width: 8000, height: 6000, shownLong: 2560 });
+    const stage = container.querySelector('.zp');
+    Object.defineProperty(stage, 'clientWidth', { value: 1600 });
+    Object.defineProperty(stage, 'clientHeight', { value: 1200 });
+    window.dispatchEvent(new Event('resize'));
+    const photo = container.querySelector('.zp-photo');
+    await vi.waitFor(() => expect(photo.style.width).toBe('1280px'));
+    const original = container.querySelector('img.orig');
+    Object.defineProperty(original, 'naturalWidth', { value: 2560 });
+    Object.defineProperty(original, 'naturalHeight', { value: 1920 });
+    await fireEvent.load(original);
+    expect(photo.style.width).toBe('1280px');
+  } finally {
+    screenDensity(1);
+  }
+});
+
+test('the import viewer keeps its own loading: no Try again after 10 s, nor for a preview that could not be loaded', async () => {
+  vi.useFakeTimers();
+  const { container } = render(ZoomPan, { ...props, loadingNote: 'Loading the photo…', offerRetry: false });
+  await vi.advanceTimersByTimeAsync(10000);
+  expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+  await fireEvent.error(container.querySelector('img.orig'));
+  await vi.advanceTimersByTimeAsync(2000);
+  await fireEvent.error(container.querySelector('img.orig'));
+  await vi.advanceTimersByTimeAsync(4000);
+  await fireEvent.error(container.querySelector('img.orig'));
+  expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+});

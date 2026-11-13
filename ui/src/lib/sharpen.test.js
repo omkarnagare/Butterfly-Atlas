@@ -13,13 +13,20 @@ function tile({ w = 300, h = 300, nw = 480, nh = 320, density = 2 } = {}) {
   document.body.append(img);
   return img;
 }
-const answer = (status, pending = false) => ({ status, ok: status === 200, headers: { get: (name) => (pending && name === 'X-Atlas-Pending' ? '1' : null) } });
+const answer = (status, pending = false) => ({
+  status, ok: status === 200, headers: { get: (name) => (pending && name === 'X-Atlas-Pending' ? '1' : null) },
+  blob: async () => new Blob(['jpeg'], { type: 'image/jpeg' }),
+});
+let urls = 0;
 const photo = { id: 7, v: 'k' };
 
 beforeEach(() => {
   vi.useFakeTimers();
   resetSharpen();
   global.fetch = vi.fn();
+  urls = 0;
+  URL.createObjectURL = vi.fn(() => `blob:sharp-${++urls}`);
+  URL.revokeObjectURL = vi.fn();
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -33,7 +40,8 @@ test('a tile that needs more pixels than its thumbnail has asks for the sharp co
   sharpen(img, photo);
   await vi.advanceTimersByTimeAsync(0);
   expect(fetch).toHaveBeenCalledWith('./api/photos/7/sharp?v=k');
-  expect(img.getAttribute('srcset')).toBe('./api/photos/7/sharp?v=k 2x');
+  // the copy fetched is the copy shown: read once, no second download, no connection left holding an unread answer
+  expect(img.getAttribute('srcset')).toBe('blob:sharp-1 2x');
   // the thumbnail stays the image's own address
   expect(img.getAttribute('src')).toBe('./api/photos/7/thumb?v=k');
 });
@@ -63,7 +71,7 @@ test('a copy still being made is asked for again, with longer and longer waits; 
   expect(fetch).toHaveBeenCalledTimes(2);
   await vi.advanceTimersByTimeAsync(1);
   expect(fetch).toHaveBeenCalledTimes(3);
-  expect(img.getAttribute('srcset')).toBe('./api/photos/7/sharp?v=k 2x');
+  expect(img.getAttribute('srcset')).toBe('blob:sharp-1 2x');
 
   fetch.mockReset();
   fetch.mockResolvedValue(answer(204));
@@ -72,6 +80,22 @@ test('a copy still being made is asked for again, with longer and longer waits; 
   await vi.advanceTimersByTimeAsync(60000);
   expect(fetch).toHaveBeenCalledTimes(1);
   expect(other.hasAttribute('srcset')).toBe(false);
+});
+
+test('a copy still pending after the quick tries (thumbnails being made, an import) is asked for every 30 s while shown', async () => {
+  fetch.mockResolvedValue(answer(204, true));
+  const img = tile();
+  sharpen(img, photo);
+  await vi.advanceTimersByTimeAsync(0);
+  await vi.advanceTimersByTimeAsync(2000 + 4000 + 8000 + 16000 + 32000);
+  expect(fetch).toHaveBeenCalledTimes(6);
+  await vi.advanceTimersByTimeAsync(30000);
+  expect(fetch).toHaveBeenCalledTimes(7);
+  fetch.mockResolvedValue(answer(200));
+  await vi.advanceTimersByTimeAsync(30000);
+  expect(img.getAttribute('srcset')).toBe('blob:sharp-1 2x');
+  await vi.advanceTimersByTimeAsync(90000);
+  expect(fetch).toHaveBeenCalledTimes(8);
 });
 
 test('at most two copies are asked for at once, so thumbnails and the page are never kept waiting', async () => {
@@ -92,8 +116,11 @@ test('another photo in the same image drops the old copy and starts again; a des
   await vi.advanceTimersByTimeAsync(0);
   action.update({ id: 9, v: 'q' });
   expect(img.hasAttribute('srcset')).toBe(false);
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:sharp-1');
   await vi.advanceTimersByTimeAsync(0);
-  expect(img.getAttribute('srcset')).toBe('./api/photos/9/sharp?v=q 2x');
+  expect(img.getAttribute('srcset')).toBe('blob:sharp-2 2x');
+  action.destroy();
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:sharp-2');
 
   fetch.mockReset();
   fetch.mockResolvedValue(answer(204, true));
