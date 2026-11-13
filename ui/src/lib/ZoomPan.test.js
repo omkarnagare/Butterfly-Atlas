@@ -329,3 +329,21 @@ test('a photo the caller knows cannot be shown offers no Try again', () => {
   render(ZoomPan, { ...props, broken: true, failedNote: 'This RAW photo has no preview.' });
   expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
 });
+
+test('the same photo given again (the page read its photos again) keeps the full size shown and the zoom, not back to the stretched preview', async () => {
+  const { default: ZoomPanSpread } = await import('./testing/ZoomPanSpread.svelte');
+  const photo = { id: 12, width: 4000, height: 3000, alt: 'Plain Tiger' };
+  const { container, rerender } = render(ZoomPanSpread, { photo });
+  stageOf(container);
+  const original = container.querySelector('img.orig');
+  await fireEvent.load(original);
+  expect(original.classList.contains('on')).toBe(true);
+  await fireEvent.dblClick(container.querySelector('.zp'), { clientX: 500, clientY: 400 });
+  expect(scaleOf(container)).toBeGreaterThan(1);
+
+  await rerender({ photo: { ...photo } });
+
+  expect(container.querySelector('img.orig').classList.contains('on')).toBe(true);
+  expect(screen.getByRole('status').textContent).toBe('');
+  expect(scaleOf(container)).toBeGreaterThan(1);
+});

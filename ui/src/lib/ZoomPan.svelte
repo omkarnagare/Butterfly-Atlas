@@ -60,7 +60,9 @@
     : width && height ? { w: width, h: height } : seen.w ? (quarter ? { w: seen.h, h: seen.w } : seen) : { w: 1600, h: 1200 });
   // The photo's size in page pixels at one photo pixel per screen pixel: the most it is drawn at when fitted.
   let capped = $derived({ w: natural.w / density, h: natural.h / density });
-  let shownSrc = $derived(attempt ? `${src}${src.includes('?') ? '&' : '?'}retry=${attempt}` : src);
+  // The address as a value (see the new-photo effect below).
+  let address = $derived(src);
+  let shownSrc = $derived(attempt ? `${address}${address.includes('?') ? '&' : '?'}retry=${attempt}` : address);
   let stage = $derived({ w: stageW, h: stageH });
   let fit = $derived(fitSize(capped, stage));
   // Zoom goes as deep as before (4×, or the photo's own pixels at one per page pixel).
@@ -75,9 +77,11 @@
     return `inset:auto;left:50%;top:50%;width:${placed.h}px;height:${placed.w}px;transform:translate(-50%, -50%) ${turn}`;
   });
 
-  // A new photo starts fitted, with its full-size image still to load.
+  // A new photo starts fitted, with its full-size image still to load. The address as a value: new props with the same
+  // photo (spread in by the viewers, given again when the page reads its photos again) are not a new photo, else the
+  // full size went back behind the stretched preview, with no new load to bring it back, and the zoom was lost.
   $effect(() => {
-    src;
+    address;
     untrack(() => {
       view = { ...FIT };
       loaded = false;
